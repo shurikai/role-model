@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-06-10T14:23:00Z",
+  "application_id": "uuid",
+  "resume_version_id": "uuid",
+
+  "identity": {
+    "name": "Jason Goodwin",
+    "email": "jason@example.com",
+    "phone": "555-555-5555",
+    "location": "Orlando, FL",
+    "linkedin_url": "https://linkedin.com/in/shurikai",
+    "github_url": "https://github.com/shurikai",
+    "site_url": "https://jgoodwin.dev",
+    "headline": "Staff Backend Engineer, Distributed Systems"
+  },
+
+  "summary": "Targeted prose summary, generated fresh per application.",
+
+  "experience": [
+    {
+      "employer": "Meridian Defense",
+      "positions": [
+        {
+          "position_id": "uuid",
+          "title": "Senior Member of Technical Staff",
+          "industry_level": "staff",
+          "started_on": "2012-03",
+          "ended_on": "2018-06",
+          "bullets": [
+            {
+              "text": "Designed and implemented a distributed telemetry pipeline...",
+              "contribution_ids": ["uuid", "uuid"],
+              "feedback_signal": "accepted"
+            },
+            {
+              "text": "Led a team of six engineers...",
+              "contribution_ids": ["uuid"],
+              "feedback_signal": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "skills": {
+    "Languages": ["Go", "Java", "Python", "C++"],
+    "Platforms": ["AWS", "Kubernetes", "PostgreSQL"],
+    "Observability": ["OpenTelemetry", "Grafana", "Prometheus", "Jaeger"],
+    "Methodologies": ["Event-driven architecture", "Distributed systems", "TDD"]
+  },
+
+  "education": [
+    {
+      "institution": "University of Central Florida",
+      "degree": "B.S.",
+      "field_of_study": "Computer Science",
+      "graduated": "2001"
+    }
+  ],
+
+  "credentials": [
+    {
+      "name": "AWS Certified Solutions Architect",
+      "issuer": "Amazon Web Services",
+      "issued_on": "2023-04",
+      "expires_on": "2026-04"
+    }
+  ],
+
+  "projects": [],
+
+  "meta": {
+    "target_role": "Staff Software Engineer, Open Source Server",
+    "target_company": "Temporal Technologies",
+    "jd_signals": {
+      "priority_skills": ["Go", "distributed systems", "workflow orchestration"],
+      "seniority": "staff",
+      "domain_vocabulary": ["durable execution", "task queues", "workers"]
+    },
+    "generation_model": "claude-sonnet-4-20250514",
+    "prompt_version": "v1.2"
+  }
+}
