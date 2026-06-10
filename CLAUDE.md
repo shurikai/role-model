@@ -10,7 +10,7 @@ Designed with a clear path to multi-tenant deployment without requiring
 a schema redesign.
 
 ## Status
-Early development. Schema and JSON contract are defined. Service not yet built.
+Early development. Schema, JSON contract, and project skeleton are defined. Business logic not yet implemented.
 
 ## Stack
 - **Language:** Go
@@ -58,6 +58,7 @@ so every generated resume can be traced back to the exact prompt that produced i
 /experiments         — Python scripts for prompt development (not part of build)
 
 ## Key Files
+- /CLAUDE.md                 — project instructions and conventions (this file)
 - /schema/resume.v1.json     — intermediate resume JSON schema (source of truth)
 - /migrations/               — database migrations (source of truth for schema)
 - /prompts/                  — LLM prompt templates
