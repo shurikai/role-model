@@ -23,7 +23,9 @@ func main() {
 	}
 	defer pool.Close()
 
-	router := api.NewRouter(pool)
+	queries := db.New(pool)
+
+	router := api.NewRouter(pool, queries)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
