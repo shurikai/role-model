@@ -16,3 +16,15 @@ sql:
             go_type: "github.com/google/uuid.UUID"
           - db_type: "timestamptz"
             go_type: "time.Time"
+          - column: "applications.jd_signals"
+            go_type:
+              import: "encoding/json"
+              package: "json"
+              type: "RawMessage"
+              pointer: true
+          - column: "resume_versions.generation_params"
+            go_type: {import: "encoding/json", package: "json", type: "RawMessage", pointer: true}
+          - column: "resume_versions.structured_output"
+            go_type: {import: "encoding/json", package: "json", type: "RawMessage", pointer: true}
+          - column: "contribution_feedback.edited_deltas"
+            go_type: {import: "encoding/json", package: "json", type: "RawMessage", pointer: true}

@@ -6,9 +6,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shurikai/role-model/internal/api/handlers"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/generation"
 )
 
-func NewRouter(pool *pgxpool.Pool, queries *db.Queries) *chi.Mux {
+func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genClient *generation.Client) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -34,6 +35,9 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries) *chi.Mux {
 		r.Post("/applications", applicationHandler.Create)
 		r.Get("/applications/{id}", applicationHandler.Get)
 		r.Patch("/applications/{id}", applicationHandler.Update)
+
+		generationHandler := handlers.NewGenerationHandler(queries, genClient)
+		r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
 	})
 
 	return r
