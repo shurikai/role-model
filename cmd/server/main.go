@@ -12,6 +12,7 @@ import (
 	"github.com/shurikai/role-model/internal/api"
 	"github.com/shurikai/role-model/internal/config"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/generation"
 )
 
 func main() {
@@ -25,7 +26,8 @@ func main() {
 
 	queries := db.New(pool)
 
-	router := api.NewRouter(pool, queries)
+	genClient := generation.NewClient(cfg.AnthropicAPIKey)
+	router := api.NewRouter(pool, queries, genClient)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

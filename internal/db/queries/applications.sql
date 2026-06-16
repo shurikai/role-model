@@ -26,3 +26,10 @@ SET company_name = $3,
     updated_at   = now()
 WHERE id = $1 AND user_id = $2
 RETURNING *;
+
+-- name: UpdateApplicationSignals :one
+UPDATE applications
+SET jd_signals = $3,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING *;
