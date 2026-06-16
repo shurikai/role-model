@@ -4,7 +4,7 @@ export
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc
 
 # Build
 all: build
@@ -50,3 +50,7 @@ seed:
 		psql "$(DATABASE_URL)" -f "$$f" || exit 1; \
 	done
 	@echo "Done."
+
+sqlc:
+	sqlc generate
+
