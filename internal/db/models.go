@@ -5,25 +5,27 @@
 package db
 
 import (
+	"encoding/json"
 	"time"
 
+	json "encoding/json"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Application struct {
-	ID          uuid.UUID   `json:"id"`
-	UserID      uuid.UUID   `json:"user_id"`
-	CompanyName string      `json:"company_name"`
-	RoleTitle   string      `json:"role_title"`
-	JdUrl       *string     `json:"jd_url"`
-	JdText      *string     `json:"jd_text"`
-	JdSignals   []byte      `json:"jd_signals"`
-	Status      string      `json:"status"`
-	AppliedOn   pgtype.Date `json:"applied_on"`
-	Notes       *string     `json:"notes"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
+	ID          uuid.UUID        `json:"id"`
+	UserID      uuid.UUID        `json:"user_id"`
+	CompanyName string           `json:"company_name"`
+	RoleTitle   string           `json:"role_title"`
+	JdUrl       *string          `json:"jd_url"`
+	JdText      *string          `json:"jd_text"`
+	JdSignals   *json.RawMessage `json:"jd_signals"`
+	Status      string           `json:"status"`
+	AppliedOn   pgtype.Date      `json:"applied_on"`
+	Notes       *string          `json:"notes"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
 type Contribution struct {

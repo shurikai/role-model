@@ -7,7 +7,9 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 
+	json "encoding/json"
 	"github.com/google/uuid"
 )
 
@@ -162,6 +164,40 @@ func (q *Queries) UpdateApplication(ctx context.Context, arg UpdateApplicationPa
 		arg.Status,
 		arg.Notes,
 	)
+	var i Application
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.CompanyName,
+		&i.RoleTitle,
+		&i.JdUrl,
+		&i.JdText,
+		&i.JdSignals,
+		&i.Status,
+		&i.AppliedOn,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateApplicationSignals = `-- name: UpdateApplicationSignals :one
+UPDATE applications
+SET jd_signals = $3,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, company_name, role_title, jd_url, jd_text, jd_signals, status, applied_on, notes, created_at, updated_at
+`
+
+type UpdateApplicationSignalsParams struct {
+	ID        uuid.UUID        `json:"id"`
+	UserID    uuid.UUID        `json:"user_id"`
+	JdSignals *json.RawMessage `json:"jd_signals"`
+}
+
+func (q *Queries) UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error) {
+	row := q.db.QueryRow(ctx, updateApplicationSignals, arg.ID, arg.UserID, arg.JdSignals)
 	var i Application
 	err := row.Scan(
 		&i.ID,

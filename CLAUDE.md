@@ -19,7 +19,7 @@ Early development. Schema, JSON contract, and project skeleton are defined. Busi
 - **Query generation:** sqlc
 - **Migrations:** golang-migrate
 - **LLM:** Anthropic API via official Go SDK
-- **Prompt storage:** /prompts directory, embedded via go:embed
+- **Prompt storage:** internal/generation/prompts directory, embedded via go:embed
 - **Prompt templating:** text/template
 - **JSON schema validation:** santhosh-tekuri/jsonschema
 

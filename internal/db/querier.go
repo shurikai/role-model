@@ -21,6 +21,7 @@ type Querier interface {
 	GetPositionsByEmployer(ctx context.Context, arg GetPositionsByEmployerParams) ([]Position, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
+	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 }
 
 var _ Querier = (*Queries)(nil)
