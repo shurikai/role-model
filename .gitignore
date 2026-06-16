@@ -28,6 +28,8 @@ go.work.sum
 .env
 *.local
 
+database/seed
+
 # Editor/IDE
 # .idea/
 # .vscode/
