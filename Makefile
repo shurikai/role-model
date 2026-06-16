@@ -4,7 +4,7 @@ export
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run
 
 # Build
 all: build
@@ -54,3 +54,5 @@ seed:
 sqlc:
 	sqlc generate
 
+run:
+	go run ./cmd/server
