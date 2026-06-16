@@ -11,8 +11,12 @@ import (
 )
 
 type Querier interface {
+	GetContribution(ctx context.Context, arg GetContributionParams) (Contribution, error)
+	GetContributionsByPosition(ctx context.Context, arg GetContributionsByPositionParams) ([]Contribution, error)
 	GetEmployer(ctx context.Context, arg GetEmployerParams) (Employer, error)
 	GetEmployers(ctx context.Context, userID uuid.UUID) ([]Employer, error)
+	GetPosition(ctx context.Context, arg GetPositionParams) (Position, error)
+	GetPositionsByEmployer(ctx context.Context, arg GetPositionsByEmployerParams) ([]Position, error)
 }
 
 var _ Querier = (*Queries)(nil)
