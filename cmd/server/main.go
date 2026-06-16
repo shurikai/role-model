@@ -17,9 +17,9 @@ import (
 func main() {
 	cfg := config.Load()
 
-	pool, err := db.New(context.Background(), cfg)
+	pool, err := db.NewPool(context.Background(), &cfg)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatal(err)
 	}
 	defer pool.Close()
 

@@ -12,7 +12,8 @@ func NewRouter(pool *pgxpool.Pool) *chi.Mux {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/health", handlers.Health)
+	health := handlers.NewHealthHandler(pool)
+	r.Get("/health", health.Health)
 
 	return r
 }
