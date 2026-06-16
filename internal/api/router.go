@@ -20,6 +20,14 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries) *chi.Mux {
 		employerHandler := handlers.NewEmployerHandler(queries)
 		r.Get("/employers", employerHandler.List)
 		r.Get("/employers/{id}", employerHandler.Get)
+
+		positionHandler := handlers.NewPositionHandler(queries)
+		r.Get("/employers/{employerID}/positions", positionHandler.ListByEmployer)
+		r.Get("/positions/{id}", positionHandler.Get)
+
+		contributionHandler := handlers.NewContributionHandler(queries)
+		r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
+		r.Get("/contributions/{id}", contributionHandler.Get)
 	})
 
 	return r
