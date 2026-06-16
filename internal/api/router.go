@@ -28,6 +28,12 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries) *chi.Mux {
 		contributionHandler := handlers.NewContributionHandler(queries)
 		r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
 		r.Get("/contributions/{id}", contributionHandler.Get)
+
+		applicationHandler := handlers.NewApplicationHandler(queries)
+		r.Get("/applications", applicationHandler.List)
+		r.Post("/applications", applicationHandler.Create)
+		r.Get("/applications/{id}", applicationHandler.Get)
+		r.Patch("/applications/{id}", applicationHandler.Update)
 	})
 
 	return r
