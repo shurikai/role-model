@@ -33,5 +33,4 @@ database/seed
 # Editor/IDE
 # .idea/
 # .vscode/
-.env.example
 .DS_Store
