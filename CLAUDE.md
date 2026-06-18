@@ -80,6 +80,12 @@ so every generated resume can be traced back to the exact prompt that produced i
   linking back to source contributions
 - Feedback is scoped per resume version, not per contribution globally
 
+## GitHub Issues
+
+This project uses `gh` (GitHub CLI) for issue tracking. The `gh` agent skill is installed
+(`gh skill install cli/cli gh --scope user`) and should be used for any issue or PR interaction
+rather than constructing raw `gh api` calls from scratch.
+
 ## API Design
 - REST
 - JSON request/response
@@ -94,6 +100,17 @@ so every generated resume can be traced back to the exact prompt that produced i
 - Errors returned as structured JSON: { "error": "message", "code": "slug" }
 - All handlers receive a context, all DB calls respect context cancellation
 - Config via environment variables, loaded at startup into a typed Config struct
+- Check `gh issue list` at the start of a session if no specific task was given, rather than
+  assuming there's nothing queued.
+- Reference issues in commit messages: `Refs #N` for related work, `Closes #N` only when the
+  fix is verified working (tests pass, manually confirmed where relevant) — not just written.
+- Do not close an issue automatically as part of a larger task unless explicitly asked. Surface
+  "this looks like it resolves #N" and let the human confirm before closing.
+- Labels in use: `stage-2`, `renderer`, `infra`, `discovery-worker` — apply the existing label
+  rather than inventing a new one; ask if a new label seems warranted.
+- Issues are the source of truth for *what's planned*; this file remains the source of truth for
+  *how to build it* (stack, conventions, the Do Not list below). Don't duplicate task lists here
+  that belong in Issues.
 
 ## Do Not
 - Use an ORM
@@ -104,6 +121,11 @@ so every generated resume can be traced back to the exact prompt that produced i
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
 - Invent prompt improvements — prompts live in /prompts and are versioned explicitly
+- Open new issues unprompted during a session focused on something else. If you notice
+  unrelated work that should be tracked, mention it and let the human decide whether to file it.
+- Use the `claude-code-action` GitHub App or any webhook-triggered automation in this
+  repo. All `gh` usage here is interactive, inside a human-initiated session — no autonomous
+  issue-triggered runs.
 
 ## Open Questions
 - Blob storage interface for rendered documents (local disk now, S3 later)
