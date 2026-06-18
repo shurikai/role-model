@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"time"
 
-	json "encoding/json"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -42,16 +41,16 @@ type Contribution struct {
 }
 
 type ContributionFeedback struct {
-	ID              uuid.UUID `json:"id"`
-	UserID          uuid.UUID `json:"user_id"`
-	ContributionID  uuid.UUID `json:"contribution_id"`
-	ResumeVersionID uuid.UUID `json:"resume_version_id"`
-	AcceptedBullets []string  `json:"accepted_bullets"`
-	RejectedBullets []string  `json:"rejected_bullets"`
-	EditedDeltas    []byte    `json:"edited_deltas"`
-	Notes           *string   `json:"notes"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              uuid.UUID        `json:"id"`
+	UserID          uuid.UUID        `json:"user_id"`
+	ContributionID  uuid.UUID        `json:"contribution_id"`
+	ResumeVersionID uuid.UUID        `json:"resume_version_id"`
+	AcceptedBullets []string         `json:"accepted_bullets"`
+	RejectedBullets []string         `json:"rejected_bullets"`
+	EditedDeltas    *json.RawMessage `json:"edited_deltas"`
+	Notes           *string          `json:"notes"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
 }
 
 type ContributionTag struct {
@@ -118,6 +117,7 @@ type Position struct {
 	SortOrder        int32       `json:"sort_order"`
 	CreatedAt        time.Time   `json:"created_at"`
 	UpdatedAt        time.Time   `json:"updated_at"`
+	Location         *string     `json:"location"`
 }
 
 type Project struct {
@@ -149,15 +149,15 @@ type ProjectTag struct {
 }
 
 type ResumeVersion struct {
-	ID               uuid.UUID `json:"id"`
-	UserID           uuid.UUID `json:"user_id"`
-	ApplicationID    uuid.UUID `json:"application_id"`
-	VersionNumber    int32     `json:"version_number"`
-	GenerationParams []byte    `json:"generation_params"`
-	StructuredOutput []byte    `json:"structured_output"`
-	GenerationNotes  *string   `json:"generation_notes"`
-	Submitted        bool      `json:"submitted"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID               uuid.UUID        `json:"id"`
+	UserID           uuid.UUID        `json:"user_id"`
+	ApplicationID    uuid.UUID        `json:"application_id"`
+	VersionNumber    int32            `json:"version_number"`
+	GenerationParams *json.RawMessage `json:"generation_params"`
+	StructuredOutput *json.RawMessage `json:"structured_output"`
+	GenerationNotes  *string          `json:"generation_notes"`
+	Submitted        bool             `json:"submitted"`
+	CreatedAt        time.Time        `json:"created_at"`
 }
 
 type Tag struct {
