@@ -19,6 +19,7 @@ type Querier interface {
 	GetEmployers(ctx context.Context, userID uuid.UUID) ([]Employer, error)
 	GetPosition(ctx context.Context, arg GetPositionParams) (Position, error)
 	GetPositionsByEmployer(ctx context.Context, arg GetPositionsByEmployerParams) ([]Position, error)
+	GetTagsByContribution(ctx context.Context, arg GetTagsByContributionParams) ([]GetTagsByContributionRow, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
