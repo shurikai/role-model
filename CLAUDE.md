@@ -10,7 +10,7 @@ Designed with a clear path to multi-tenant deployment without requiring
 a schema redesign.
 
 ## Status
-Early development. Schema, JSON contract, and project skeleton are defined. Business logic not yet implemented.
+Active development. Core API endpoints are implemented: employer/position/contribution reads, application CRUD, and JD signal extraction via Anthropic. Resume generation pipeline is wired. Renderer is not yet built.
 
 ## Stack
 - **Language:** Go
@@ -42,26 +42,28 @@ using python-docx, communicating with the Go service over HTTP.
 The Go service owns generation; the renderer owns document output.
 
 ### Prompt management
-Prompts are versioned files in /prompts, embedded into the binary at compile
-time via go:embed. Prompt version is recorded in resume_versions.generation_params
-so every generated resume can be traced back to the exact prompt that produced it.
+Prompts are versioned files in /internal/generation/prompts, embedded into the
+binary at compile time via go:embed. Prompt version is recorded in
+resume_versions.generation_params so every generated resume can be traced back
+to the exact prompt that produced it.
 
 ## Project Structure
-/cmd/server          — main entry point
-/internal/api        — HTTP handlers
-/internal/db         — sqlc generated code
-/internal/generation — LLM pipeline (signal extraction + resume generation)
-/internal/renderer   — intermediate JSON -> output format
-/migrations          — golang-migrate SQL migration files
-/prompts             — LLM prompt template files
-/schema              — JSON schema documents
-/experiments         — Python scripts for prompt development (not part of build)
+/cmd/server                      — main entry point
+/internal/api/handlers           — HTTP handlers
+/internal/config                 — environment-based config loading
+/internal/db                     — sqlc generated code
+/internal/generation             — LLM pipeline (signal extraction + resume generation)
+/internal/generation/prompts     — LLM prompt template files (embedded at compile time)
+/internal/renderer               — intermediate JSON -> output format
+/database/seed                   — seed SQL scripts
+/migrations                      — golang-migrate SQL migration files
+/schema                          — JSON schema documents
 
 ## Key Files
 - /CLAUDE.md                 — project instructions and conventions (this file)
 - /schema/resume.v1.json     — intermediate resume JSON schema (source of truth)
 - /migrations/               — database migrations (source of truth for schema)
-- /prompts/                  — LLM prompt templates
+- /internal/generation/prompts/ — LLM prompt templates
 
 ## Data Model Decisions
 - UUIDs for all primary keys, client-generated
