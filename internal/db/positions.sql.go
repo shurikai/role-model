@@ -12,7 +12,7 @@ import (
 )
 
 const getPosition = `-- name: GetPosition :one
-SELECT id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at FROM positions
+SELECT id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at, location FROM positions
 WHERE id = $1 AND user_id = $2
 `
 
@@ -38,12 +38,13 @@ func (q *Queries) GetPosition(ctx context.Context, arg GetPositionParams) (Posit
 		&i.SortOrder,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Location,
 	)
 	return i, err
 }
 
 const getPositionsByEmployer = `-- name: GetPositionsByEmployer :many
-SELECT id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at FROM positions
+SELECT id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at, location FROM positions
 WHERE employer_id = $1 AND user_id = $2
 ORDER BY sort_order, started_on DESC
 `
@@ -76,6 +77,7 @@ func (q *Queries) GetPositionsByEmployer(ctx context.Context, arg GetPositionsBy
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Location,
 		); err != nil {
 			return nil, err
 		}
