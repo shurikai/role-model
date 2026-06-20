@@ -19,6 +19,6 @@ type errorResponse struct {
 	Code  string `json:"code"`
 }
 
-func writeError(w http.ResponseWriter, status int, code, message string) {
+func WriteError(w http.ResponseWriter, status int, code, message string) {
 	writeJSON(w, status, errorResponse{Error: message, Code: code})
 }
