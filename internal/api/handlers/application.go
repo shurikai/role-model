@@ -41,7 +41,7 @@ type updateApplicationRequest struct {
 func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
 	apps, err := h.queries.ListApplications(r.Context(), stubUserID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch applications")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch applications")
 		return
 	}
 	writeJSON(w, http.StatusOK, apps)
@@ -50,7 +50,7 @@ func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -60,10 +60,10 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "application not found")
+			WriteError(w, http.StatusNotFound, "not_found", "application not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
 		return
 	}
 	writeJSON(w, http.StatusOK, app)
@@ -76,7 +76,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.CompanyName == "" || req.RoleTitle == "" {
-		writeError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
+		WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
 		return
 	}
 	if req.Status == "" {
@@ -93,7 +93,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Notes:       req.Notes,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to create application")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create application")
 		return
 	}
 	writeJSON(w, http.StatusCreated, app)
@@ -102,7 +102,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -111,7 +111,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.CompanyName == "" || req.RoleTitle == "" {
-		writeError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
+		WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
 		return
 	}
 
@@ -128,10 +128,10 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "application not found")
+			WriteError(w, http.StatusNotFound, "not_found", "application not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to update application")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update application")
 		return
 	}
 	writeJSON(w, http.StatusOK, app)
