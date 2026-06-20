@@ -22,7 +22,7 @@ func NewContributionHandler(queries *db.Queries) *ContributionHandler {
 func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Request) {
 	positionID, err := uuid.Parse(chi.URLParam(r, "positionID"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
 		return
 	}
 
@@ -31,7 +31,7 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 		UserID:     stubUserID,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "contribution id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "contribution id must be a valid UUID")
 		return
 	}
 
@@ -51,10 +51,10 @@ func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "contribution not found")
+			WriteError(w, http.StatusNotFound, "not_found", "contribution not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contribution")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contribution")
 		return
 	}
 

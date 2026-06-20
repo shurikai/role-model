@@ -26,7 +26,7 @@ func NewEmployerHandler(queries *db.Queries) *EmployerHandler {
 func (h *EmployerHandler) List(w http.ResponseWriter, r *http.Request) {
 	employers, err := h.queries.GetEmployers(r.Context(), stubUserID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch employers")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch employers")
 		return
 	}
 
@@ -37,7 +37,7 @@ func (h *EmployerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	idParam := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
 		return
 	}
 
@@ -47,10 +47,10 @@ func (h *EmployerHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "employer not found")
+			WriteError(w, http.StatusNotFound, "not_found", "employer not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch employer")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch employer")
 		return
 	}
 

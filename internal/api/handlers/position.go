@@ -22,7 +22,7 @@ func NewPositionHandler(queries *db.Queries) *PositionHandler {
 func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request) {
 	employerID, err := uuid.Parse(chi.URLParam(r, "employerID"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
 		return
 	}
 
@@ -31,7 +31,7 @@ func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request)
 		UserID:     stubUserID,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch positions")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch positions")
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request)
 func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
 		return
 	}
 
@@ -51,10 +51,10 @@ func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "position not found")
+			WriteError(w, http.StatusNotFound, "not_found", "position not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch position")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch position")
 		return
 	}
 

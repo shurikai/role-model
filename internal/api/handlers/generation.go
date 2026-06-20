@@ -26,7 +26,7 @@ func NewGenerationHandler(queries *db.Queries, client *generation.Client) *Gener
 func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -36,28 +36,28 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusNotFound, "not_found", "application not found")
+			WriteError(w, http.StatusNotFound, "not_found", "application not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
 		return
 	}
 
 	if app.JdText == nil || *app.JdText == "" {
-		writeError(w, http.StatusBadRequest, "no_jd_text", "application has no job description text to analyze")
+		WriteError(w, http.StatusBadRequest, "no_jd_text", "application has no job description text to analyze")
 		return
 	}
 
 	signals, err := h.client.ExtractSignals(r.Context(), *app.JdText)
 	if err != nil {
 		log.Printf("extract signals: %v", err)
-		writeError(w, http.StatusBadGateway, "extraction_failed", "failed to extract signals from job description")
+		WriteError(w, http.StatusBadGateway, "extraction_failed", "failed to extract signals from job description")
 		return
 	}
 
 	signalsJSON, err := json.Marshal(signals)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to encode signals")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to encode signals")
 		return
 	}
 
@@ -68,7 +68,7 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 		JdSignals: &raw,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal_error", "failed to store signals")
+		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to store signals")
 		return
 	}
 
