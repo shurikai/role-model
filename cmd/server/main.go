@@ -27,7 +27,8 @@ func main() {
 	queries := db.New(pool)
 
 	genClient := generation.NewClient(cfg.AnthropicAPIKey)
-	router := api.NewRouter(pool, queries, genClient)
+	genSvc := generation.NewService(queries, genClient)
+	router := api.NewRouter(pool, queries, genSvc)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

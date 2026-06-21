@@ -16,11 +16,11 @@ import (
 
 type GenerationHandler struct {
 	queries *db.Queries
-	client  *generation.Client
+	svc     *generation.Service
 }
 
-func NewGenerationHandler(queries *db.Queries, client *generation.Client) *GenerationHandler {
-	return &GenerationHandler{queries: queries, client: client}
+func NewGenerationHandler(queries *db.Queries, svc *generation.Service) *GenerationHandler {
+	return &GenerationHandler{queries: queries, svc: svc}
 }
 
 func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	signals, err := h.client.ExtractSignals(r.Context(), *app.JdText)
+	signals, err := h.svc.ExtractSignals(r.Context(), *app.JdText)
 	if err != nil {
 		log.Printf("extract signals: %v", err)
 		WriteError(w, http.StatusBadGateway, "extraction_failed", "failed to extract signals from job description")
