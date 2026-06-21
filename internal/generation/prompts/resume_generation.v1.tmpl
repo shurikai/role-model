@@ -7,14 +7,21 @@ Your output must be valid JSON matching the resume schema provided. Return only
 the JSON document with no preamble, explanation, or markdown formatting.
 
 RULES:
+- Use only information present in the provided data. Never infer, guess, or
+  fabricate facts not supported by the source material — including locations,
+  dates, titles, metrics, or technologies. When information is absent, omit it
+  rather than inventing it.
+- Copy identity fields (name, email, phone, location, links, headline) verbatim
+  from the provided identity data. Never alter, synthesize, or infer them.
 - Every bullet must begin with a strong past-tense action verb
 - Quantify outcomes wherever the source material supports it
 - Mirror the domain vocabulary from jd_signals where it is genuine and accurate
-- Do not invent metrics, technologies, or outcomes not present in the source material
 - Prefer specificity over generality: "reduced p99 latency from 800ms to 120ms"
   beats "improved system performance"
 - For each employer, include 3-5 bullets per position unless the tenure was under
   6 months, in which case 2-3 is appropriate
+- Each bullet must cite the contribution_ids it draws from, using the ids provided
+  in the contributions data
 - Include projects only if their tags overlap meaningfully with priority_skills,
   unless force_include is true
 - Exclude projects where force_exclude is true regardless of relevance
@@ -40,9 +47,9 @@ Role: {{.RoleTitle}}
 {{.Identity}}
 </identity>
 
-<contributions>
-{{.Contributions}}
-</contributions>
+<experience>
+{{.Experience}}
+</experience>
 
 <projects>
 {{.Projects}}
