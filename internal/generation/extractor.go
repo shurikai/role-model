@@ -21,7 +21,7 @@ type extractPromptData struct {
 }
 
 // ExtractSignals runs JD signal extraction against the given job description text.
-func (c *Client) ExtractSignals(ctx context.Context, jdText string) (*JDSignals, error) {
+func (s *Service) ExtractSignals(ctx context.Context, jdText string) (*JDSignals, error) {
 	prompt, err := renderPrompt("jd_extraction.v1.tmpl", extractPromptData{
 		JobDescription: jdText,
 	})
@@ -29,9 +29,9 @@ func (c *Client) ExtractSignals(ctx context.Context, jdText string) (*JDSignals,
 		return nil, err
 	}
 
-	msg, err := c.api.Messages.New(ctx, anthropic.MessageNewParams{
+	msg, err := s.client.api.Messages.New(ctx, anthropic.MessageNewParams{
 		MaxTokens: 1024,
-		Model:     c.model,
+		Model:     s.client.model,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
 		},
