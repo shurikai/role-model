@@ -10,7 +10,7 @@ import (
 	"github.com/shurikai/role-model/internal/generation"
 )
 
-func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genClient *generation.Client) *chi.Mux {
+func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Service) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -37,7 +37,7 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genClient *generation.Cl
 		r.Get("/applications/{id}", applicationHandler.Get)
 		r.Patch("/applications/{id}", applicationHandler.Update)
 
-		generationHandler := handlers.NewGenerationHandler(queries, genClient)
+		generationHandler := handlers.NewGenerationHandler(queries, genSvc)
 		r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
 	})
 
