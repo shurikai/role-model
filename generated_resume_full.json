@@ -1,0 +1,344 @@
+{
+  "id": "2de6a2ee-d4a8-418c-8079-c6f8e5ad70f6",
+  "user_id": "a0000000-0000-0000-0000-000000000001",
+  "application_id": "fd526e5d-edbb-4e13-90b6-099eb5e9ed52",
+  "version_number": 2,
+  "generation_params": {
+    "model": "claude-sonnet-4-5-20250929",
+    "prompt_version": "v1"
+  },
+  "structured_output": {
+    "meta": {
+      "jd_signals": {
+        "seniority": "staff",
+        "priority_skills": [
+          "Go",
+          "Distributed Systems",
+          "Workflow Orchestration"
+        ],
+        "domain_vocabulary": [
+          "durable execution",
+          "task queues",
+          "worker fleets",
+          "workflow orchestration"
+        ]
+      },
+      "target_role": "Staff Engineer",
+      "prompt_version": "v1.2",
+      "target_company": "Temporal",
+      "generation_model": "claude-sonnet-4-20250514"
+    },
+    "skills": {
+      "Databases": [
+        "PostgreSQL",
+        "Cassandra"
+      ],
+      "Languages": [
+        "Go",
+        "Java",
+        "C++",
+        "Ada",
+        "Python",
+        "C#"
+      ],
+      "Observability": [
+        "Splunk",
+        "Dynatrace",
+        "SonarQube"
+      ],
+      "Tools & CI/CD": [
+        "Jenkins",
+        "Harness",
+        "Maven",
+        "Gradle",
+        "Jira"
+      ],
+      "Distributed Systems": [
+        "Kafka",
+        "DDS",
+        "HLA",
+        "DIS",
+        "Microservices",
+        "SOA"
+      ],
+      "Cloud & Infrastructure": [
+        "AWS",
+        "Kubernetes",
+        "Docker",
+        "GCP",
+        "ECS",
+        "EC2",
+        "S3"
+      ],
+      "Frameworks & Libraries": [
+        "Spring Boot",
+        "Hibernate",
+        ".NET"
+      ]
+    },
+    "summary": "Staff-level backend engineer with deep expertise in distributed systems and workflow orchestration across defense, finance, and enterprise domains. Architected service-oriented systems using message buses and task distribution patterns similar to durable execution models; led distributed system integrations spanning hundreds of nodes. Proven track record designing resilient architectures, leading cross-site teams, and driving organizational adoption of distributed systems patterns.",
+    "identity": {
+      "name": "Jason Chestnut",
+      "email": "jason.chestnut@gmail.com",
+      "phone": null,
+      "headline": "Staff Backend Engineer",
+      "location": "Orlando, FL",
+      "site_url": "https://shurikai.github.io",
+      "github_url": "https://github.com/shurikai",
+      "linkedin_url": "https://linkedin.com/in/jason-chestnut"
+    },
+    "projects": [],
+    "education": [],
+    "experience": [
+      {
+        "employer": "Daugherty Business Solutions",
+        "positions": [
+          {
+            "title": "Senior Software Consultant",
+            "bullets": [
+              {
+                "text": "Learned Go and deployed a prototype service to GCP as part of an internal learning cohort, including Go testing and fuzzing",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000b0004"
+                ]
+              },
+              {
+                "text": "Diagnosed and eliminated lock contention bottlenecks in distributed services using Splunk and Dynatrace, reducing p99 latency from ~10 seconds to milliseconds",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000b0005"
+                ]
+              },
+              {
+                "text": "Decomposed legacy monoliths into approximately 5 microservices for Edward Jones, deployed to AWS with Kubernetes orchestration",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000b0001"
+                ]
+              },
+              {
+                "text": "Owned Trip Trading and Give Away functions end-to-end for Southwest Airlines crew scheduling decomposition following the December 2022 crisis, integrating with crew bidding systems",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000b0002"
+                ]
+              }
+            ],
+            "ended_on": "2024-11",
+            "started_on": "2022-02",
+            "position_id": "daugherty-senior-consultant",
+            "industry_level": "senior"
+          }
+        ]
+      },
+      {
+        "employer": "Disney Cruise Line",
+        "positions": [
+          {
+            "title": "Senior Software Engineer",
+            "bullets": [
+              {
+                "text": "Owned approximately 6 Spring Boot microservices for the Navigator passenger app, deployed across 8 ships and AWS shore-side services with ship-to-shore data synchronization",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000d0001"
+                ]
+              },
+              {
+                "text": "Reduced API response times approximately 10x (from several seconds to under 500ms) by separating historical and future cruise data endpoints and loading past data asynchronously",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000d0002"
+                ]
+              },
+              {
+                "text": "Built end-to-end test harnesses and improved local development environment to support running 5 distributed services locally, benefiting all 8 service engineers on the team",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000d0004"
+                ]
+              },
+              {
+                "text": "Owned deployment to ships and shore using Jenkins, Harness, and a homegrown feature flag system with zero incidents during tenure",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-0000000d0005"
+                ]
+              }
+            ],
+            "ended_on": "2026-04",
+            "started_on": "2025-09",
+            "position_id": "disney-senior-engineer",
+            "industry_level": "senior"
+          }
+        ]
+      },
+      {
+        "employer": "MAK Technologies",
+        "positions": [
+          {
+            "title": "Senior Software Engineer",
+            "bullets": [
+              {
+                "text": "Integrated VR-Forces CGF simulation with Apache Kafka via C++ plugins, forwarding live simulation data to Dockerized services for analysis and trainee scoring across distributed environments",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000fed0001"
+                ]
+              }
+            ],
+            "ended_on": "2020-10",
+            "started_on": "2020-06",
+            "position_id": "mak-senior-engineer",
+            "industry_level": "senior"
+          }
+        ]
+      },
+      {
+        "employer": "Dignitas Technologies",
+        "positions": [
+          {
+            "title": "Senior Software Engineer",
+            "bullets": [
+              {
+                "text": "Led a team of 3 engineers as architect for the Intelligent After Action Review (IAAR) tool across the full SDLC, integrating a GIFT rules engine with PostgreSQL and automated PowerPoint report generation",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ace0001",
+                  "c0000000-0000-0000-0000-00000ace0002"
+                ]
+              },
+              {
+                "text": "Modernized CCTT hardware I/O by replacing a mid-90s bespoke system with off-the-shelf WAGO hardware across 100+ simulators at 6 training sites, porting all Ada 95 logic",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ace0003"
+                ]
+              }
+            ],
+            "ended_on": "2020-06",
+            "started_on": "2018-01",
+            "position_id": "dignitas-senior-engineer",
+            "industry_level": "senior"
+          }
+        ]
+      },
+      {
+        "employer": "Manifold Technology",
+        "positions": [
+          {
+            "title": "Senior Software Engineer",
+            "bullets": [
+              {
+                "text": "Integrated a proprietary blockchain ledger platform into RBC applications as a customer loyalty ledger, wrapping it in a Spring Boot microservice layer with OpenAPI-designed REST API",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000eef0001"
+                ]
+              },
+              {
+                "text": "Built Android and iOS SDKs integrating with loyalty services; integrated into RBC's mobile app for a pilot deployment to approximately 1,000 users",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000eef0002"
+                ]
+              }
+            ],
+            "ended_on": "2018-01",
+            "started_on": "2016-02",
+            "position_id": "manifold-senior-engineer",
+            "industry_level": "senior"
+          }
+        ]
+      },
+      {
+        "employer": "Lockheed Martin",
+        "positions": [
+          {
+            "title": "Senior Software Engineer",
+            "bullets": [
+              {
+                "text": "Architected a service-oriented distributed simulation for the UK Army Scout vehicle using RTI Connext DDS as the real-time communications bus, leading a team of 5 engineers across Orlando and the UK",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0009"
+                ]
+              },
+              {
+                "text": "Led development of the Instructor/Operator Station simulation control product for F-16 and F-35 trainers, leading 7 engineers across 2 locations; implemented Agile processes, CI/CD pipelines, and deployed to 3 flight simulations",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0008"
+                ]
+              },
+              {
+                "text": "Software lead for WARSIM; rearchitected C2 reporting from a single feed to three live situational awareness feeds to GCCS-J, enabling the first joint training events with Army, Navy, and Air Force",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0005"
+                ]
+              },
+              {
+                "text": "Software lead for C2 on SE Core; built the C2 common vehicular component for AVCATT, integrating the C4I Adapter gateway with MCS and BFT tactical systems for the first time, leading a team of 3 engineers",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0004"
+                ]
+              },
+              {
+                "text": "Developed, tested, and integrated OneSAF distributed simulation with multiple Army C2 systems including FBCB2, AFATDS, and BCS3",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0007"
+                ]
+              }
+            ],
+            "ended_on": "2016-02",
+            "started_on": "2003-01",
+            "position_id": "lockheed-senior-engineer",
+            "industry_level": "senior"
+          },
+          {
+            "title": "Software Engineer",
+            "bullets": [
+              {
+                "text": "Led the effort to rehost the CCTT distributed simulation from IBM AIX to Linux PCs, including endianness conversion and network packet debugging across multiple concurrent workstreams",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0002"
+                ]
+              },
+              {
+                "text": "Developed simulation code in Ada for the CCTT manned modules, a distributed virtual simulation with 20-40 manned simulators per site plus dozens of additional nodes, using DIS protocol and TCP/IP networking",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0001"
+                ]
+              },
+              {
+                "text": "Took ownership of the C4I Adapter, a Java network gateway translating between simulation communications and tactical C2 protocols, driving its integration into training simulations",
+                "feedback_signal": null,
+                "contribution_ids": [
+                  "c0000000-0000-0000-0000-00000ead0003"
+                ]
+              }
+            ],
+            "ended_on": "2003-01",
+            "started_on": "1999-06",
+            "position_id": "lockheed-engineer",
+            "industry_level": "junior"
+          }
+        ]
+      }
+    ],
+    "credentials": [],
+    "generated_at": "2026-06-16T15:30:00Z",
+    "application_id": "temporal-staff-engineer-2026",
+    "schema_version": "1.0",
+    "resume_version_id": "temporal-staff-v1"
+  },
+  "generation_notes": null,
+  "submitted": false,
+  "created_at": "2026-06-21T20:04:24.60411-04:00"
+}
