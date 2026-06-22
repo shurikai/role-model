@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/google/uuid"
@@ -109,12 +110,51 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	}
 
 	cleaned := stripCodeFence(raw)
-	var resumeDoc json.RawMessage
-	if err := json.Unmarshal([]byte(cleaned), &resumeDoc); err != nil {
+
+	// Parse into a key-preserving map so untouched fields pass through byte-for-byte.
+	var doc map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(cleaned), &doc); err != nil {
 		return nil, fmt.Errorf("generate: parse resume json: %w (raw: %s)", err, cleaned)
 	}
 
-	if err := validateResume(resumeDoc); err != nil {
+	// Overwrite provenance fields the model must not own. The model generates
+	// resume *content*; the generator stamps the *facts* about generation.
+	meta := map[string]any{
+		"schema_version":   "1.0",
+		"generated_at":     time.Now().UTC().Format(time.RFC3339),
+		"application_id":   applicationID.String(),
+		"target_company":   app.CompanyName,
+		"target_role":      app.RoleTitle,
+		"jd_signals":       app.JdSignals,
+		"generation_model": s.client.ModelName(),
+		"prompt_version":   promptVersion,
+	}
+	metaJSON, err := json.Marshal(meta)
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal meta: %w", err)
+	}
+	doc["meta"] = metaJSON
+
+	versionID := uuid.New()
+
+	vid, _ := json.Marshal(versionID.String())
+	doc["resume_version_id"] = vid
+
+	// Stamp top-level provenance fields too (these live outside meta in the schema).
+	genAt, _ := json.Marshal(time.Now().UTC().Format(time.RFC3339))
+	doc["generated_at"] = genAt
+	appID, _ := json.Marshal(applicationID.String())
+	doc["application_id"] = appID
+
+	// Re-marshal the corrected document — this is what we validate AND store.
+	corrected, err := json.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("generate: re-marshal corrected document: %w", err)
+	}
+	correctedRaw := json.RawMessage(corrected)
+
+	// Validate the corrected document, not the model's raw output.
+	if err := validateResume(correctedRaw); err != nil {
 		return nil, fmt.Errorf("generate: schema validation: %w", err)
 	}
 
@@ -130,8 +170,8 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		Model         string `json:"model"`
 		PromptVersion string `json:"prompt_version"`
 	}{
-		Model:         string(s.client.model),
-		PromptVersion: "v1",
+		Model:         s.client.ModelName(),
+		PromptVersion: promptVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal gen params: %w", err)
@@ -139,11 +179,12 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	genParamsRaw := json.RawMessage(genParamsJSON)
 
 	rv, err := s.q.CreateResumeVersion(ctx, db.CreateResumeVersionParams{
+		ID:               versionID,
 		UserID:           userID,
 		ApplicationID:    applicationID,
 		VersionNumber:    versionNum,
 		GenerationParams: &genParamsRaw,
-		StructuredOutput: &resumeDoc,
+		StructuredOutput: &correctedRaw,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: store resume version: %w", err)

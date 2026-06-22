@@ -7,6 +7,8 @@ import (
 	"text/template"
 )
 
+const promptVersion = "v1"
+
 //go:embed prompts/*.tmpl
 var promptFS embed.FS
 

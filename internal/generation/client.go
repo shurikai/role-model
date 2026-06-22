@@ -16,3 +16,7 @@ func NewClient(apiKey string) *Client {
 		model: anthropic.ModelClaudeSonnet4_5_20250929,
 	}
 }
+
+func (c *Client) ModelName() string {
+	return string(c.model)
+}

@@ -40,6 +40,10 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Servi
 		generationHandler := handlers.NewGenerationHandler(queries, genSvc)
 		r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
 		r.Post("/applications/{id}/generate", generationHandler.Generate)
+
+		resumeVersionHandler := handlers.NewResumeVersionHandler(queries)
+		r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
+		r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
 	})
 
 	return r

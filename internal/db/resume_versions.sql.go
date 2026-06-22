@@ -14,14 +14,15 @@ import (
 
 const createResumeVersion = `-- name: CreateResumeVersion :one
 INSERT INTO resume_versions (
-    user_id, application_id, version_number, generation_params, structured_output
+    id, user_id, application_id, version_number, generation_params, structured_output
 ) VALUES (
-    $1, $2, $3, $4, $5
+    $1, $2, $3, $4, $5, $6
 )
 RETURNING id, user_id, application_id, version_number, generation_params, structured_output, generation_notes, submitted, created_at
 `
 
 type CreateResumeVersionParams struct {
+	ID               uuid.UUID        `json:"id"`
 	UserID           uuid.UUID        `json:"user_id"`
 	ApplicationID    uuid.UUID        `json:"application_id"`
 	VersionNumber    int32            `json:"version_number"`
@@ -31,6 +32,7 @@ type CreateResumeVersionParams struct {
 
 func (q *Queries) CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error) {
 	row := q.db.QueryRow(ctx, createResumeVersion,
+		arg.ID,
 		arg.UserID,
 		arg.ApplicationID,
 		arg.VersionNumber,
@@ -50,6 +52,74 @@ func (q *Queries) CreateResumeVersion(ctx context.Context, arg CreateResumeVersi
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getResumeVersion = `-- name: GetResumeVersion :one
+SELECT id, user_id, application_id, version_number, generation_params, structured_output, generation_notes, submitted, created_at FROM resume_versions
+WHERE id = $1 AND user_id = $2
+`
+
+type GetResumeVersionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetResumeVersion(ctx context.Context, arg GetResumeVersionParams) (ResumeVersion, error) {
+	row := q.db.QueryRow(ctx, getResumeVersion, arg.ID, arg.UserID)
+	var i ResumeVersion
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ApplicationID,
+		&i.VersionNumber,
+		&i.GenerationParams,
+		&i.StructuredOutput,
+		&i.GenerationNotes,
+		&i.Submitted,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const listResumeVersions = `-- name: ListResumeVersions :many
+SELECT id, user_id, application_id, version_number, generation_params, structured_output, generation_notes, submitted, created_at FROM resume_versions
+WHERE application_id = $1 AND user_id = $2
+ORDER BY version_number DESC
+`
+
+type ListResumeVersionsParams struct {
+	ApplicationID uuid.UUID `json:"application_id"`
+	UserID        uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error) {
+	rows, err := q.db.Query(ctx, listResumeVersions, arg.ApplicationID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ResumeVersion
+	for rows.Next() {
+		var i ResumeVersion
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ApplicationID,
+			&i.VersionNumber,
+			&i.GenerationParams,
+			&i.StructuredOutput,
+			&i.GenerationNotes,
+			&i.Submitted,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const nextResumeVersionNumber = `-- name: NextResumeVersionNumber :one
