@@ -84,9 +84,50 @@ to the exact prompt that produced it.
 
 ## GitHub Issues
 
-This project uses `gh` (GitHub CLI) for issue tracking. The `gh` agent skill is installed
-(`gh skill install cli/cli gh --scope user`) and should be used for any issue or PR interaction
-rather than constructing raw `gh api` calls from scratch.
+This project uses `gh` (GitHub CLI) for issue tracking. The `gh` agent skill is
+installed (`gh skill install cli/cli gh --scope user`) and should be used for any
+issue or PR interaction rather than constructing raw `gh api` calls from scratch.
+
+### Session workflow
+
+**At session start:**
+- If no specific task was given, run `gh issue list --label stage-2` (or the
+  relevant label) to find the next queued item rather than assuming there is
+  nothing to do.
+- When picking up an issue, apply the `in-progress` label:
+  `gh issue edit N --add-label in-progress`
+- Leave a comment on the issue noting the session date and starting point:
+  `gh issue comment N --body "Picking up in session YYYY-MM-DD. Starting from X."`
+
+**During a session:**
+- Reference issues in commit messages: `Refs #N` for related work,
+  `Closes #N` only when the fix is verified working (tests pass, manually
+  confirmed where relevant) — not just written.
+- Do not close an issue automatically as part of a larger task unless explicitly
+  asked. Surface "this looks like it resolves #N" and let the human confirm.
+
+**At session end:**
+- Leave a closing comment summarizing what was done, what was deferred, and
+  any blockers: `gh issue comment N --body "..."`
+- Remove the `in-progress` label when closing or suspending work:
+  `gh issue edit N --remove-label in-progress`
+- Close only on explicit human confirmation: `gh issue close N`
+
+### Labels in use
+- `stage-2` — resume generation pipeline work
+- `renderer` — DOCX/PDF rendering
+- `infra` — tooling, migrations, dev environment
+- `backlog` — deferred, not forgotten
+- `in-progress` — actively being worked in the current or most recent session
+
+Apply an existing label rather than inventing a new one. Ask if a new label
+seems genuinely warranted.
+
+### What belongs in Issues vs. here
+- Issues are the source of truth for *what's planned and tracked*.
+- This file is the source of truth for *how to build it* (stack, conventions,
+  the Do Not list below).
+- Do not duplicate task lists here that belong in Issues.
 
 ## API Design
 - REST
@@ -102,17 +143,6 @@ rather than constructing raw `gh api` calls from scratch.
 - Errors returned as structured JSON: { "error": "message", "code": "slug" }
 - All handlers receive a context, all DB calls respect context cancellation
 - Config via environment variables, loaded at startup into a typed Config struct
-- Check `gh issue list` at the start of a session if no specific task was given, rather than
-  assuming there's nothing queued.
-- Reference issues in commit messages: `Refs #N` for related work, `Closes #N` only when the
-  fix is verified working (tests pass, manually confirmed where relevant) — not just written.
-- Do not close an issue automatically as part of a larger task unless explicitly asked. Surface
-  "this looks like it resolves #N" and let the human confirm before closing.
-- Labels in use: `stage-2`, `renderer`, `infra`, `discovery-worker` — apply the existing label
-  rather than inventing a new one; ask if a new label seems warranted.
-- Issues are the source of truth for *what's planned*; this file remains the source of truth for
-  *how to build it* (stack, conventions, the Do Not list below). Don't duplicate task lists here
-  that belong in Issues.
 
 ## Do Not
 - Use an ORM
@@ -123,14 +153,14 @@ rather than constructing raw `gh api` calls from scratch.
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
 - Invent prompt improvements — prompts live in /prompts and are versioned explicitly
-- Open new issues unprompted during a session focused on something else. If you notice
-  unrelated work that should be tracked, mention it and let the human decide whether to file it.
-- Use the `claude-code-action` GitHub App or any webhook-triggered automation in this
-  repo. All `gh` usage here is interactive, inside a human-initiated session — no autonomous
-  issue-triggered runs.
+- Open new issues unprompted during a session focused on something else. If you
+  notice unrelated work that should be tracked, mention it and let the human decide.
+- Use the `claude-code-action` GitHub App or any webhook-triggered automation.
+  All `gh` usage is interactive, inside a human-initiated session only.
 
 ## Open Questions
 - Blob storage interface for rendered documents (local disk now, S3 later)
 - Auth implementation (stub for single-user, JWT for multi-user)
 - Renderer service: Go-native vs Python/python-docx (deferred)
 - Evaluation strategy for prompt quality across versions (deferred)
+
