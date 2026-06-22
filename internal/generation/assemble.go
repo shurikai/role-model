@@ -44,6 +44,7 @@ func (s *Service) AssembleContext(ctx context.Context, userID uuid.UUID) (*Resum
 			}
 
 			pv := PositionView{
+				ID:               pos.ID,
 				Title:            pos.Title,
 				IndustryLevel:    pos.IndustryLevel,
 				IndustryRole:     pos.IndustryRole,

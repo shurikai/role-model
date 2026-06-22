@@ -27,6 +27,7 @@ type EmployerView struct {
 }
 
 type PositionView struct {
+	ID               uuid.UUID          `json:"id"`
 	Title            string             `json:"title"`
 	IndustryLevel    *string            `json:"industry_level,omitempty"`
 	IndustryRole     *string            `json:"industry_role,omitempty"`
