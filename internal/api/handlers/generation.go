@@ -74,3 +74,38 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 
 	writeJSON(w, http.StatusOK, updated)
 }
+
+func (h *GenerationHandler) Generate(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		return
+	}
+
+	rv, err := h.svc.Generate(r.Context(), id, stubUserID)
+	if err != nil {
+		if errors.Is(err, generation.ErrSignalsRequired) {
+			WriteError(w, http.StatusConflict, "signals_required", "jd_signals must be extracted before generating a resume")
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			WriteError(w, http.StatusNotFound, "not_found", "application not found")
+			return
+		}
+		log.Printf("generate resume: %v", err)
+		if isValidationError(err) {
+			WriteError(w, http.StatusBadGateway, "invalid_generation", "generated resume failed schema validation")
+			return
+		}
+		WriteError(w, http.StatusBadGateway, "generation_failed", "failed to generate resume")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, rv)
+}
+
+// isValidationError reports whether err came from JSON schema validation.
+func isValidationError(err error) bool {
+	var ve *generation.ValidationError
+	return errors.As(err, &ve)
+}

@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
+	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
 	GetContribution(ctx context.Context, arg GetContributionParams) (Contribution, error)
 	GetContributionsByPosition(ctx context.Context, arg GetContributionsByPositionParams) ([]Contribution, error)
@@ -22,6 +23,7 @@ type Querier interface {
 	GetTagsByContribution(ctx context.Context, arg GetTagsByContributionParams) ([]GetTagsByContributionRow, error)
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
+	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 }
