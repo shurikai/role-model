@@ -82,6 +82,24 @@ func TestGenerate(t *testing.T) {
 	if rv.ID == uuid.Nil {
 		t.Error("expected non-zero resume version ID")
 	}
+
+	var out struct {
+		Education   []json.RawMessage `json:"education"`
+		Credentials []json.RawMessage `json:"credentials"`
+		Projects    []json.RawMessage `json:"projects"`
+	}
+	if err := json.Unmarshal(*rv.StructuredOutput, &out); err != nil {
+		t.Fatalf("unmarshal structured_output: %v", err)
+	}
+	if len(out.Education) == 0 {
+		t.Error("expected education to be populated (Lakeside State is seeded)")
+	}
+	if out.Credentials == nil {
+		t.Error("expected credentials array (may be empty, but must not be null)")
+	}
+	if out.Projects == nil {
+		t.Error("expected projects array (may be empty, but must not be null)")
+	}
 }
 
 func strPtr(s string) *string { return &s }

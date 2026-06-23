@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -20,6 +21,12 @@ func NewPositionHandler(queries *db.Queries) *PositionHandler {
 }
 
 func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	employerID, err := uuid.Parse(chi.URLParam(r, "employerID"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
@@ -28,7 +35,7 @@ func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request)
 
 	positions, err := h.queries.GetPositionsByEmployer(r.Context(), db.GetPositionsByEmployerParams{
 		EmployerID: employerID,
-		UserID:     stubUserID,
+		UserID:     userID,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch positions")
@@ -39,6 +46,12 @@ func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
@@ -47,7 +60,7 @@ func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	position, err := h.queries.GetPosition(r.Context(), db.GetPositionParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
