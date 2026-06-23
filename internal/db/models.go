@@ -179,15 +179,16 @@ type TagCategory struct {
 }
 
 type User struct {
-	ID          uuid.UUID `json:"id"`
-	Email       string    `json:"email"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	FullName    *string   `json:"full_name"`
-	Phone       *string   `json:"phone"`
-	Location    *string   `json:"location"`
-	LinkedinUrl *string   `json:"linkedin_url"`
-	GithubUrl   *string   `json:"github_url"`
-	SiteUrl     *string   `json:"site_url"`
-	Headline    *string   `json:"headline"`
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	FullName     *string   `json:"full_name"`
+	Phone        *string   `json:"phone"`
+	Location     *string   `json:"location"`
+	LinkedinUrl  *string   `json:"linkedin_url"`
+	GithubUrl    *string   `json:"github_url"`
+	SiteUrl      *string   `json:"site_url"`
+	Headline     *string   `json:"headline"`
+	PasswordHash *string   `json:"password_hash"`
 }

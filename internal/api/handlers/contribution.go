@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -20,6 +21,12 @@ func NewContributionHandler(queries *db.Queries) *ContributionHandler {
 }
 
 func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	positionID, err := uuid.Parse(chi.URLParam(r, "positionID"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
@@ -28,7 +35,7 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 
 	contributions, err := h.queries.GetContributionsByPosition(r.Context(), db.GetContributionsByPositionParams{
 		PositionID: positionID,
-		UserID:     stubUserID,
+		UserID:     userID,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
@@ -39,6 +46,12 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 }
 
 func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "contribution id must be a valid UUID")
@@ -47,7 +60,7 @@ func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	contribution, err := h.queries.GetContribution(r.Context(), db.GetContributionParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

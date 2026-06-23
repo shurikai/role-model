@@ -8,12 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 )
-
-// TODO: replace with authenticated user once auth is implemented.
-// Single-user stub — matches the seeded user_id.
-var stubUserID = uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 
 type EmployerHandler struct {
 	queries *db.Queries
@@ -24,16 +21,32 @@ func NewEmployerHandler(queries *db.Queries) *EmployerHandler {
 }
 
 func (h *EmployerHandler) List(w http.ResponseWriter, r *http.Request) {
-	employers, err := h.queries.GetEmployers(r.Context(), stubUserID)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	employers, err := h.queries.GetEmployers(r.Context(), userID)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch employers")
 		return
+	}
+
+	if employers == nil {
+		employers = []db.Employer{}
 	}
 
 	writeJSON(w, http.StatusOK, employers)
 }
 
 func (h *EmployerHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	idParam := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -43,7 +56,7 @@ func (h *EmployerHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	employer, err := h.queries.GetEmployer(r.Context(), db.GetEmployerParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

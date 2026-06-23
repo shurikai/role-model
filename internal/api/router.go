@@ -10,7 +10,7 @@ import (
 	"github.com/shurikai/role-model/internal/generation"
 )
 
-func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Service) *chi.Mux {
+func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Service, jwtSecret string) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.Logger)
 	r.Use(middleware.Recoverer)
@@ -19,31 +19,39 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Servi
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		employerHandler := handlers.NewEmployerHandler(queries)
-		r.Get("/employers", employerHandler.List)
-		r.Get("/employers/{id}", employerHandler.Get)
+		authHandler := handlers.NewAuthHandler(queries, jwtSecret)
+		r.Post("/auth/signup", authHandler.Signup)
+		r.Post("/auth/login", authHandler.Login)
 
-		positionHandler := handlers.NewPositionHandler(queries)
-		r.Get("/employers/{employerID}/positions", positionHandler.ListByEmployer)
-		r.Get("/positions/{id}", positionHandler.Get)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireAuth(jwtSecret))
 
-		contributionHandler := handlers.NewContributionHandler(queries)
-		r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
-		r.Get("/contributions/{id}", contributionHandler.Get)
+			employerHandler := handlers.NewEmployerHandler(queries)
+			r.Get("/employers", employerHandler.List)
+			r.Get("/employers/{id}", employerHandler.Get)
 
-		applicationHandler := handlers.NewApplicationHandler(queries)
-		r.Get("/applications", applicationHandler.List)
-		r.Post("/applications", applicationHandler.Create)
-		r.Get("/applications/{id}", applicationHandler.Get)
-		r.Patch("/applications/{id}", applicationHandler.Update)
+			positionHandler := handlers.NewPositionHandler(queries)
+			r.Get("/employers/{employerID}/positions", positionHandler.ListByEmployer)
+			r.Get("/positions/{id}", positionHandler.Get)
 
-		generationHandler := handlers.NewGenerationHandler(queries, genSvc)
-		r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
-		r.Post("/applications/{id}/generate", generationHandler.Generate)
+			contributionHandler := handlers.NewContributionHandler(queries)
+			r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
+			r.Get("/contributions/{id}", contributionHandler.Get)
 
-		resumeVersionHandler := handlers.NewResumeVersionHandler(queries)
-		r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
-		r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
+			applicationHandler := handlers.NewApplicationHandler(queries)
+			r.Get("/applications", applicationHandler.List)
+			r.Post("/applications", applicationHandler.Create)
+			r.Get("/applications/{id}", applicationHandler.Get)
+			r.Patch("/applications/{id}", applicationHandler.Update)
+
+			generationHandler := handlers.NewGenerationHandler(queries, genSvc)
+			r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
+			r.Post("/applications/{id}/generate", generationHandler.Generate)
+
+			resumeVersionHandler := handlers.NewResumeVersionHandler(queries)
+			r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
+			r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
+		})
 	})
 
 	return r

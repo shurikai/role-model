@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
 )
@@ -24,6 +25,12 @@ func NewGenerationHandler(queries *db.Queries, svc *generation.Service) *Generat
 }
 
 func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
@@ -32,7 +39,7 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 
 	app, err := h.queries.GetApplication(r.Context(), db.GetApplicationParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -64,7 +71,7 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 	raw := json.RawMessage(signalsJSON)
 	updated, err := h.queries.UpdateApplicationSignals(r.Context(), db.UpdateApplicationSignalsParams{
 		ID:        id,
-		UserID:    stubUserID,
+		UserID:    userID,
 		JdSignals: &raw,
 	})
 	if err != nil {
@@ -76,13 +83,19 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *GenerationHandler) Generate(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
-	rv, err := h.svc.Generate(r.Context(), id, stubUserID)
+	rv, err := h.svc.Generate(r.Context(), id, userID)
 	if err != nil {
 		if errors.Is(err, generation.ErrSignalsRequired) {
 			WriteError(w, http.StatusConflict, "signals_required", "jd_signals must be extracted before generating a resume")

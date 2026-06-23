@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -20,6 +21,12 @@ func NewResumeVersionHandler(queries *db.Queries) *ResumeVersionHandler {
 }
 
 func (h *ResumeVersionHandler) ListByApplication(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	appID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
@@ -28,7 +35,7 @@ func (h *ResumeVersionHandler) ListByApplication(w http.ResponseWriter, r *http.
 
 	versions, err := h.queries.ListResumeVersions(r.Context(), db.ListResumeVersionsParams{
 		ApplicationID: appID,
-		UserID:        stubUserID,
+		UserID:        userID,
 	})
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch resume versions")
@@ -39,6 +46,12 @@ func (h *ResumeVersionHandler) ListByApplication(w http.ResponseWriter, r *http.
 }
 
 func (h *ResumeVersionHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "resume version id must be a valid UUID")
@@ -47,7 +60,7 @@ func (h *ResumeVersionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	version, err := h.queries.GetResumeVersion(r.Context(), db.GetResumeVersionParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

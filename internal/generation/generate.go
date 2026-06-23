@@ -77,15 +77,41 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal experience: %w", err)
 	}
 
+	projects, err := s.assembleProjects(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+	education, err := s.assembleEducation(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+	credentials, err := s.assembleCredentials(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
+	projectsJSON, err := json.MarshalIndent(projects, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal projects: %w", err)
+	}
+	educationJSON, err := json.MarshalIndent(education, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal education: %w", err)
+	}
+	credentialsJSON, err := json.MarshalIndent(credentials, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal credentials: %w", err)
+	}
+
 	prompt, err := renderPrompt("resume_generation.v1.tmpl", resumePromptData{
 		CompanyName:   app.CompanyName,
 		RoleTitle:     app.RoleTitle,
 		JDSignals:     string(signalsJSON),
 		Identity:      string(identityJSON),
 		Experience:    string(experienceJSON),
-		Projects:      "[]",
-		Education:     "[]",
-		Credentials:   "[]",
+		Projects:      string(projectsJSON),
+		Education:     string(educationJSON),
+		Credentials:   string(credentialsJSON),
 		ResumeSchema:  string(resumeschema.ResumeV1JSON),
 		PriorFeedback: "",
 	})
