@@ -94,3 +94,138 @@ func (s *Service) AssembleContext(ctx context.Context, userID uuid.UUID) (*Resum
 
 	return result, nil
 }
+
+func (s *Service) assembleProjects(ctx context.Context, userID uuid.UUID) ([]ProjectView, error) {
+	projects, err := s.q.GetProjects(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("assemble projects: get projects: %w", err)
+	}
+
+	result := make([]ProjectView, 0, len(projects))
+
+	for _, p := range projects {
+		contributions, err := s.q.GetContributionsByProject(ctx, db.GetContributionsByProjectParams{
+			ProjectID: p.ID,
+			UserID:    userID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("assemble projects: contributions for project %q: %w", p.Name, err)
+		}
+
+		cvs := make([]ContributionView, 0, len(contributions))
+		for _, c := range contributions {
+			tags, err := s.q.GetTagsByContribution(ctx, db.GetTagsByContributionParams{
+				ContributionID: c.ID,
+				UserID:         userID,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("assemble projects: tags for contribution %s: %w", c.ID, err)
+			}
+
+			tagViews := make([]TagView, len(tags))
+			for i, t := range tags {
+				tagViews[i] = TagView{Name: t.Name, Category: t.Category}
+			}
+
+			cvs = append(cvs, ContributionView{
+				ID:              c.ID,
+				Summary:         c.Summary,
+				FullDescription: c.FullDescription,
+				Outcomes:        c.Outcomes,
+				ScaleContext:    c.ScaleContext,
+				Tags:            tagViews,
+			})
+		}
+
+		projectTags, err := s.q.GetTagsByProject(ctx, db.GetTagsByProjectParams{
+			ProjectID: p.ID,
+			UserID:    userID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("assemble projects: tags for project %q: %w", p.Name, err)
+		}
+
+		tagViews := make([]TagView, len(projectTags))
+		for i, t := range projectTags {
+			tagViews[i] = TagView{Name: t.Name, Category: t.Category}
+		}
+
+		pv := ProjectView{
+			ID:            p.ID,
+			Name:          p.Name,
+			Tagline:       p.Tagline,
+			Role:          p.Role,
+			Status:        p.Status,
+			RepoURL:       p.RepoUrl,
+			LiveURL:       p.LiveUrl,
+			WriteupURL:    p.WriteupUrl,
+			ForceInclude:  p.ForceInclude,
+			ForceExclude:  p.ForceExclude,
+			Contributions: cvs,
+			Tags:          tagViews,
+		}
+		if p.StartedOn.Valid {
+			d := p.StartedOn.Time.Format("2006-01")
+			pv.StartedOn = &d
+		}
+		if p.EndedOn.Valid {
+			d := p.EndedOn.Time.Format("2006-01")
+			pv.EndedOn = &d
+		}
+
+		result = append(result, pv)
+	}
+
+	return result, nil
+}
+
+func (s *Service) assembleEducation(ctx context.Context, userID uuid.UUID) ([]EducationView, error) {
+	rows, err := s.q.GetEducation(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("assemble education: %w", err)
+	}
+
+	result := make([]EducationView, 0, len(rows))
+	for _, e := range rows {
+		ev := EducationView{
+			Institution:  e.Institution,
+			Degree:       e.Degree,
+			FieldOfStudy: e.FieldOfStudy,
+			Notes:        e.Notes,
+		}
+		if e.EndedOn.Valid {
+			d := e.EndedOn.Time.Format("2006")
+			ev.Graduated = &d
+		}
+		result = append(result, ev)
+	}
+
+	return result, nil
+}
+
+func (s *Service) assembleCredentials(ctx context.Context, userID uuid.UUID) ([]CredentialView, error) {
+	rows, err := s.q.GetCredentials(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("assemble credentials: %w", err)
+	}
+
+	result := make([]CredentialView, 0, len(rows))
+	for _, c := range rows {
+		cv := CredentialView{
+			Name:          c.Name,
+			Issuer:        c.Issuer,
+			CredentialURL: c.CredentialUrl,
+		}
+		if c.IssuedOn.Valid {
+			d := c.IssuedOn.Time.Format("2006-01")
+			cv.IssuedOn = &d
+		}
+		if c.ExpiresOn.Valid {
+			d := c.ExpiresOn.Time.Format("2006-01")
+			cv.ExpiresOn = &d
+		}
+		result = append(result, cv)
+	}
+
+	return result, nil
+}

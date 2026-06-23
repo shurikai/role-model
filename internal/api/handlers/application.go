@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -39,7 +40,13 @@ type updateApplicationRequest struct {
 }
 
 func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
-	apps, err := h.queries.ListApplications(r.Context(), stubUserID)
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	apps, err := h.queries.ListApplications(r.Context(), userID)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch applications")
 		return
@@ -48,6 +55,12 @@ func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
@@ -56,7 +69,7 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	app, err := h.queries.GetApplication(r.Context(), db.GetApplicationParams{
 		ID:     id,
-		UserID: stubUserID,
+		UserID: userID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -70,6 +83,12 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	var req createApplicationRequest
 	if !decodeJSON(w, r, &req) {
 		return
@@ -84,7 +103,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app, err := h.queries.CreateApplication(r.Context(), db.CreateApplicationParams{
-		UserID:      stubUserID,
+		UserID:      userID,
 		CompanyName: req.CompanyName,
 		RoleTitle:   req.RoleTitle,
 		JdUrl:       req.JDUrl,
@@ -100,6 +119,12 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.UserIDFromContext(r.Context())
+	if !ok {
+		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
@@ -117,7 +142,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	app, err := h.queries.UpdateApplication(r.Context(), db.UpdateApplicationParams{
 		ID:          id,
-		UserID:      stubUserID,
+		UserID:      userID,
 		CompanyName: req.CompanyName,
 		RoleTitle:   req.RoleTitle,
 		JdUrl:       req.JDUrl,

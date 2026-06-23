@@ -7,23 +7,45 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
 
-const getUser = `-- name: GetUser :one
-SELECT id, email, created_at, updated_at, full_name, phone, location, linkedin_url, github_url, site_url, headline FROM users
-WHERE id = $1
+const createUser = `-- name: CreateUser :one
+INSERT INTO users (id, email, password_hash)
+VALUES ($1, $2, $3)
+RETURNING id, email, full_name, phone, location,
+          linkedin_url, github_url, site_url, headline,
+          created_at, updated_at
 `
 
-func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRow(ctx, getUser, id)
-	var i User
+type CreateUserParams struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash *string   `json:"password_hash"`
+}
+
+type CreateUserRow struct {
+	ID          uuid.UUID `json:"id"`
+	Email       string    `json:"email"`
+	FullName    *string   `json:"full_name"`
+	Phone       *string   `json:"phone"`
+	Location    *string   `json:"location"`
+	LinkedinUrl *string   `json:"linkedin_url"`
+	GithubUrl   *string   `json:"github_url"`
+	SiteUrl     *string   `json:"site_url"`
+	Headline    *string   `json:"headline"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+	row := q.db.QueryRow(ctx, createUser, arg.ID, arg.Email, arg.PasswordHash)
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.FullName,
 		&i.Phone,
 		&i.Location,
@@ -31,6 +53,68 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.GithubUrl,
 		&i.SiteUrl,
 		&i.Headline,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const getUser = `-- name: GetUser :one
+SELECT id, email, full_name, phone, location,
+       linkedin_url, github_url, site_url, headline,
+       created_at, updated_at
+FROM users
+WHERE id = $1
+`
+
+type GetUserRow struct {
+	ID          uuid.UUID `json:"id"`
+	Email       string    `json:"email"`
+	FullName    *string   `json:"full_name"`
+	Phone       *string   `json:"phone"`
+	Location    *string   `json:"location"`
+	LinkedinUrl *string   `json:"linkedin_url"`
+	GithubUrl   *string   `json:"github_url"`
+	SiteUrl     *string   `json:"site_url"`
+	Headline    *string   `json:"headline"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error) {
+	row := q.db.QueryRow(ctx, getUser, id)
+	var i GetUserRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.FullName,
+		&i.Phone,
+		&i.Location,
+		&i.LinkedinUrl,
+		&i.GithubUrl,
+		&i.SiteUrl,
+		&i.Headline,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, email, password_hash
+FROM users
+WHERE email = $1
+`
+
+type GetUserByEmailRow struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	PasswordHash *string   `json:"password_hash"`
+}
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i GetUserByEmailRow
+	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
 	return i, err
 }

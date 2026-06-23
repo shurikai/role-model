@@ -30,6 +30,9 @@ RULES:
 - Exclude projects where force_exclude is true regardless of relevance
 - The summary should be 2-3 sentences, written in third person, targeting the
   specific role and company
+- Each project's project_id in the output must be copied verbatim from the
+  id field of the corresponding project in the projects data. Never invent
+  or generate a project_id.
 - Use only information present in the provided data. Never infer, guess, or
   fabricate facts not supported by the source material — including locations,
   dates, titles, metrics, or technologies. When information is absent, omit it

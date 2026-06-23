@@ -11,6 +11,7 @@ type Config struct {
 	AnthropicAPIKey string
 	Port            string
 	Environment     string
+	JWTSecret       string
 }
 
 func Load() Config {
@@ -29,5 +30,6 @@ func Load() Config {
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
 		Port:            port,
 		Environment:     env,
+		JWTSecret:       os.Getenv("JWT_SECRET"),
 	}
 }

@@ -28,7 +28,7 @@ func main() {
 
 	genClient := generation.NewClient(cfg.AnthropicAPIKey)
 	genSvc := generation.NewService(queries, genClient)
-	router := api.NewRouter(pool, queries, genSvc)
+	router := api.NewRouter(pool, queries, genSvc, cfg.JWTSecret)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

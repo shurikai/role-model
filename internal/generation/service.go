@@ -51,3 +51,36 @@ type TagView struct {
 	Name     string `json:"name"`
 	Category string `json:"category"`
 }
+
+type ProjectView struct {
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	Tagline       *string            `json:"tagline,omitempty"`
+	Role          string             `json:"role"`
+	Status        string             `json:"status"`
+	StartedOn     *string            `json:"started_on,omitempty"`
+	EndedOn       *string            `json:"ended_on,omitempty"`
+	RepoURL       *string            `json:"repo_url,omitempty"`
+	LiveURL       *string            `json:"live_url,omitempty"`
+	WriteupURL    *string            `json:"writeup_url,omitempty"`
+	ForceInclude  bool               `json:"force_include"`
+	ForceExclude  bool               `json:"force_exclude"`
+	Contributions []ContributionView `json:"contributions"`
+	Tags          []TagView          `json:"tags"`
+}
+
+type EducationView struct {
+	Institution  string  `json:"institution"`
+	Degree       *string `json:"degree,omitempty"`
+	FieldOfStudy *string `json:"field_of_study,omitempty"`
+	Graduated    *string `json:"graduated,omitempty"`
+	Notes        *string `json:"notes,omitempty"`
+}
+
+type CredentialView struct {
+	Name          string  `json:"name"`
+	Issuer        *string `json:"issuer,omitempty"`
+	IssuedOn      *string `json:"issued_on,omitempty"`
+	ExpiresOn     *string `json:"expires_on,omitempty"`
+	CredentialURL *string `json:"credential_url,omitempty"`
+}

@@ -1,0 +1,359 @@
+{
+  "meta": {
+    "jd_signals": {
+      "seniority": "staff",
+      "priority_skills": [
+        "Go",
+        "Distributed Systems",
+        "Workflow Orchestration"
+      ],
+      "domain_vocabulary": [
+        "durable execution",
+        "task queues",
+        "worker fleets",
+        "workflow orchestration"
+      ]
+    },
+    "target_role": "Staff Engineer",
+    "generated_at": "2026-06-22T21:57:42Z",
+    "application_id": "fd526e5d-edbb-4e13-90b6-099eb5e9ed52",
+    "prompt_version": "v1",
+    "schema_version": "1.0",
+    "target_company": "Temporal",
+    "generation_model": "claude-sonnet-4-5-20250929"
+  },
+  "skills": {
+    "Databases": [
+      "PostgreSQL",
+      "Cassandra"
+    ],
+    "Languages": [
+      "Go",
+      "Java",
+      "Python",
+      "C++",
+      "Ada"
+    ],
+    "Methodologies": [
+      "Distributed Systems",
+      "Microservices",
+      "SOA",
+      "Agile"
+    ],
+    "Observability": [
+      "Dynatrace",
+      "Splunk",
+      "SonarQube"
+    ],
+    "Tools & CI/CD": [
+      "Jenkins",
+      "Harness",
+      "Maven",
+      "GitHub Actions",
+      "Jira"
+    ],
+    "Protocols & Messaging": [
+      "Kafka",
+      "DDS",
+      "HLA",
+      "DIS"
+    ],
+    "Cloud & Infrastructure": [
+      "AWS",
+      "Kubernetes",
+      "Docker",
+      "GCP",
+      "ECS",
+      "EC2",
+      "S3"
+    ],
+    "Frameworks & Libraries": [
+      "Spring Boot",
+      "React"
+    ]
+  },
+  "summary": "Staff-level backend engineer with deep expertise in Go and distributed systems, including production experience building services for high-scale orchestration and microservice environments. Proven track record architecting and leading distributed systems across defense simulation, financial services, and consumer platforms, with hands-on experience in task queues, worker fleets, and workflow orchestration patterns.",
+  "identity": {
+    "name": "Jason Chestnut",
+    "email": "jason.chestnut@gmail.com",
+    "phone": null,
+    "headline": "Staff Backend Engineer",
+    "location": "Orlando, FL",
+    "site_url": "https://shurikai.github.io",
+    "github_url": "https://github.com/shurikai",
+    "linkedin_url": "https://linkedin.com/in/jason-chestnut"
+  },
+  "projects": [
+    {
+      "name": "Role Model",
+      "role": "author",
+      "tags": [
+        "Go",
+        "PostgreSQL"
+      ],
+      "status": "active",
+      "bullets": [],
+      "tagline": "AI-powered resume generation pipeline: PostgreSQL-backed career knowledge store, Go service layer, LLM generation.",
+      "ended_on": null,
+      "live_url": null,
+      "repo_url": "https://github.com/shurikai/resumatron",
+      "project_id": "c1000000-0000-0000-0000-00000000a002",
+      "started_on": "2026-01",
+      "writeup_url": null,
+      "force_exclude": false,
+      "force_include": false
+    },
+    {
+      "name": "dedupe",
+      "role": "author",
+      "tags": [
+        "Go"
+      ],
+      "status": "active",
+      "bullets": [],
+      "tagline": "Go CLI for photo deduplication and organization with a Bubble Tea TUI.",
+      "ended_on": null,
+      "live_url": null,
+      "repo_url": "https://github.com/shurikai/dedupe",
+      "project_id": "c1000000-0000-0000-0000-00000000a001",
+      "started_on": "2024-01",
+      "writeup_url": null,
+      "force_exclude": false,
+      "force_include": false
+    }
+  ],
+  "education": [
+    {
+      "degree": "Bachelor of Science",
+      "graduated": "1999",
+      "institution": "Tulane University",
+      "field_of_study": "Computer Science"
+    }
+  ],
+  "experience": [
+    {
+      "employer": "Disney Cruise Line",
+      "positions": [
+        {
+          "title": "Senior Software Engineer",
+          "bullets": [
+            {
+              "text": "Owned approximately 6 Spring Boot services (Java 8 and 17) for the Navigator passenger app used by thousands of passengers per cruise across 8 ships, deployed partially on-prem and partially in AWS",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000d0001"
+              ]
+            },
+            {
+              "text": "Reduced cruise data load times approximately 10x by separating historical and future data endpoints and loading past data asynchronously, decreasing API response times from several seconds to under 500ms",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000d0002"
+              ]
+            },
+            {
+              "text": "Built end-to-end test harnesses where none existed and improved local execution environment enabling up to 5 distributed services to run locally, benefiting all ~8 service-based engineers",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000d0004"
+              ]
+            },
+            {
+              "text": "Owned deployment of services to ships and shore using Jenkins and Harness with zero incidents during tenure, leveraging a homegrown feature flag system for controlled rollout across the fleet",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000d0005"
+              ]
+            }
+          ],
+          "ended_on": "2026-04",
+          "started_on": "2025-09",
+          "position_id": "f0000000-0000-0000-0000-000000000009",
+          "industry_level": "senior"
+        }
+      ]
+    },
+    {
+      "employer": "Daugherty Business Solutions",
+      "positions": [
+        {
+          "title": "Senior Software Consultant",
+          "bullets": [
+            {
+              "text": "Reduced service latency from ~10 seconds to milliseconds by identifying and resolving lock contention in two shared services using Splunk and Dynatrace distributed traces at Edward Jones",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000b0005"
+              ]
+            },
+            {
+              "text": "Built and deployed a prototype Go service to GCP as part of an internal learning cohort, gaining hands-on experience with Go testing and fuzzing",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000b0004"
+              ]
+            },
+            {
+              "text": "Owned Trip Trading and Give Away (TTGA) functions end-to-end as part of Southwest Airlines crew scheduling monolith decomposition following the December 2022 crisis, integrating with crew bidding systems",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000b0002"
+              ]
+            },
+            {
+              "text": "Delivered production microservices as member of a 6-person pod decomposing a legacy monolith for Edward Jones, deployed to AWS with Kubernetes orchestration",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-0000000b0001"
+              ]
+            }
+          ],
+          "ended_on": "2024-11",
+          "started_on": "2022-02",
+          "position_id": "f0000000-0000-0000-0000-000000000007",
+          "industry_level": "senior"
+        }
+      ]
+    },
+    {
+      "employer": "MAK Technologies",
+      "positions": [
+        {
+          "title": "Senior Software Engineer",
+          "bullets": [
+            {
+              "text": "Integrated VR-Forces CGF simulation with Apache Kafka via C++ plugins, forwarding live simulation data to Docker-containerized services for automated data collection and trainee task scoring across distributed simulation environments",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000fed0001"
+              ]
+            }
+          ],
+          "ended_on": "2020-10",
+          "started_on": "2020-06",
+          "position_id": "f0000000-0000-0000-0000-000000000005",
+          "industry_level": "senior"
+        }
+      ]
+    },
+    {
+      "employer": "Dignitas Technologies",
+      "positions": [
+        {
+          "title": "Senior Software Engineer",
+          "bullets": [
+            {
+              "text": "Led team of 3 engineers as architect for the Intelligent After Action Review (IAAR) tool across full SDLC, integrating a GIFT rules engine to automate report generation from simulation events stored in PostgreSQL",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ace0001"
+              ]
+            },
+            {
+              "text": "Co-developed IAAR React frontend, implemented automated PowerPoint report generation, and contributed to GIFT rules engine integration driving trainee evaluation and remediation recommendations",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ace0002"
+              ]
+            },
+            {
+              "text": "Modernized CCTT manned simulator hardware I/O by replacing a mid-90s bespoke system with off-the-shelf WAGO hardware across 100+ simulators at ~6 training sites, porting all Ada 95 logic",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ace0003"
+              ]
+            }
+          ],
+          "ended_on": "2020-06",
+          "started_on": "2018-01",
+          "position_id": "f0000000-0000-0000-0000-000000000004",
+          "industry_level": "senior"
+        }
+      ]
+    },
+    {
+      "employer": "Manifold Technology",
+      "positions": [
+        {
+          "title": "Senior Software Engineer",
+          "bullets": [
+            {
+              "text": "Integrated a proprietary blockchain ledger platform into RBC applications as a customer loyalty program ledger, wrapping it in a Spring Boot microservice layer with OpenAPI-designed REST API",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000eef0001"
+              ]
+            },
+            {
+              "text": "Built Android (Java) and iOS (Swift) SDKs integrating with the loyalty services, deployed to ~1,000 users in a pilot deployment",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000eef0002"
+              ]
+            }
+          ],
+          "ended_on": "2018-01",
+          "started_on": "2016-02",
+          "position_id": "f0000000-0000-0000-0000-000000000003",
+          "industry_level": "senior"
+        }
+      ]
+    },
+    {
+      "employer": "Lockheed Martin",
+      "positions": [
+        {
+          "title": "Senior Software Engineer",
+          "bullets": [
+            {
+              "text": "Architected service-oriented distributed simulation for UK Army Scout vehicle using RTI Connext DDS as the real-time communications bus, leading a team of ~5 engineers across Orlando and the UK",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0009"
+              ]
+            },
+            {
+              "text": "Led development of the Instructor/Operator Station (IOS) simulation control product for F-16 and F-35 trainers, leading 7 engineers across 2 locations and implementing CI/CD pipelines for deployment into 3 separate simulations",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0008"
+              ]
+            },
+            {
+              "text": "Led WARSIM R&D team of 3 engineers, rearchitecting C2 reporting from a single feed to three live situational awareness feeds to GCCS-J using HLA, enabling first joint training events with Army, Navy, and Air Force",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0005"
+              ]
+            },
+            {
+              "text": "Led team of 3 engineers as software lead for C2 on SE Core program, building the C2 common vehicular component for AVCATT integrating with MCS and BFT tactical systems for the first time",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0004"
+              ]
+            },
+            {
+              "text": "Developed, tested, and integrated OneSAF distributed simulation with multiple Army C2 systems including FBCB2, AFATDS, and BCS3",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0007"
+              ]
+            }
+          ],
+          "ended_on": "2016-02",
+          "started_on": "2003-01",
+          "position_id": "f0000000-0000-0000-0000-000000000002",
+          "industry_level": "senior"
+        },
+        {
+          "title": "Software Engineer",
+          "bullets": [
+            {
+              "text": "Led effort to rehost CCTT distributed simulation from IBM AIX to Linux PCs, including endianness conversion and network packet debugging across a team of developers",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0002"
+              ]
+            },
+            {
+              "text": "Developed simulation code for CCTT manned modules in Ada, integrating 20-40 manned simulators per site with TCP/IP networking and DIS protocol across distributed systems",
+              "contribution_ids": [
+                "c0000000-0000-0000-0000-00000ead0001"
+              ]
+            }
+          ],
+          "ended_on": "2003-01",
+          "started_on": "1999-06",
+          "position_id": "f0000000-0000-0000-0000-000000000001",
+          "industry_level": "junior"
+        }
+      ]
+    }
+  ],
+  "credentials": [],
+  "generated_at": "2026-06-22T21:57:42Z",
+  "application_id": "fd526e5d-edbb-4e13-90b6-099eb5e9ed52",
+  "schema_version": "1.0",
+  "resume_version_id": "748f4ac6-a041-4e75-98f5-8537cbc9250b"
+}
