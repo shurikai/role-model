@@ -86,7 +86,17 @@ func (s *Service) AssembleContext(ctx context.Context, userID uuid.UUID) (*Resum
 				})
 			}
 
+			// Skip positions with no active contributions — nothing for the LLM to write about.
+			if len(pv.Contributions) == 0 {
+				continue
+			}
+
 			ev.Positions = append(ev.Positions, pv)
+		}
+
+		// Skip employers left with no positions after filtering.
+		if len(ev.Positions) == 0 {
+			continue
 		}
 
 		result.Employers = append(result.Employers, ev)
