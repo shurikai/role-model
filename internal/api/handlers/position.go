@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/shurikai/role-model/internal/api/middleware"
+	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -21,15 +21,15 @@ func NewPositionHandler(queries *db.Queries) *PositionHandler {
 }
 
 func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	employerID, err := uuid.Parse(chi.URLParam(r, "employerID"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "employer id must be a valid UUID")
 		return
 	}
 
@@ -38,23 +38,23 @@ func (h *PositionHandler) ListByEmployer(w http.ResponseWriter, r *http.Request)
 		UserID:     userID,
 	})
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch positions")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch positions")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, positions)
+	httputil.WriteJSON(w, http.StatusOK, positions)
 }
 
 func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
 		return
 	}
 
@@ -64,12 +64,12 @@ func (h *PositionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			WriteError(w, http.StatusNotFound, "not_found", "position not found")
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "position not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch position")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch position")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, position)
+	httputil.WriteJSON(w, http.StatusOK, position)
 }

@@ -29,6 +29,9 @@ func NewRouter(pool *pgxpool.Pool, queries *db.Queries, genSvc *generation.Servi
 			employerHandler := handlers.NewEmployerHandler(queries)
 			r.Get("/employers", employerHandler.List)
 			r.Get("/employers/{id}", employerHandler.Get)
+			r.Post("/employers", employerHandler.Create)
+			r.Patch("/employers/{id}", employerHandler.Update)
+			r.Delete("/employers/{id}", employerHandler.Delete)
 
 			positionHandler := handlers.NewPositionHandler(queries)
 			r.Get("/employers/{employerID}/positions", positionHandler.ListByEmployer)

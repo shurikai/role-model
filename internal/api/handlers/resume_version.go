@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/shurikai/role-model/internal/api/middleware"
+	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -21,15 +21,15 @@ func NewResumeVersionHandler(queries *db.Queries) *ResumeVersionHandler {
 }
 
 func (h *ResumeVersionHandler) ListByApplication(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	appID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -38,23 +38,23 @@ func (h *ResumeVersionHandler) ListByApplication(w http.ResponseWriter, r *http.
 		UserID:        userID,
 	})
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch resume versions")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch resume versions")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, versions)
+	httputil.WriteJSON(w, http.StatusOK, versions)
 }
 
 func (h *ResumeVersionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "resume version id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "resume version id must be a valid UUID")
 		return
 	}
 
@@ -64,12 +64,12 @@ func (h *ResumeVersionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			WriteError(w, http.StatusNotFound, "not_found", "resume version not found")
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "resume version not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch resume version")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch resume version")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, version)
+	httputil.WriteJSON(w, http.StatusOK, version)
 }
