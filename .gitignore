@@ -29,8 +29,10 @@ go.work.sum
 *.local
 
 database/seed
+scripts
 
 # Editor/IDE
 # .idea/
 # .vscode/
 .DS_Store
+

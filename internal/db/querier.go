@@ -11,12 +11,15 @@ import (
 )
 
 type Querier interface {
+	CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error)
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error)
+	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
+	DeletePosition(ctx context.Context, arg DeletePositionParams) error
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
 	GetContribution(ctx context.Context, arg GetContributionParams) (Contribution, error)
 	GetContributionsByPosition(ctx context.Context, arg GetContributionsByPositionParams) ([]Contribution, error)
@@ -39,6 +42,7 @@ type Querier interface {
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 	UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error)
+	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
 }
 
 var _ Querier = (*Queries)(nil)

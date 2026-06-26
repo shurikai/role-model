@@ -9,7 +9,99 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const countContributionsByPosition = `-- name: CountContributionsByPosition :one
+SELECT count(*) FROM contributions
+WHERE position_id = $1 AND user_id = $2
+`
+
+type CountContributionsByPositionParams struct {
+	PositionID uuid.UUID `json:"position_id"`
+	UserID     uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countContributionsByPosition, arg.PositionID, arg.UserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createPosition = `-- name: CreatePosition :one
+INSERT INTO positions (
+    id, user_id, employer_id, title, industry_level, industry_role,
+    location, level_rationale, started_on, ended_on, context_narrative, sort_order
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at, location
+`
+
+type CreatePositionParams struct {
+	ID               uuid.UUID   `json:"id"`
+	UserID           uuid.UUID   `json:"user_id"`
+	EmployerID       uuid.UUID   `json:"employer_id"`
+	Title            string      `json:"title"`
+	IndustryLevel    *string     `json:"industry_level"`
+	IndustryRole     *string     `json:"industry_role"`
+	Location         *string     `json:"location"`
+	LevelRationale   *string     `json:"level_rationale"`
+	StartedOn        pgtype.Date `json:"started_on"`
+	EndedOn          pgtype.Date `json:"ended_on"`
+	ContextNarrative *string     `json:"context_narrative"`
+	SortOrder        int32       `json:"sort_order"`
+}
+
+func (q *Queries) CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error) {
+	row := q.db.QueryRow(ctx, createPosition,
+		arg.ID,
+		arg.UserID,
+		arg.EmployerID,
+		arg.Title,
+		arg.IndustryLevel,
+		arg.IndustryRole,
+		arg.Location,
+		arg.LevelRationale,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.ContextNarrative,
+		arg.SortOrder,
+	)
+	var i Position
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.EmployerID,
+		&i.Title,
+		&i.IndustryLevel,
+		&i.IndustryRole,
+		&i.LevelRationale,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.ContextNarrative,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Location,
+	)
+	return i, err
+}
+
+const deletePosition = `-- name: DeletePosition :exec
+DELETE FROM positions
+WHERE id = $1 AND user_id = $2
+`
+
+type DeletePositionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeletePosition(ctx context.Context, arg DeletePositionParams) error {
+	_, err := q.db.Exec(ctx, deletePosition, arg.ID, arg.UserID)
+	return err
+}
 
 const getPosition = `-- name: GetPosition :one
 SELECT id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at, location FROM positions
@@ -87,4 +179,68 @@ func (q *Queries) GetPositionsByEmployer(ctx context.Context, arg GetPositionsBy
 		return nil, err
 	}
 	return items, nil
+}
+
+const updatePosition = `-- name: UpdatePosition :one
+UPDATE positions
+SET title             = $3,
+    industry_level    = $4,
+    industry_role     = $5,
+    location          = $6,
+    level_rationale   = $7,
+    started_on        = $8,
+    ended_on          = $9,
+    context_narrative = $10,
+    sort_order        = $11,
+    updated_at        = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, employer_id, title, industry_level, industry_role, level_rationale, started_on, ended_on, context_narrative, sort_order, created_at, updated_at, location
+`
+
+type UpdatePositionParams struct {
+	ID               uuid.UUID   `json:"id"`
+	UserID           uuid.UUID   `json:"user_id"`
+	Title            string      `json:"title"`
+	IndustryLevel    *string     `json:"industry_level"`
+	IndustryRole     *string     `json:"industry_role"`
+	Location         *string     `json:"location"`
+	LevelRationale   *string     `json:"level_rationale"`
+	StartedOn        pgtype.Date `json:"started_on"`
+	EndedOn          pgtype.Date `json:"ended_on"`
+	ContextNarrative *string     `json:"context_narrative"`
+	SortOrder        int32       `json:"sort_order"`
+}
+
+func (q *Queries) UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error) {
+	row := q.db.QueryRow(ctx, updatePosition,
+		arg.ID,
+		arg.UserID,
+		arg.Title,
+		arg.IndustryLevel,
+		arg.IndustryRole,
+		arg.Location,
+		arg.LevelRationale,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.ContextNarrative,
+		arg.SortOrder,
+	)
+	var i Position
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.EmployerID,
+		&i.Title,
+		&i.IndustryLevel,
+		&i.IndustryRole,
+		&i.LevelRationale,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.ContextNarrative,
+		&i.SortOrder,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Location,
+	)
+	return i, err
 }
