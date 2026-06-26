@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/shurikai/role-model/internal/api/middleware"
+	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -21,15 +21,15 @@ func NewContributionHandler(queries *db.Queries) *ContributionHandler {
 }
 
 func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	positionID, err := uuid.Parse(chi.URLParam(r, "positionID"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "position id must be a valid UUID")
 		return
 	}
 
@@ -38,23 +38,23 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 		UserID:     userID,
 	})
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, contributions)
+	httputil.WriteJSON(w, http.StatusOK, contributions)
 }
 
 func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "contribution id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "contribution id must be a valid UUID")
 		return
 	}
 
@@ -64,12 +64,12 @@ func (h *ContributionHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			WriteError(w, http.StatusNotFound, "not_found", "contribution not found")
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "contribution not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contribution")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contribution")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, contribution)
+	httputil.WriteJSON(w, http.StatusOK, contribution)
 }
