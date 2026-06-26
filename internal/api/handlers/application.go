@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/shurikai/role-model/internal/api/middleware"
+	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -40,30 +40,30 @@ type updateApplicationRequest struct {
 }
 
 func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	apps, err := h.queries.ListApplications(r.Context(), userID)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch applications")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch applications")
 		return
 	}
-	writeJSON(w, http.StatusOK, apps)
+	httputil.WriteJSON(w, http.StatusOK, apps)
 }
 
 func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -73,19 +73,19 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			WriteError(w, http.StatusNotFound, "not_found", "application not found")
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "application not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch application")
 		return
 	}
-	writeJSON(w, http.StatusOK, app)
+	httputil.WriteJSON(w, http.StatusOK, app)
 }
 
 func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
@@ -95,7 +95,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.CompanyName == "" || req.RoleTitle == "" {
-		WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
 		return
 	}
 	if req.Status == "" {
@@ -112,22 +112,22 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Notes:       req.Notes,
 	})
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create application")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create application")
 		return
 	}
-	writeJSON(w, http.StatusCreated, app)
+	httputil.WriteJSON(w, http.StatusCreated, app)
 }
 
 func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, ok := middleware.UserIDFromContext(r.Context())
+	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
 		return
 	}
 
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
+		httputil.WriteError(w, http.StatusBadRequest, "invalid_id", "application id must be a valid UUID")
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.CompanyName == "" || req.RoleTitle == "" {
-		WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "company_name and role_title are required")
 		return
 	}
 
@@ -153,11 +153,11 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			WriteError(w, http.StatusNotFound, "not_found", "application not found")
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "application not found")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update application")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update application")
 		return
 	}
-	writeJSON(w, http.StatusOK, app)
+	httputil.WriteJSON(w, http.StatusOK, app)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/shurikai/role-model/internal/auth"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/httputil"
 )
 
 type AuthHandler struct {
@@ -44,17 +45,17 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Email == "" || req.Password == "" {
-		WriteError(w, http.StatusBadRequest, "validation_error", "email and password are required")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "email and password are required")
 		return
 	}
 	if len(req.Password) < 8 {
-		WriteError(w, http.StatusBadRequest, "validation_error", "password must be at least 8 characters")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "password must be at least 8 characters")
 		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to process password")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to process password")
 		return
 	}
 	hashStr := string(hash)
@@ -67,17 +68,17 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		// Most likely cause: email already exists (unique constraint).
-		WriteError(w, http.StatusConflict, "email_taken", "an account with that email already exists")
+		httputil.WriteError(w, http.StatusConflict, "email_taken", "an account with that email already exists")
 		return
 	}
 
 	token, err := auth.IssueToken(user.ID, h.jwtSecret)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue token")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue token")
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, authResponse{
+	httputil.WriteJSON(w, http.StatusCreated, authResponse{
 		Token: token,
 		User:  userDTO{ID: user.ID, Email: user.Email},
 	})
@@ -89,7 +90,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Email == "" || req.Password == "" {
-		WriteError(w, http.StatusBadRequest, "validation_error", "email and password are required")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "email and password are required")
 		return
 	}
 
@@ -97,31 +98,31 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Same generic error as a bad password — don't reveal which failed.
-			WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+			httputil.WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 			return
 		}
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to process login")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to process login")
 		return
 	}
 
 	// An account with no password (future OAuth-only user) can't log in by password.
 	if user.PasswordHash == nil {
-		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		httputil.WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
-		WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		httputil.WriteError(w, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
 
 	token, err := auth.IssueToken(user.ID, h.jwtSecret)
 	if err != nil {
-		WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue token")
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to issue token")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, authResponse{
+	httputil.WriteJSON(w, http.StatusOK, authResponse{
 		Token: token,
 		User:  userDTO{ID: user.ID, Email: user.Email},
 	})

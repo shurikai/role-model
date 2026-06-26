@@ -11,6 +11,73 @@ import (
 	"github.com/google/uuid"
 )
 
+const countPositionsByEmployer = `-- name: CountPositionsByEmployer :one
+SELECT count(*) FROM positions
+WHERE employer_id = $1 AND user_id = $2
+`
+
+type CountPositionsByEmployerParams struct {
+	EmployerID uuid.UUID `json:"employer_id"`
+	UserID     uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPositionsByEmployer, arg.EmployerID, arg.UserID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createEmployer = `-- name: CreateEmployer :one
+INSERT INTO employers (id, user_id, name, industry, notes)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, name, industry, notes, created_at, updated_at
+`
+
+type CreateEmployerParams struct {
+	ID       uuid.UUID `json:"id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Name     string    `json:"name"`
+	Industry *string   `json:"industry"`
+	Notes    *string   `json:"notes"`
+}
+
+func (q *Queries) CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error) {
+	row := q.db.QueryRow(ctx, createEmployer,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Industry,
+		arg.Notes,
+	)
+	var i Employer
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Industry,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteEmployer = `-- name: DeleteEmployer :exec
+DELETE FROM employers
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteEmployerParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error {
+	_, err := q.db.Exec(ctx, deleteEmployer, arg.ID, arg.UserID)
+	return err
+}
+
 const getEmployer = `-- name: GetEmployer :one
 SELECT id, user_id, name, industry, notes, created_at, updated_at FROM employers
 WHERE id = $1 AND user_id = $2
@@ -68,4 +135,43 @@ func (q *Queries) GetEmployers(ctx context.Context, userID uuid.UUID) ([]Employe
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateEmployer = `-- name: UpdateEmployer :one
+UPDATE employers
+SET name     = $3,
+    industry = $4,
+    notes    = $5,
+    updated_at = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, name, industry, notes, created_at, updated_at
+`
+
+type UpdateEmployerParams struct {
+	ID       uuid.UUID `json:"id"`
+	UserID   uuid.UUID `json:"user_id"`
+	Name     string    `json:"name"`
+	Industry *string   `json:"industry"`
+	Notes    *string   `json:"notes"`
+}
+
+func (q *Queries) UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error) {
+	row := q.db.QueryRow(ctx, updateEmployer,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Industry,
+		arg.Notes,
+	)
+	var i Employer
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Industry,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
