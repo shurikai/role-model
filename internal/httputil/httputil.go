@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type contextKey string
@@ -40,4 +42,19 @@ func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
 func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(userIDKey).(uuid.UUID)
 	return id, ok
+}
+
+func ParseDate(s string) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return pgtype.Date{}, err
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
+}
+
+func ParseNullableDate(s *string) (pgtype.Date, error) {
+	if s == nil || *s == "" {
+		return pgtype.Date{Valid: false}, nil
+	}
+	return ParseDate(*s)
 }

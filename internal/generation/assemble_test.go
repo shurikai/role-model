@@ -47,7 +47,7 @@ func TestAssembleContext(t *testing.T) {
 		}
 		for _, pos := range emp.Positions {
 			if len(pos.Contributions) == 0 {
-				t.Errorf("position %q (employer %q) has no contributions", pos.Title, emp.Name)
+				t.Errorf("position %q (employer %q) has no contributions, but was included", pos.Title, emp.Name)
 				continue
 			}
 			for _, c := range pos.Contributions {
@@ -55,6 +55,13 @@ func TestAssembleContext(t *testing.T) {
 					foundTags = true
 				}
 			}
+		}
+	}
+
+	// Pelotech must NOT appear — its only contributions are inactive.
+	for _, emp := range rc.Employers {
+		if emp.Name == "Pelotech" {
+			t.Errorf("Pelotech should be excluded (only inactive contributions) but appeared")
 		}
 	}
 
