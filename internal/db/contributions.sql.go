@@ -11,6 +11,87 @@ import (
 	"github.com/google/uuid"
 )
 
+const createContribution = `-- name: CreateContribution :one
+INSERT INTO contributions (
+    id, user_id, position_id, summary, full_description, outcomes, scale_context, is_active
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, position_id, summary, full_description, outcomes, scale_context, is_active, created_at, updated_at
+`
+
+type CreateContributionParams struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	PositionID      uuid.UUID `json:"position_id"`
+	Summary         string    `json:"summary"`
+	FullDescription string    `json:"full_description"`
+	Outcomes        *string   `json:"outcomes"`
+	ScaleContext    *string   `json:"scale_context"`
+	IsActive        bool      `json:"is_active"`
+}
+
+func (q *Queries) CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error) {
+	row := q.db.QueryRow(ctx, createContribution,
+		arg.ID,
+		arg.UserID,
+		arg.PositionID,
+		arg.Summary,
+		arg.FullDescription,
+		arg.Outcomes,
+		arg.ScaleContext,
+		arg.IsActive,
+	)
+	var i Contribution
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PositionID,
+		&i.Summary,
+		&i.FullDescription,
+		&i.Outcomes,
+		&i.ScaleContext,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteContribution = `-- name: DeleteContribution :exec
+DELETE FROM contributions
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteContributionParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteContribution(ctx context.Context, arg DeleteContributionParams) error {
+	_, err := q.db.Exec(ctx, deleteContribution, arg.ID, arg.UserID)
+	return err
+}
+
+const deleteContributionProjectLinks = `-- name: DeleteContributionProjectLinks :exec
+DELETE FROM project_contributions
+WHERE contribution_id = $1
+`
+
+func (q *Queries) DeleteContributionProjectLinks(ctx context.Context, contributionID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteContributionProjectLinks, contributionID)
+	return err
+}
+
+const deleteContributionTags = `-- name: DeleteContributionTags :exec
+DELETE FROM contribution_tags
+WHERE contribution_id = $1
+`
+
+func (q *Queries) DeleteContributionTags(ctx context.Context, contributionID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteContributionTags, contributionID)
+	return err
+}
+
 const getContribution = `-- name: GetContribution :one
 SELECT id, user_id, position_id, summary, full_description, outcomes, scale_context, is_active, created_at, updated_at FROM contributions
 WHERE id = $1 AND user_id = $2
@@ -79,4 +160,52 @@ func (q *Queries) GetContributionsByPosition(ctx context.Context, arg GetContrib
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateContribution = `-- name: UpdateContribution :one
+UPDATE contributions
+SET summary         = $3,
+    full_description = $4,
+    outcomes        = $5,
+    scale_context   = $6,
+    is_active       = $7,
+    updated_at      = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, position_id, summary, full_description, outcomes, scale_context, is_active, created_at, updated_at
+`
+
+type UpdateContributionParams struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Summary         string    `json:"summary"`
+	FullDescription string    `json:"full_description"`
+	Outcomes        *string   `json:"outcomes"`
+	ScaleContext    *string   `json:"scale_context"`
+	IsActive        bool      `json:"is_active"`
+}
+
+func (q *Queries) UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error) {
+	row := q.db.QueryRow(ctx, updateContribution,
+		arg.ID,
+		arg.UserID,
+		arg.Summary,
+		arg.FullDescription,
+		arg.Outcomes,
+		arg.ScaleContext,
+		arg.IsActive,
+	)
+	var i Contribution
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PositionID,
+		&i.Summary,
+		&i.FullDescription,
+		&i.Outcomes,
+		&i.ScaleContext,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

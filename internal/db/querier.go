@@ -14,10 +14,14 @@ type Querier interface {
 	CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error)
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
+	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
 	CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error)
 	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
+	DeleteContribution(ctx context.Context, arg DeleteContributionParams) error
+	DeleteContributionProjectLinks(ctx context.Context, contributionID uuid.UUID) error
+	DeleteContributionTags(ctx context.Context, contributionID uuid.UUID) error
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
@@ -41,6 +45,7 @@ type Querier interface {
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
+	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
 	UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error)
 	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
 }

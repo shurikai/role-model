@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -149,4 +150,53 @@ func assertStatus(t *testing.T, resp *http.Response, want int, label string) {
 	if resp.StatusCode != want {
 		t.Errorf("%s: got status %d, want %d", label, resp.StatusCode, want)
 	}
+}
+
+func TestContributionDelete(t *testing.T) {
+	srv, _ := testServer(t)
+
+	suffix := uuid.NewString()
+	token := signupUser(t, srv, "contrib-"+suffix+"@test.local", "password123")
+
+	// Build the parent chain: employer -> position -> contribution.
+	employerID := createAndGetID(t, srv, token, "/api/v1/employers",
+		map[string]string{"name": "Test Corp"})
+
+	positionID := createAndGetID(t, srv, token, "/api/v1/positions", map[string]any{
+		"employer_id": employerID,
+		"title":       "Engineer",
+		"started_on":  "2020-01-01",
+		"sort_order":  0,
+	})
+
+	contribID := createAndGetID(t, srv, token, "/api/v1/contributions", map[string]any{
+		"position_id":      positionID,
+		"summary":          "Did a thing",
+		"full_description": "A detailed description of the thing.",
+	})
+
+	// Delete it — should succeed with 204.
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/contributions/"+contribID, token, nil)
+	assertStatus(t, resp, http.StatusNoContent, "delete contribution")
+
+	// Confirm it's gone — a follow-up GET should 404.
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/contributions/"+contribID, token, nil)
+	assertStatus(t, resp, http.StatusNotFound, "get deleted contribution")
+}
+
+func createAndGetID(t *testing.T, srv *httptest.Server, token, path string, body any) string {
+	t.Helper()
+	resp := doJSON(t, srv, http.MethodPost, path, token, body)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("%s: status %d, body: %s", path, resp.StatusCode, b)
+	}
+	var out struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode id from %s: %v", path, err)
+	}
+	return out.ID
 }
