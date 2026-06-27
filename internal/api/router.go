@@ -47,9 +47,12 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Patch("/positions/{id}", positionHandler.Update)
 			r.Delete("/positions/{id}", positionHandler.Delete)
 
-			contributionHandler := handlers.NewContributionHandler(deps.Queries)
+			contributionHandler := handlers.NewContributionHandler(deps.Pool, deps.Queries)
 			r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
 			r.Get("/contributions/{id}", contributionHandler.Get)
+			r.Post("/contributions", contributionHandler.Create)
+			r.Patch("/contributions/{id}", contributionHandler.Update)
+			r.Delete("/contributions/{id}", contributionHandler.Delete)
 
 			applicationHandler := handlers.NewApplicationHandler(deps.Queries)
 			r.Get("/applications", applicationHandler.List)
