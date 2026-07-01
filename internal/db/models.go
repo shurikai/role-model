@@ -40,6 +40,22 @@ type Contribution struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+type ContributionDraft struct {
+	ID              uuid.UUID        `json:"id"`
+	UserID          uuid.UUID        `json:"user_id"`
+	BatchID         uuid.UUID        `json:"batch_id"`
+	EmployerName    string           `json:"employer_name"`
+	PositionTitle   string           `json:"position_title"`
+	Summary         *string          `json:"summary"`
+	FullDescription *string          `json:"full_description"`
+	Outcomes        *string          `json:"outcomes"`
+	ScaleContext    *string          `json:"scale_context"`
+	Flags           *json.RawMessage `json:"flags"`
+	Status          string           `json:"status"`
+	CreatedAt       time.Time        `json:"created_at"`
+	UpdatedAt       time.Time        `json:"updated_at"`
+}
+
 type ContributionFeedback struct {
 	ID              uuid.UUID        `json:"id"`
 	UserID          uuid.UUID        `json:"user_id"`
@@ -99,6 +115,16 @@ type Employer struct {
 	Name      string    `json:"name"`
 	Industry  *string   `json:"industry"`
 	Notes     *string   `json:"notes"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ImportBatch struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	RawText   string    `json:"raw_text"`
+	Status    string    `json:"status"`
+	ErrorText *string   `json:"error_text"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

@@ -8,12 +8,14 @@ import (
 	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/stage0"
 )
 
 type RouterDeps struct {
 	Pool      *pgxpool.Pool
 	Queries   *db.Queries
 	GenSvc    *generation.Service
+	Stage0Svc *stage0.Service
 	JWTSecret string
 }
 
@@ -67,6 +69,15 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			resumeVersionHandler := handlers.NewResumeVersionHandler(deps.Queries)
 			r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
 			r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
+
+			importHandler := handlers.NewImportHandler(deps.Pool, deps.Queries, deps.Stage0Svc)
+			r.Post("/import", importHandler.Create)
+			r.Get("/import/{batchID}", importHandler.GetBatch)
+			r.Get("/import/{batchID}/drafts", importHandler.ListDrafts)
+			r.Get("/import/drafts/{draftID}", importHandler.GetDraft)
+			r.Put("/import/drafts/{draftID}", importHandler.UpdateDraft)
+			r.Post("/import/drafts/{draftID}/approve", importHandler.Approve)
+			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
 		})
 	})
 
