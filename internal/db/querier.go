@@ -17,13 +17,17 @@ type Querier interface {
 	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
 	CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error)
 	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
+	CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
+	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteContribution(ctx context.Context, arg DeleteContributionParams) error
 	DeleteContributionProjectLinks(ctx context.Context, contributionID uuid.UUID) error
 	DeleteContributionTags(ctx context.Context, contributionID uuid.UUID) error
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
+	DeletePreference(ctx context.Context, arg DeletePreferenceParams) error
+	DeleteSkill(ctx context.Context, arg DeleteSkillParams) error
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
 	GetContribution(ctx context.Context, arg GetContributionParams) (Contribution, error)
 	GetContributionsByPosition(ctx context.Context, arg GetContributionsByPositionParams) ([]Contribution, error)
@@ -34,20 +38,30 @@ type Querier interface {
 	GetEmployers(ctx context.Context, userID uuid.UUID) ([]Employer, error)
 	GetPosition(ctx context.Context, arg GetPositionParams) (Position, error)
 	GetPositionsByEmployer(ctx context.Context, arg GetPositionsByEmployerParams) ([]Position, error)
+	GetPreference(ctx context.Context, arg GetPreferenceParams) (Preference, error)
 	GetProjects(ctx context.Context, userID uuid.UUID) ([]Project, error)
 	GetResumeVersion(ctx context.Context, arg GetResumeVersionParams) (ResumeVersion, error)
+	GetSkill(ctx context.Context, arg GetSkillParams) (Skill, error)
 	GetTagsByContribution(ctx context.Context, arg GetTagsByContributionParams) ([]GetTagsByContributionRow, error)
 	GetTagsByProject(ctx context.Context, arg GetTagsByProjectParams) ([]GetTagsByProjectRow, error)
 	GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
+	ListActiveSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
+	ListContributionsBySkill(ctx context.Context, skillID uuid.UUID) ([]uuid.UUID, error)
+	ListHardExcludesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
+	ListPreferencesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
+	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)
 	ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error)
+	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
 	UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error)
 	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
+	UpdatePreference(ctx context.Context, arg UpdatePreferenceParams) (Preference, error)
+	UpdateSkill(ctx context.Context, arg UpdateSkillParams) (Skill, error)
 }
 
 var _ Querier = (*Queries)(nil)

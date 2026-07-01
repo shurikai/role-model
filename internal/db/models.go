@@ -120,6 +120,19 @@ type Position struct {
 	Location         *string     `json:"location"`
 }
 
+type Preference struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	PreferenceType string    `json:"preference_type"`
+	Label          string    `json:"label"`
+	Sentiment      string    `json:"sentiment"`
+	Weight         *int16    `json:"weight"`
+	ContextType    *string   `json:"context_type"`
+	Notes          *string   `json:"notes"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type Project struct {
 	ID           uuid.UUID   `json:"id"`
 	UserID       uuid.UUID   `json:"user_id"`
@@ -160,6 +173,17 @@ type ResumeVersion struct {
 	CreatedAt        time.Time        `json:"created_at"`
 }
 
+type Skill struct {
+	ID              uuid.UUID      `json:"id"`
+	UserID          uuid.UUID      `json:"user_id"`
+	TagID           uuid.UUID      `json:"tag_id"`
+	Proficiency     string         `json:"proficiency"`
+	YearsExperience pgtype.Numeric `json:"years_experience"`
+	IsActive        bool           `json:"is_active"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
 type Tag struct {
 	ID        uuid.UUID `json:"id"`
 	UserID    uuid.UUID `json:"user_id"`
@@ -191,4 +215,10 @@ type User struct {
 	SiteUrl      *string   `json:"site_url"`
 	Headline     *string   `json:"headline"`
 	PasswordHash *string   `json:"password_hash"`
+}
+
+type VSkillProvenance struct {
+	SkillID        uuid.UUID `json:"skill_id"`
+	UserID         uuid.UUID `json:"user_id"`
+	ContributionID uuid.UUID `json:"contribution_id"`
 }
