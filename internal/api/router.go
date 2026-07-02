@@ -37,6 +37,8 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(deps.JWTSecret))
 
+			r.Get("/auth/me", authHandler.Me)
+
 			employerHandler := handlers.NewEmployerHandler(deps.Queries)
 			r.Get("/employers", employerHandler.List)
 			r.Get("/employers/{id}", employerHandler.Get)
