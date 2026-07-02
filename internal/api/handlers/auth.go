@@ -127,3 +127,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		User:  userDTO{ID: user.ID, Email: user.Email},
 	})
 }
+
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httputil.UserIDFromContext(r.Context())
+	if !ok {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	user, err := h.queries.GetUser(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			httputil.WriteError(w, http.StatusNotFound, "not_found", "user not found")
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch user")
+		return
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, user)
+}
