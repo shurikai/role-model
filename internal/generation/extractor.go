@@ -11,9 +11,22 @@ import (
 
 // JDSignals is the structured output of signal extraction.
 type JDSignals struct {
-	PrioritySkills   []string `json:"priority_skills"`
-	Seniority        string   `json:"seniority"`
-	DomainVocabulary []string `json:"domain_vocabulary"`
+	// Skills
+	RequiredSkills  []string `json:"required_skills"`
+	PreferredSkills []string `json:"preferred_skills"`
+
+	// Role classification
+	Seniority string `json:"seniority"`
+	Domain    string `json:"domain"`
+	WorkType  string `json:"work_type"`
+
+	// Culture and preference signals
+	CultureSignals []string `json:"culture_signals"`
+
+	// Deprecated: retained for backward compatibility with existing jd_signals rows.
+	// Do not use in new code. Will be removed in a future cleanup.
+	PrioritySkills   []string `json:"priority_skills,omitempty"`
+	DomainVocabulary []string `json:"domain_vocabulary,omitempty"`
 }
 
 type extractPromptData struct {
