@@ -6,10 +6,12 @@ package stage0
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/shurikai/role-model/internal/db"
@@ -19,6 +21,12 @@ import (
 const (
 	extractionMaxTokens = 4096
 	enrichmentMaxTokens = 1024
+)
+
+var (
+	ErrDraftNotPending  = errors.New("draft is not pending")
+	ErrDraftIncomplete  = errors.New("draft summary and full_description must be set before approval")
+	ErrPositionNotFound = errors.New("position not found")
 )
 
 // Service owns the Stage 0 lifecycle: extraction, enrichment, and the status
@@ -147,6 +155,71 @@ func (s *Service) insertDrafts(ctx context.Context, batchID, userID uuid.UUID, e
 	}
 
 	return drafts, nil
+}
+
+// ApproveDraft verifies the target position belongs to userID, writes a new
+// contribution from the draft's fields, and marks the draft approved.
+func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID uuid.UUID) (db.Contribution, error) {
+	draft, err := s.q.GetContributionDraft(ctx, db.GetContributionDraftParams{ID: draftID, UserID: userID})
+	if err != nil {
+		return db.Contribution{}, err
+	}
+	if draft.Status != "pending" {
+		return db.Contribution{}, ErrDraftNotPending
+	}
+	if draft.Summary == nil || *draft.Summary == "" {
+		return db.Contribution{}, ErrDraftIncomplete
+	}
+	if draft.FullDescription == nil || *draft.FullDescription == "" {
+		return db.Contribution{}, ErrDraftIncomplete
+	}
+
+	// Parent-ownership check: the position must exist AND belong to this user.
+	if _, err := s.q.GetPosition(ctx, db.GetPositionParams{
+		ID:     positionID,
+		UserID: userID,
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return db.Contribution{}, ErrPositionNotFound
+		}
+		return db.Contribution{}, fmt.Errorf("approve draft: verify position: %w", err)
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return db.Contribution{}, fmt.Errorf("approve draft: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) // no-op after a successful commit
+
+	qtx := s.q.WithTx(tx)
+
+	contribution, err := qtx.CreateContribution(ctx, db.CreateContributionParams{
+		ID:              uuid.New(),
+		UserID:          userID,
+		PositionID:      positionID,
+		Summary:         *draft.Summary,
+		FullDescription: *draft.FullDescription,
+		Outcomes:        draft.Outcomes,
+		ScaleContext:    draft.ScaleContext,
+		IsActive:        true,
+	})
+	if err != nil {
+		return db.Contribution{}, fmt.Errorf("approve draft: create contribution: %w", err)
+	}
+
+	if _, err := qtx.UpdateContributionDraftStatus(ctx, db.UpdateContributionDraftStatusParams{
+		ID:     draftID,
+		UserID: userID,
+		Status: "approved",
+	}); err != nil {
+		return db.Contribution{}, fmt.Errorf("approve draft: update draft status: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return db.Contribution{}, fmt.Errorf("approve draft: commit tx: %w", err)
+	}
+
+	return contribution, nil
 }
 
 // RunEnrichment runs Stage 0b for a single draft. Failures are returned to the

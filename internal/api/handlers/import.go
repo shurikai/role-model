@@ -11,7 +11,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/httputil"
@@ -19,13 +18,12 @@ import (
 )
 
 type ImportHandler struct {
-	pool    *pgxpool.Pool
 	queries *db.Queries
 	stage0  *stage0.Service
 }
 
-func NewImportHandler(pool *pgxpool.Pool, queries *db.Queries, stage0Svc *stage0.Service) *ImportHandler {
-	return &ImportHandler{pool: pool, queries: queries, stage0: stage0Svc}
+func NewImportHandler(queries *db.Queries, stage0Svc *stage0.Service) *ImportHandler {
+	return &ImportHandler{queries: queries, stage0: stage0Svc}
 }
 
 type createImportBatchRequest struct {
@@ -303,8 +301,7 @@ type approveDraftRequest struct {
 	PositionID uuid.UUID `json:"position_id"`
 }
 
-// Approve verifies the target position belongs to the user, writes a new
-// contribution from the draft's fields, and marks the draft approved.
+// Approve validates the request and delegates draft approval to stage0.Service.
 func (h *ImportHandler) Approve(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
@@ -327,76 +324,20 @@ func (h *ImportHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	draft, err := h.queries.GetContributionDraft(r.Context(), db.GetContributionDraftParams{ID: id, UserID: userID})
+	contribution, err := h.stage0.ApproveDraft(r.Context(), userID, id, req.PositionID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
 			httputil.WriteError(w, http.StatusNotFound, "not_found", "draft not found")
-			return
-		}
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch draft")
-		return
-	}
-	if draft.Status != "pending" {
-		httputil.WriteError(w, http.StatusConflict, "invalid_state", "draft is not pending")
-		return
-	}
-	if draft.Summary == nil || *draft.Summary == "" {
-		httputil.WriteError(w, http.StatusUnprocessableEntity, "validation_error", "draft summary must be set before approval")
-		return
-	}
-	if draft.FullDescription == nil || *draft.FullDescription == "" {
-		httputil.WriteError(w, http.StatusUnprocessableEntity, "validation_error", "draft full_description must be set before approval")
-		return
-	}
-
-	// Parent-ownership check: the position must exist AND belong to this user.
-	if _, err := h.queries.GetPosition(r.Context(), db.GetPositionParams{
-		ID:     req.PositionID,
-		UserID: userID,
-	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		case errors.Is(err, stage0.ErrDraftNotPending):
+			httputil.WriteError(w, http.StatusConflict, "invalid_state", "draft is not pending")
+		case errors.Is(err, stage0.ErrDraftIncomplete):
+			httputil.WriteError(w, http.StatusUnprocessableEntity, "validation_error", err.Error())
+		case errors.Is(err, stage0.ErrPositionNotFound):
 			httputil.WriteError(w, http.StatusNotFound, "position_not_found", "position not found")
-			return
+		default:
+			httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to approve draft")
 		}
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to verify position")
-		return
-	}
-
-	tx, err := h.pool.Begin(r.Context())
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to begin transaction")
-		return
-	}
-	defer tx.Rollback(r.Context()) // no-op after a successful commit
-
-	qtx := h.queries.WithTx(tx)
-
-	contribution, err := qtx.CreateContribution(r.Context(), db.CreateContributionParams{
-		ID:              uuid.New(),
-		UserID:          userID,
-		PositionID:      req.PositionID,
-		Summary:         *draft.Summary,
-		FullDescription: *draft.FullDescription,
-		Outcomes:        draft.Outcomes,
-		ScaleContext:    draft.ScaleContext,
-		IsActive:        true,
-	})
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create contribution")
-		return
-	}
-
-	if _, err := qtx.UpdateContributionDraftStatus(r.Context(), db.UpdateContributionDraftStatusParams{
-		ID:     id,
-		UserID: userID,
-		Status: "approved",
-	}); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to update draft status")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to commit approval")
 		return
 	}
 
