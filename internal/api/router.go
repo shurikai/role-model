@@ -7,6 +7,7 @@ import (
 	"github.com/shurikai/role-model/internal/api/handlers"
 	"github.com/shurikai/role-model/internal/api/middleware"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/stage0"
 )
@@ -16,6 +17,7 @@ type RouterDeps struct {
 	Queries   *db.Queries
 	GenSvc    *generation.Service
 	Stage0Svc *stage0.Service
+	FitSvc    *fitgate.Service
 	JWTSecret string
 }
 
@@ -69,6 +71,11 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			resumeVersionHandler := handlers.NewResumeVersionHandler(deps.Queries)
 			r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
 			r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
+
+			fitHandler := handlers.NewFitHandler(deps.Queries, deps.FitSvc)
+			r.Post("/applications/{applicationID}/fit", fitHandler.Run)
+			r.Get("/applications/{applicationID}/fit", fitHandler.ListByApplication)
+			r.Get("/applications/{applicationID}/fit/{reportID}", fitHandler.Get)
 
 			importHandler := handlers.NewImportHandler(deps.Pool, deps.Queries, deps.Stage0Svc)
 			r.Post("/import", importHandler.Create)
