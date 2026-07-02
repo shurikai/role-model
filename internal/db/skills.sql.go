@@ -91,6 +91,33 @@ func (q *Queries) GetSkill(ctx context.Context, arg GetSkillParams) (Skill, erro
 	return i, err
 }
 
+const listActiveSkillTagNamesByUser = `-- name: ListActiveSkillTagNamesByUser :many
+SELECT t.name
+FROM skills s
+JOIN tags t ON t.id = s.tag_id
+WHERE s.user_id = $1 AND s.is_active = true
+`
+
+func (q *Queries) ListActiveSkillTagNamesByUser(ctx context.Context, userID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listActiveSkillTagNamesByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveSkillsByUser = `-- name: ListActiveSkillsByUser :many
 SELECT id, user_id, tag_id, proficiency, years_experience, is_active, created_at, updated_at FROM skills
 WHERE user_id = $1 AND is_active = true

@@ -12,6 +12,7 @@ import (
 	"github.com/shurikai/role-model/internal/api"
 	"github.com/shurikai/role-model/internal/config"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/stage0"
 )
@@ -30,11 +31,13 @@ func main() {
 	genClient := generation.NewClient(cfg.AnthropicAPIKey)
 	genSvc := generation.NewService(queries, genClient)
 	stage0Svc := stage0.NewService(pool, queries, genClient)
+	fitSvc := fitgate.NewService(queries, genClient)
 	router := api.NewRouter(api.RouterDeps{
 		Pool:      pool,
 		Queries:   queries,
 		GenSvc:    genSvc,
 		Stage0Svc: stage0Svc,
+		FitSvc:    fitSvc,
 		JWTSecret: cfg.JWTSecret,
 	})
 
