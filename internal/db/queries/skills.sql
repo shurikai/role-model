@@ -33,3 +33,9 @@ WHERE id = $1 AND user_id = $2;
 -- name: ListContributionsBySkill :many
 SELECT contribution_id FROM v_skill_provenance
 WHERE skill_id = $1;
+
+-- name: ListActiveSkillTagNamesByUser :many
+SELECT t.name
+FROM skills s
+JOIN tags t ON t.id = s.tag_id
+WHERE s.user_id = $1 AND s.is_active = true;

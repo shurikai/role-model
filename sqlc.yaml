@@ -29,3 +29,9 @@ sql:
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "contribution_drafts.flags"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
+          - column: "fit_reports.anti_pattern_hits"
+            go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
+          - column: "fit_reports.technical_gaps"
+            go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
+          - column: "fit_reports.preference_gaps"
+            go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
