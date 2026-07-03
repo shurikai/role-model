@@ -10,7 +10,13 @@ Designed with a clear path to multi-tenant deployment without requiring
 a schema redesign.
 
 ## Status
-Active development. Core API endpoints are implemented: employer/position/contribution reads, application CRUD, and JD signal extraction via Anthropic. Resume generation pipeline is wired. Renderer is not yet built.
+Active development. Backend: employer/position/contribution CRUD, application
+CRUD, JWT auth (signup/login/me), JD signal extraction and resume generation
+pipeline, Stage 0 import (extract + enrich + approve/reject), fit gate
+scoring, CORS. Frontend: auth shell (login/signup/session persistence/401
+handling) with test coverage, built on Vite + React + TypeScript.
+internal/renderer was deleted (dead code, no consumer) — resume rendering
+is not yet built; see Open Questions below for the deferred design question.
 
 ## Stack
 - **Language:** Go
@@ -134,7 +140,9 @@ seems genuinely warranted.
 - JSON request/response
 - Structured error responses, not raw strings
 - Environment-based config, no hardcoded values
-- Auth is stubbed for single-user now, designed for JWT-based auth later
+- JWT-based auth (24h token, no refresh — see internal/auth), single-tenant
+  today but every table already carries user_id for a clean path to
+  multi-tenant later
 
 ## Conventions
 - No ORM — use sqlc generated code against pgx native interface
@@ -160,7 +168,7 @@ seems genuinely warranted.
 
 ## Open Questions
 - Blob storage interface for rendered documents (local disk now, S3 later)
-- Auth implementation (stub for single-user, JWT for multi-user)
-- Renderer service: Go-native vs Python/python-docx (deferred)
+- Renderer service: Go-native vs Python/python-docx (deferred — no
+  implementation exists yet; do not pre-define an interface for this ahead
+  of the actual session, per the internal/renderer lesson)
 - Evaluation strategy for prompt quality across versions (deferred)
-
