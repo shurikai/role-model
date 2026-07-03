@@ -39,6 +39,7 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 - **Anthropic Go SDK** for both pipeline stages, with prompts versioned as templates and included in the static executable via `go:embed`
 - **JSON Schema validation** (`santhosh-tekuri/jsonschema`) against a fixed resume schema, so generation output is structurally guaranteed before storage
 - **Python**, scoped narrowly to prompt experimentation and a planned DOCX renderer — not the service itself
+- **React + TypeScript** frontend (Vite, TanStack Query, React Router) for the auth shell, with more views to come as the backend surface grows
 
 ## Getting started
 
@@ -58,14 +59,36 @@ Other useful targets: `make test` (unit tests), `make test-integration` (require
 
 Career history itself — employers, positions, contributions — lives outside this repo as a set of versioned, idempotent SQL seed files, pointed to by `SEED_DIR`. This is intentional (see "Career data is seeded, not written through the API" above); there's no bundled sample data, since the whole point is that this seeds *your* career, not a demo one.
 
+### Frontend
+
+The frontend (auth shell only, for now) lives in `frontend/` and talks to the API above. See `frontend/README.md` for details.
+
+```bash
+cd frontend
+npm install
+npm run dev     # start the Vite dev server
+npm test        # run the Vitest suite
+```
+
 ## Status
 
-The JD signal extraction pipeline (Stage 1) is working end to end against the real API. Stage 2 — context assembly, the generation endpoint, and resume version storage and retrieval — is the current focus. A job discovery worker (scraping public ATS feeds like Greenhouse and Ashby, fanning out via Kafka to extraction and notification consumers) is designed but parked until Stage 2 ships.
+Both pipeline stages work end to end against the real API, output is validated against `schema/resume.v1.json` before storage, and the surrounding CRUD surface is built out:
+
+- **Backend:** full CRUD for employers, positions, and contributions; application CRUD; JWT auth (signup/login/me, 24h token, no refresh); JD signal extraction and resume generation (Stages 1–2); Stage 0 import (LLM-assisted extract + enrich, with human approve/reject) for pulling new contributions out of raw text; a fit-gate scoring pass that flags weak job/candidate matches before spending a generation call; config-driven CORS.
+- **Frontend:** an auth shell (login, signup, session persistence, 401 handling) on Vite + React + TypeScript + TanStack Query, with test coverage (Vitest).
+- `internal/renderer` was removed as dead code — no consumer existed yet. Resume rendering (DOCX/PDF) is designed but not started; see Open Questions.
+
+A job discovery worker (scraping public ATS feeds like Greenhouse and Ashby, fanning out via Kafka to extraction and notification consumers) is designed but parked until the renderer ships.
 
 This README will grow as the system does.
 
+## Open Questions
+- Blob storage interface for rendered documents (local disk now, S3 later)
+- Renderer service: Go-native vs. Python/python-docx — deferred deliberately; no interface has been pre-defined ahead of that session
+- Evaluation strategy for prompt quality across versions
+
 ## TODO
-[ ] Wire `santhosh-tekuri/jsonschema` validation against `schema/resume.v1.json`
 [ ] Restore `applied_on` date parsing on the application update endpoint
-[ ] Add sample migrations with dummy test data
+[ ] Add sample migrations with dummy test data (for onboarding without real career data)
 [ ] Scaffold the document renderer (DOCX, possibly PDF)
+[ ] Build out frontend beyond the auth shell (employer/position/contribution/application views)
