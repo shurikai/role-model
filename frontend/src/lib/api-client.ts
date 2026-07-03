@@ -19,6 +19,15 @@ export class ApiError extends Error {
   }
 }
 
+const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
+
+export function formatApiError(err: unknown): string {
+  if (err instanceof ApiError) {
+    return err.code === "internal_error" ? GENERIC_ERROR_MESSAGE : err.message;
+  }
+  return GENERIC_ERROR_MESSAGE;
+}
+
 let unauthorizedHandler: (() => void) | null = null;
 
 export function setUnauthorizedHandler(fn: () => void): void {
