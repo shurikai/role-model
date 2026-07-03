@@ -7,19 +7,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/httputil"
 )
 
 type ContributionHandler struct {
-	pool    *pgxpool.Pool
-	queries *db.Queries
+	queries    *db.Queries
+	contribSvc *contribution.Service
 }
 
-func NewContributionHandler(pool *pgxpool.Pool, queries *db.Queries) *ContributionHandler {
-	return &ContributionHandler{pool: pool, queries: queries}
+func NewContributionHandler(queries *db.Queries, contribSvc *contribution.Service) *ContributionHandler {
+	return &ContributionHandler{queries: queries, contribSvc: contribSvc}
 }
 
 type createContributionRequest struct {
@@ -219,47 +219,12 @@ func (h *ContributionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ownership check before starting the transaction.
-	if _, err := h.queries.GetContribution(r.Context(), db.GetContributionParams{
-		ID:     id,
-		UserID: userID,
-	}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	if err := h.contribSvc.Delete(r.Context(), userID, id); err != nil {
+		if errors.Is(err, contribution.ErrNotFound) {
 			httputil.WriteError(w, http.StatusNotFound, "not_found", "contribution not found")
 			return
 		}
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to verify contribution")
-		return
-	}
-
-	// Transaction: remove join rows and the contribution atomically.
-	tx, err := h.pool.Begin(r.Context())
-	if err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to begin transaction")
-		return
-	}
-	defer tx.Rollback(r.Context()) // no-op after a successful commit
-
-	qtx := h.queries.WithTx(tx)
-
-	if err := qtx.DeleteContributionTags(r.Context(), id); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to remove tag links")
-		return
-	}
-	if err := qtx.DeleteContributionProjectLinks(r.Context(), id); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to remove project links")
-		return
-	}
-	if err := qtx.DeleteContribution(r.Context(), db.DeleteContributionParams{
-		ID:     id,
-		UserID: userID,
-	}); err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to delete contribution")
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to commit deletion")
 		return
 	}
 
