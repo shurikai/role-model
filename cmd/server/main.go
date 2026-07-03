@@ -33,12 +33,13 @@ func main() {
 	stage0Svc := stage0.NewService(pool, queries, genClient)
 	fitSvc := fitgate.NewService(queries, genClient)
 	router := api.NewRouter(api.RouterDeps{
-		Pool:      pool,
-		Queries:   queries,
-		GenSvc:    genSvc,
-		Stage0Svc: stage0Svc,
-		FitSvc:    fitSvc,
-		JWTSecret: cfg.JWTSecret,
+		Pool:           pool,
+		Queries:        queries,
+		GenSvc:         genSvc,
+		Stage0Svc:      stage0Svc,
+		FitSvc:         fitSvc,
+		JWTSecret:      cfg.JWTSecret,
+		AllowedOrigins: cfg.AllowedOrigins,
 	})
 
 	srv := &http.Server{

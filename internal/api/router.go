@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shurikai/role-model/internal/api/handlers"
 	"github.com/shurikai/role-model/internal/api/middleware"
@@ -13,16 +14,27 @@ import (
 )
 
 type RouterDeps struct {
-	Pool      *pgxpool.Pool
-	Queries   *db.Queries
-	GenSvc    *generation.Service
-	Stage0Svc *stage0.Service
-	FitSvc    *fitgate.Service
-	JWTSecret string
+	Pool           *pgxpool.Pool
+	Queries        *db.Queries
+	GenSvc         *generation.Service
+	Stage0Svc      *stage0.Service
+	FitSvc         *fitgate.Service
+	JWTSecret      string
+	AllowedOrigins []string
 }
 
 func NewRouter(deps RouterDeps) *chi.Mux {
 	r := chi.NewRouter()
+	// Mounted before Recoverer/Logger so CORS preflight (OPTIONS) requests —
+	// which never carry the Authorization header — are answered here instead
+	// of falling through to RequireAuth and being rejected as unauthenticated.
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   deps.AllowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 	r.Use(chimiddleware.Logger)
 	r.Use(middleware.Recoverer)
 
