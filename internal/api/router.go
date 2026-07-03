@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shurikai/role-model/internal/api/handlers"
 	"github.com/shurikai/role-model/internal/api/middleware"
+	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
@@ -19,6 +20,7 @@ type RouterDeps struct {
 	GenSvc         *generation.Service
 	Stage0Svc      *stage0.Service
 	FitSvc         *fitgate.Service
+	ContribSvc     *contribution.Service
 	JWTSecret      string
 	AllowedOrigins []string
 }
@@ -65,7 +67,7 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Patch("/positions/{id}", positionHandler.Update)
 			r.Delete("/positions/{id}", positionHandler.Delete)
 
-			contributionHandler := handlers.NewContributionHandler(deps.Pool, deps.Queries)
+			contributionHandler := handlers.NewContributionHandler(deps.Queries, deps.ContribSvc)
 			r.Get("/positions/{positionID}/contributions", contributionHandler.ListByPosition)
 			r.Get("/contributions/{id}", contributionHandler.Get)
 			r.Post("/contributions", contributionHandler.Create)

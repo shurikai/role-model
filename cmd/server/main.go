@@ -11,6 +11,7 @@ import (
 
 	"github.com/shurikai/role-model/internal/api"
 	"github.com/shurikai/role-model/internal/config"
+	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
@@ -32,12 +33,14 @@ func main() {
 	genSvc := generation.NewService(queries, genClient)
 	stage0Svc := stage0.NewService(pool, queries, genClient)
 	fitSvc := fitgate.NewService(queries, genClient)
+	contribSvc := contribution.NewService(pool, queries)
 	router := api.NewRouter(api.RouterDeps{
 		Pool:           pool,
 		Queries:        queries,
 		GenSvc:         genSvc,
 		Stage0Svc:      stage0Svc,
 		FitSvc:         fitSvc,
+		ContribSvc:     contribSvc,
 		JWTSecret:      cfg.JWTSecret,
 		AllowedOrigins: cfg.AllowedOrigins,
 	})
