@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { ApiError } from "../lib/api-client";
+import { formatApiError } from "../lib/api-client";
 
 export function Login() {
   const { login } = useAuth();
@@ -28,7 +28,7 @@ export function Login() {
       const redirect = searchParams.get("redirect");
       navigate(redirect || "/");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(formatApiError(err));
     } finally {
       setSubmitting(false);
     }
