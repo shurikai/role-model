@@ -54,6 +54,9 @@ func (s *Service) Delete(ctx context.Context, userID, contributionID uuid.UUID) 
 	if err := qtx.DeleteContributionProjectLinks(ctx, contributionID); err != nil {
 		return fmt.Errorf("delete: remove project links: %w", err)
 	}
+	if err := qtx.DeleteContributionFeedback(ctx, contributionID); err != nil {
+		return fmt.Errorf("delete: remove feedback: %w", err)
+	}
 	if err := qtx.DeleteContribution(ctx, db.DeleteContributionParams{
 		ID:     contributionID,
 		UserID: userID,

@@ -9,7 +9,77 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createCredential = `-- name: CreateCredential :one
+INSERT INTO credentials (id, user_id, name, issuer, issued_on, expires_on, credential_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, user_id, name, issuer, issued_on, expires_on, credential_url, created_at, updated_at
+`
+
+type CreateCredentialParams struct {
+	ID            uuid.UUID   `json:"id"`
+	UserID        uuid.UUID   `json:"user_id"`
+	Name          string      `json:"name"`
+	Issuer        *string     `json:"issuer"`
+	IssuedOn      pgtype.Date `json:"issued_on"`
+	ExpiresOn     pgtype.Date `json:"expires_on"`
+	CredentialUrl *string     `json:"credential_url"`
+}
+
+func (q *Queries) CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error) {
+	row := q.db.QueryRow(ctx, createCredential,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Issuer,
+		arg.IssuedOn,
+		arg.ExpiresOn,
+		arg.CredentialUrl,
+	)
+	var i Credential
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Issuer,
+		&i.IssuedOn,
+		&i.ExpiresOn,
+		&i.CredentialUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteContributionFeedback = `-- name: DeleteContributionFeedback :exec
+DELETE FROM contribution_feedback
+WHERE contribution_id = $1
+`
+
+func (q *Queries) DeleteContributionFeedback(ctx context.Context, contributionID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteContributionFeedback, contributionID)
+	return err
+}
+
+const deleteCredential = `-- name: DeleteCredential :execrows
+DELETE FROM credentials
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteCredentialParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteCredential(ctx context.Context, arg DeleteCredentialParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCredential, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const getCredentials = `-- name: GetCredentials :many
 SELECT id, user_id, name, issuer, issued_on, expires_on, credential_url, created_at, updated_at FROM credentials
@@ -45,4 +115,51 @@ func (q *Queries) GetCredentials(ctx context.Context, userID uuid.UUID) ([]Crede
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateCredential = `-- name: UpdateCredential :one
+UPDATE credentials
+SET name           = $3,
+    issuer         = $4,
+    issued_on      = $5,
+    expires_on     = $6,
+    credential_url = $7,
+    updated_at     = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, name, issuer, issued_on, expires_on, credential_url, created_at, updated_at
+`
+
+type UpdateCredentialParams struct {
+	ID            uuid.UUID   `json:"id"`
+	UserID        uuid.UUID   `json:"user_id"`
+	Name          string      `json:"name"`
+	Issuer        *string     `json:"issuer"`
+	IssuedOn      pgtype.Date `json:"issued_on"`
+	ExpiresOn     pgtype.Date `json:"expires_on"`
+	CredentialUrl *string     `json:"credential_url"`
+}
+
+func (q *Queries) UpdateCredential(ctx context.Context, arg UpdateCredentialParams) (Credential, error) {
+	row := q.db.QueryRow(ctx, updateCredential,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Issuer,
+		arg.IssuedOn,
+		arg.ExpiresOn,
+		arg.CredentialUrl,
+	)
+	var i Credential
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Issuer,
+		&i.IssuedOn,
+		&i.ExpiresOn,
+		&i.CredentialUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

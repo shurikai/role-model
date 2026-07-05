@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shurikai/role-model/internal/api"
 	"github.com/shurikai/role-model/internal/config"
+	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
 )
@@ -45,12 +46,14 @@ func testServer(t *testing.T) (*httptest.Server, *config.Config) {
 	queries := db.New(pool)
 	genClient := generation.NewClient(cfg.AnthropicAPIKey) // not exercised in these tests
 	genSvc := generation.NewService(queries, genClient)    // however your Service constructor is shaped
+	contribSvc := contribution.NewService(pool, queries)
 
 	router := api.NewRouter(api.RouterDeps{
-		Pool:      pool,
-		Queries:   queries,
-		GenSvc:    genSvc,
-		JWTSecret: cfg.JWTSecret,
+		Pool:       pool,
+		Queries:    queries,
+		GenSvc:     genSvc,
+		ContribSvc: contribSvc,
+		JWTSecret:  cfg.JWTSecret,
 	})
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
