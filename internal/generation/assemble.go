@@ -114,6 +114,11 @@ func (s *Service) assembleProjects(ctx context.Context, userID uuid.UUID) ([]Pro
 	result := make([]ProjectView, 0, len(projects))
 
 	for _, p := range projects {
+		// Explicit exclusion wins immediately.
+		if p.ForceExclude {
+			continue
+		}
+
 		contributions, err := s.q.GetContributionsByProject(ctx, db.GetContributionsByProjectParams{
 			ProjectID: p.ID,
 			UserID:    userID,
@@ -145,6 +150,10 @@ func (s *Service) assembleProjects(ctx context.Context, userID uuid.UUID) ([]Pro
 				ScaleContext:    c.ScaleContext,
 				Tags:            tagViews,
 			})
+		}
+
+		if len(cvs) == 0 {
+			continue // no citable contributions; skip before further assembly
 		}
 
 		projectTags, err := s.q.GetTagsByProject(ctx, db.GetTagsByProjectParams{
