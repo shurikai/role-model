@@ -17,6 +17,8 @@ type Querier interface {
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
 	CreateContributionDraft(ctx context.Context, arg CreateContributionDraftParams) (ContributionDraft, error)
+	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
+	CreateEducation(ctx context.Context, arg CreateEducationParams) (Education, error)
 	CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error)
 	CreateFitReport(ctx context.Context, arg CreateFitReportParams) (FitReport, error)
 	CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error)
@@ -26,8 +28,11 @@ type Querier interface {
 	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteContribution(ctx context.Context, arg DeleteContributionParams) error
+	DeleteContributionFeedback(ctx context.Context, contributionID uuid.UUID) error
 	DeleteContributionProjectLinks(ctx context.Context, contributionID uuid.UUID) error
 	DeleteContributionTags(ctx context.Context, contributionID uuid.UUID) error
+	DeleteCredential(ctx context.Context, arg DeleteCredentialParams) (int64, error)
+	DeleteEducation(ctx context.Context, arg DeleteEducationParams) (int64, error)
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
 	DeletePreference(ctx context.Context, arg DeletePreferenceParams) error
@@ -72,6 +77,8 @@ type Querier interface {
 	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
 	UpdateContributionDraft(ctx context.Context, arg UpdateContributionDraftParams) (ContributionDraft, error)
 	UpdateContributionDraftStatus(ctx context.Context, arg UpdateContributionDraftStatusParams) (ContributionDraft, error)
+	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) (Credential, error)
+	UpdateEducation(ctx context.Context, arg UpdateEducationParams) (Education, error)
 	UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error)
 	UpdateImportBatchStatus(ctx context.Context, arg UpdateImportBatchStatusParams) (ImportBatch, error)
 	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
