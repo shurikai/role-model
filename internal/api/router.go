@@ -101,6 +101,16 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Put("/import/drafts/{draftID}", importHandler.UpdateDraft)
 			r.Post("/import/drafts/{draftID}/approve", importHandler.Approve)
 			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
+
+			educationHandler := handlers.NewEducationHandler(deps.Queries)
+			r.Post("/education", educationHandler.Create)
+			r.Patch("/education/{id}", educationHandler.Update)
+			r.Delete("/education/{id}", educationHandler.Delete)
+
+			credentialHandler := handlers.NewCredentialHandler(deps.Queries)
+			r.Post("/credentials", credentialHandler.Create)
+			r.Patch("/credentials/{id}", credentialHandler.Update)
+			r.Delete("/credentials/{id}", credentialHandler.Delete)
 		})
 	})
 

@@ -9,7 +9,70 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createEducation = `-- name: CreateEducation :one
+INSERT INTO education (id, user_id, institution, degree, field_of_study, started_on, ended_on, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, user_id, institution, degree, field_of_study, started_on, ended_on, notes, created_at, updated_at
+`
+
+type CreateEducationParams struct {
+	ID           uuid.UUID   `json:"id"`
+	UserID       uuid.UUID   `json:"user_id"`
+	Institution  string      `json:"institution"`
+	Degree       *string     `json:"degree"`
+	FieldOfStudy *string     `json:"field_of_study"`
+	StartedOn    pgtype.Date `json:"started_on"`
+	EndedOn      pgtype.Date `json:"ended_on"`
+	Notes        *string     `json:"notes"`
+}
+
+func (q *Queries) CreateEducation(ctx context.Context, arg CreateEducationParams) (Education, error) {
+	row := q.db.QueryRow(ctx, createEducation,
+		arg.ID,
+		arg.UserID,
+		arg.Institution,
+		arg.Degree,
+		arg.FieldOfStudy,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.Notes,
+	)
+	var i Education
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Institution,
+		&i.Degree,
+		&i.FieldOfStudy,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteEducation = `-- name: DeleteEducation :execrows
+DELETE FROM education
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteEducationParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteEducation(ctx context.Context, arg DeleteEducationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteEducation, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
 
 const getEducation = `-- name: GetEducation :many
 SELECT id, user_id, institution, degree, field_of_study, started_on, ended_on, notes, created_at, updated_at FROM education
@@ -46,4 +109,55 @@ func (q *Queries) GetEducation(ctx context.Context, userID uuid.UUID) ([]Educati
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateEducation = `-- name: UpdateEducation :one
+UPDATE education
+SET institution    = $3,
+    degree         = $4,
+    field_of_study = $5,
+    started_on     = $6,
+    ended_on       = $7,
+    notes          = $8,
+    updated_at     = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, institution, degree, field_of_study, started_on, ended_on, notes, created_at, updated_at
+`
+
+type UpdateEducationParams struct {
+	ID           uuid.UUID   `json:"id"`
+	UserID       uuid.UUID   `json:"user_id"`
+	Institution  string      `json:"institution"`
+	Degree       *string     `json:"degree"`
+	FieldOfStudy *string     `json:"field_of_study"`
+	StartedOn    pgtype.Date `json:"started_on"`
+	EndedOn      pgtype.Date `json:"ended_on"`
+	Notes        *string     `json:"notes"`
+}
+
+func (q *Queries) UpdateEducation(ctx context.Context, arg UpdateEducationParams) (Education, error) {
+	row := q.db.QueryRow(ctx, updateEducation,
+		arg.ID,
+		arg.UserID,
+		arg.Institution,
+		arg.Degree,
+		arg.FieldOfStudy,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.Notes,
+	)
+	var i Education
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Institution,
+		&i.Degree,
+		&i.FieldOfStudy,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
