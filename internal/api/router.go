@@ -111,6 +111,18 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/credentials", credentialHandler.Create)
 			r.Patch("/credentials/{id}", credentialHandler.Update)
 			r.Delete("/credentials/{id}", credentialHandler.Delete)
+
+			tagHandler := handlers.NewTagHandler(deps.Queries)
+			r.Post("/tags", tagHandler.Create)
+			r.Get("/tags", tagHandler.List)
+			r.Delete("/tags/{id}", tagHandler.Delete)
+
+			r.Post("/tag-categories", tagHandler.CreateCategory)
+			r.Get("/tag-categories", tagHandler.ListCategories)
+			r.Delete("/tag-categories/{id}", tagHandler.DeleteCategory)
+
+			r.Post("/contributions/{id}/tags", tagHandler.AssignToContribution)
+			r.Delete("/contributions/{id}/tags/{tagId}", tagHandler.UnassignFromContribution)
 		})
 	})
 

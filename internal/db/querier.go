@@ -11,9 +11,12 @@ import (
 )
 
 type Querier interface {
+	AssignTagToContribution(ctx context.Context, arg AssignTagToContributionParams) error
 	CountContributionDraftsByBatch(ctx context.Context, arg CountContributionDraftsByBatchParams) (CountContributionDraftsByBatchRow, error)
 	CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error)
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
+	CountTagUsage(ctx context.Context, tagID uuid.UUID) (int32, error)
+	CountTagsInCategory(ctx context.Context, arg CountTagsInCategoryParams) (int64, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
 	CreateContributionDraft(ctx context.Context, arg CreateContributionDraftParams) (ContributionDraft, error)
@@ -26,6 +29,8 @@ type Querier interface {
 	CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
+	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
+	CreateTagCategory(ctx context.Context, arg CreateTagCategoryParams) (TagCategory, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteContribution(ctx context.Context, arg DeleteContributionParams) error
 	DeleteContributionFeedback(ctx context.Context, contributionID uuid.UUID) error
@@ -37,6 +42,8 @@ type Querier interface {
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
 	DeletePreference(ctx context.Context, arg DeletePreferenceParams) error
 	DeleteSkill(ctx context.Context, arg DeleteSkillParams) error
+	DeleteTag(ctx context.Context, arg DeleteTagParams) (int64, error)
+	DeleteTagCategory(ctx context.Context, arg DeleteTagCategoryParams) (int64, error)
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
 	GetContribution(ctx context.Context, arg GetContributionParams) (Contribution, error)
 	GetContributionDraft(ctx context.Context, arg GetContributionDraftParams) (ContributionDraft, error)
@@ -54,6 +61,7 @@ type Querier interface {
 	GetProjects(ctx context.Context, userID uuid.UUID) ([]Project, error)
 	GetResumeVersion(ctx context.Context, arg GetResumeVersionParams) (ResumeVersion, error)
 	GetSkill(ctx context.Context, arg GetSkillParams) (Skill, error)
+	GetTag(ctx context.Context, arg GetTagParams) (Tag, error)
 	GetTagsByContribution(ctx context.Context, arg GetTagsByContributionParams) ([]GetTagsByContributionRow, error)
 	GetTagsByProject(ctx context.Context, arg GetTagsByProjectParams) ([]GetTagsByProjectRow, error)
 	GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
@@ -71,7 +79,10 @@ type Querier interface {
 	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)
 	ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error)
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
+	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
+	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
+	UnassignTagFromContribution(ctx context.Context, arg UnassignTagFromContributionParams) (int64, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
