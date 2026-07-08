@@ -18,6 +18,7 @@ import (
 	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/project"
 )
 
 // testServer spins up the real router against the test database and returns
@@ -47,12 +48,14 @@ func testServer(t *testing.T) (*httptest.Server, *config.Config) {
 	genClient := generation.NewClient(cfg.AnthropicAPIKey) // not exercised in these tests
 	genSvc := generation.NewService(queries, genClient)    // however your Service constructor is shaped
 	contribSvc := contribution.NewService(pool, queries)
+	projectSvc := project.NewService(pool, queries)
 
 	router := api.NewRouter(api.RouterDeps{
 		Pool:       pool,
 		Queries:    queries,
 		GenSvc:     genSvc,
 		ContribSvc: contribSvc,
+		ProjectSvc: projectSvc,
 		JWTSecret:  cfg.JWTSecret,
 	})
 	srv := httptest.NewServer(router)

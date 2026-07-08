@@ -11,6 +11,7 @@ import (
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/project"
 	"github.com/shurikai/role-model/internal/stage0"
 )
 
@@ -21,6 +22,7 @@ type RouterDeps struct {
 	Stage0Svc      *stage0.Service
 	FitSvc         *fitgate.Service
 	ContribSvc     *contribution.Service
+	ProjectSvc     *project.Service
 	JWTSecret      string
 	AllowedOrigins []string
 }
@@ -103,11 +105,13 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
 
 			educationHandler := handlers.NewEducationHandler(deps.Queries)
+			r.Get("/education", educationHandler.List)
 			r.Post("/education", educationHandler.Create)
 			r.Patch("/education/{id}", educationHandler.Update)
 			r.Delete("/education/{id}", educationHandler.Delete)
 
 			credentialHandler := handlers.NewCredentialHandler(deps.Queries)
+			r.Get("/credentials", credentialHandler.List)
 			r.Post("/credentials", credentialHandler.Create)
 			r.Patch("/credentials/{id}", credentialHandler.Update)
 			r.Delete("/credentials/{id}", credentialHandler.Delete)
@@ -123,6 +127,18 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 
 			r.Post("/contributions/{id}/tags", tagHandler.AssignToContribution)
 			r.Delete("/contributions/{id}/tags/{tagId}", tagHandler.UnassignFromContribution)
+
+			projectHandler := handlers.NewProjectHandler(deps.Queries, deps.ProjectSvc)
+			r.Get("/projects", projectHandler.List)
+			r.Get("/projects/{id}", projectHandler.Get)
+			r.Post("/projects", projectHandler.Create)
+			r.Patch("/projects/{id}", projectHandler.Update)
+			r.Delete("/projects/{id}", projectHandler.Delete)
+
+			r.Post("/projects/{id}/contributions", projectHandler.AssignContribution)
+			r.Delete("/projects/{id}/contributions/{contribID}", projectHandler.UnassignContribution)
+			r.Post("/projects/{id}/tags", projectHandler.AssignTag)
+			r.Delete("/projects/{id}/tags/{tagId}", projectHandler.UnassignTag)
 		})
 	})
 

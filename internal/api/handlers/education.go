@@ -29,6 +29,21 @@ type educationRequest struct {
 	Notes        *string `json:"notes"`
 }
 
+func (h *EducationHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httputil.UserIDFromContext(r.Context())
+	if !ok {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	education, err := h.queries.GetEducation(r.Context(), userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch education")
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, education)
+}
+
 func (h *EducationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {

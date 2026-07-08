@@ -28,6 +28,21 @@ type credentialRequest struct {
 	CredentialUrl *string `json:"credential_url"`
 }
 
+func (h *CredentialHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httputil.UserIDFromContext(r.Context())
+	if !ok {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	credentials, err := h.queries.GetCredentials(r.Context(), userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch credentials")
+		return
+	}
+	httputil.WriteJSON(w, http.StatusOK, credentials)
+}
+
 func (h *CredentialHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httputil.UserIDFromContext(r.Context())
 	if !ok {
