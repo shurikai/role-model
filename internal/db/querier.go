@@ -11,7 +11,9 @@ import (
 )
 
 type Querier interface {
+	AssignContributionToProject(ctx context.Context, arg AssignContributionToProjectParams) error
 	AssignTagToContribution(ctx context.Context, arg AssignTagToContributionParams) error
+	AssignTagToProject(ctx context.Context, arg AssignTagToProjectParams) error
 	CountContributionDraftsByBatch(ctx context.Context, arg CountContributionDraftsByBatchParams) (CountContributionDraftsByBatchRow, error)
 	CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error)
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
@@ -27,6 +29,7 @@ type Querier interface {
 	CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error)
 	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
 	CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error)
+	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
@@ -41,6 +44,9 @@ type Querier interface {
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
 	DeletePreference(ctx context.Context, arg DeletePreferenceParams) error
+	DeleteProject(ctx context.Context, arg DeleteProjectParams) (int64, error)
+	DeleteProjectContributions(ctx context.Context, projectID uuid.UUID) error
+	DeleteProjectTags(ctx context.Context, projectID uuid.UUID) error
 	DeleteSkill(ctx context.Context, arg DeleteSkillParams) error
 	DeleteTag(ctx context.Context, arg DeleteTagParams) (int64, error)
 	DeleteTagCategory(ctx context.Context, arg DeleteTagCategoryParams) (int64, error)
@@ -58,6 +64,7 @@ type Querier interface {
 	GetPosition(ctx context.Context, arg GetPositionParams) (Position, error)
 	GetPositionsByEmployer(ctx context.Context, arg GetPositionsByEmployerParams) ([]Position, error)
 	GetPreference(ctx context.Context, arg GetPreferenceParams) (Preference, error)
+	GetProject(ctx context.Context, arg GetProjectParams) (Project, error)
 	GetProjects(ctx context.Context, userID uuid.UUID) ([]Project, error)
 	GetResumeVersion(ctx context.Context, arg GetResumeVersionParams) (ResumeVersion, error)
 	GetSkill(ctx context.Context, arg GetSkillParams) (Skill, error)
@@ -82,7 +89,9 @@ type Querier interface {
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
+	UnassignContributionFromProject(ctx context.Context, arg UnassignContributionFromProjectParams) (int64, error)
 	UnassignTagFromContribution(ctx context.Context, arg UnassignTagFromContributionParams) (int64, error)
+	UnassignTagFromProject(ctx context.Context, arg UnassignTagFromProjectParams) (int64, error)
 	UpdateApplication(ctx context.Context, arg UpdateApplicationParams) (Application, error)
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
@@ -94,6 +103,7 @@ type Querier interface {
 	UpdateImportBatchStatus(ctx context.Context, arg UpdateImportBatchStatusParams) (ImportBatch, error)
 	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
 	UpdatePreference(ctx context.Context, arg UpdatePreferenceParams) (Preference, error)
+	UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error)
 	UpdateSkill(ctx context.Context, arg UpdateSkillParams) (Skill, error)
 }
 

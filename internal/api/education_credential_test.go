@@ -19,16 +19,19 @@ func TestEducationCRUD(t *testing.T) {
 
 	degree := "BS Computer Science"
 	eduID := createAndGetID(t, srv, token, "/api/v1/education", map[string]any{
-		"institution":   "Lakeside State University",
-		"degree":        degree,
+		"institution":    "Lakeside State University",
+		"degree":         degree,
 		"field_of_study": "Computer Science",
-		"started_on":    "2010-08-01",
-		"ended_on":      "2014-05-01",
-		"notes":         "Graduated cum laude",
+		"started_on":     "2010-08-01",
+		"ended_on":       "2014-05-01",
+		"notes":          "Graduated cum laude",
 	})
 
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/education", token, nil)
+	assertStatus(t, resp, http.StatusOK, "list education")
+
 	// Update (full replace) with changed fields.
-	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/education/"+eduID, token, map[string]any{
+	resp = doJSON(t, srv, http.MethodPatch, "/api/v1/education/"+eduID, token, map[string]any{
 		"institution":    "Lakeside State University",
 		"degree":         "MS Computer Science",
 		"field_of_study": "Computer Science",
@@ -60,8 +63,9 @@ func TestEducationCRUD(t *testing.T) {
 	resp = doJSON(t, srv, http.MethodDelete, "/api/v1/education/"+eduID, token, nil)
 	assertStatus(t, resp, http.StatusNoContent, "delete education")
 
-	// No single-education GET endpoint exists (router.go only wires
-	// POST/PATCH/DELETE for /api/v1/education) — skipping the re-fetch-after-delete check.
+	// Confirm it's gone from the list.
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/education", token, nil)
+	assertNotInList(t, resp, eduID, "education")
 
 	// Validation: empty institution.
 	resp = doJSON(t, srv, http.MethodPost, "/api/v1/education", token, map[string]any{
@@ -91,8 +95,11 @@ func TestCredentialCRUD(t *testing.T) {
 		"credential_url": "https://example.com/cred/123",
 	})
 
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/credentials", token, nil)
+	assertStatus(t, resp, http.StatusOK, "list credentials")
+
 	// Update (full replace) with changed fields.
-	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/credentials/"+credID, token, map[string]any{
+	resp = doJSON(t, srv, http.MethodPatch, "/api/v1/credentials/"+credID, token, map[string]any{
 		"name":           "AWS Certified Solutions Architect - Professional",
 		"issuer":         "Amazon Web Services",
 		"issued_on":      "2021-03-01",
@@ -123,8 +130,9 @@ func TestCredentialCRUD(t *testing.T) {
 	resp = doJSON(t, srv, http.MethodDelete, "/api/v1/credentials/"+credID, token, nil)
 	assertStatus(t, resp, http.StatusNoContent, "delete credential")
 
-	// No single-credential GET endpoint exists (router.go only wires
-	// POST/PATCH/DELETE for /api/v1/credentials) — skipping the re-fetch-after-delete check.
+	// Confirm it's gone from the list.
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/credentials", token, nil)
+	assertNotInList(t, resp, credID, "credential")
 
 	// Validation: empty name.
 	resp = doJSON(t, srv, http.MethodPost, "/api/v1/credentials", token, map[string]any{
@@ -172,4 +180,29 @@ func TestEducationCredentialsIsolation(t *testing.T) {
 	// User B must NOT be able to delete A's credential.
 	resp = doJSON(t, srv, http.MethodDelete, "/api/v1/credentials/"+credID, tokenB, nil)
 	assertStatus(t, resp, http.StatusNotFound, "B deletes A's credential")
+
+	// User B's lists must NOT include A's rows.
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/education", tokenB, nil)
+	assertNotInList(t, resp, eduID, "education")
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/credentials", tokenB, nil)
+	assertNotInList(t, resp, credID, "credential")
+}
+
+// assertNotInList decodes a list response body ([{"id": "..."}]) and fails if
+// wantAbsentID appears among the returned ids.
+func assertNotInList(t *testing.T, resp *http.Response, wantAbsentID, label string) {
+	t.Helper()
+	defer resp.Body.Close()
+	var items []struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		t.Fatalf("decode %s list: %v", label, err)
+	}
+	for _, item := range items {
+		if item.ID == wantAbsentID {
+			t.Errorf("%s list still contains id %s", label, wantAbsentID)
+			return
+		}
+	}
 }

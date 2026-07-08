@@ -9,7 +9,140 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const assignContributionToProject = `-- name: AssignContributionToProject :exec
+INSERT INTO project_contributions (project_id, contribution_id)
+VALUES ($1, $2)
+ON CONFLICT (project_id, contribution_id) DO NOTHING
+`
+
+type AssignContributionToProjectParams struct {
+	ProjectID      uuid.UUID `json:"project_id"`
+	ContributionID uuid.UUID `json:"contribution_id"`
+}
+
+func (q *Queries) AssignContributionToProject(ctx context.Context, arg AssignContributionToProjectParams) error {
+	_, err := q.db.Exec(ctx, assignContributionToProject, arg.ProjectID, arg.ContributionID)
+	return err
+}
+
+const assignTagToProject = `-- name: AssignTagToProject :exec
+INSERT INTO project_tags (project_id, tag_id)
+VALUES ($1, $2)
+ON CONFLICT (project_id, tag_id) DO NOTHING
+`
+
+type AssignTagToProjectParams struct {
+	ProjectID uuid.UUID `json:"project_id"`
+	TagID     uuid.UUID `json:"tag_id"`
+}
+
+func (q *Queries) AssignTagToProject(ctx context.Context, arg AssignTagToProjectParams) error {
+	_, err := q.db.Exec(ctx, assignTagToProject, arg.ProjectID, arg.TagID)
+	return err
+}
+
+const createProject = `-- name: CreateProject :one
+INSERT INTO projects (
+    id, user_id, name, tagline, role, status, started_on, ended_on,
+    repo_url, live_url, writeup_url, force_include, force_exclude
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
+`
+
+type CreateProjectParams struct {
+	ID           uuid.UUID   `json:"id"`
+	UserID       uuid.UUID   `json:"user_id"`
+	Name         string      `json:"name"`
+	Tagline      *string     `json:"tagline"`
+	Role         string      `json:"role"`
+	Status       string      `json:"status"`
+	StartedOn    pgtype.Date `json:"started_on"`
+	EndedOn      pgtype.Date `json:"ended_on"`
+	RepoUrl      *string     `json:"repo_url"`
+	LiveUrl      *string     `json:"live_url"`
+	WriteupUrl   *string     `json:"writeup_url"`
+	ForceInclude bool        `json:"force_include"`
+	ForceExclude bool        `json:"force_exclude"`
+}
+
+func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, createProject,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Tagline,
+		arg.Role,
+		arg.Status,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.RepoUrl,
+		arg.LiveUrl,
+		arg.WriteupUrl,
+		arg.ForceInclude,
+		arg.ForceExclude,
+	)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Tagline,
+		&i.Role,
+		&i.Status,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.RepoUrl,
+		&i.LiveUrl,
+		&i.WriteupUrl,
+		&i.ForceInclude,
+		&i.ForceExclude,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteProject = `-- name: DeleteProject :execrows
+DELETE FROM projects
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteProjectParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteProject(ctx context.Context, arg DeleteProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteProject, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteProjectContributions = `-- name: DeleteProjectContributions :exec
+DELETE FROM project_contributions
+WHERE project_id = $1
+`
+
+func (q *Queries) DeleteProjectContributions(ctx context.Context, projectID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProjectContributions, projectID)
+	return err
+}
+
+const deleteProjectTags = `-- name: DeleteProjectTags :exec
+DELETE FROM project_tags
+WHERE project_id = $1
+`
+
+func (q *Queries) DeleteProjectTags(ctx context.Context, projectID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteProjectTags, projectID)
+	return err
+}
 
 const getContributionsByProject = `-- name: GetContributionsByProject :many
 SELECT c.id, c.user_id, c.position_id, c.summary, c.full_description, c.outcomes, c.scale_context, c.is_active, c.created_at, c.updated_at FROM contributions c
@@ -52,6 +185,39 @@ func (q *Queries) GetContributionsByProject(ctx context.Context, arg GetContribu
 		return nil, err
 	}
 	return items, nil
+}
+
+const getProject = `-- name: GetProject :one
+SELECT id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at FROM projects
+WHERE id = $1 AND user_id = $2
+`
+
+type GetProjectParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetProject(ctx context.Context, arg GetProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, getProject, arg.ID, arg.UserID)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Tagline,
+		&i.Role,
+		&i.Status,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.RepoUrl,
+		&i.LiveUrl,
+		&i.WriteupUrl,
+		&i.ForceInclude,
+		&i.ForceExclude,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getProjects = `-- name: GetProjects :many
@@ -139,4 +305,111 @@ func (q *Queries) GetTagsByProject(ctx context.Context, arg GetTagsByProjectPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const unassignContributionFromProject = `-- name: UnassignContributionFromProject :execrows
+DELETE FROM project_contributions
+WHERE project_id = $1 AND contribution_id = $2
+`
+
+type UnassignContributionFromProjectParams struct {
+	ProjectID      uuid.UUID `json:"project_id"`
+	ContributionID uuid.UUID `json:"contribution_id"`
+}
+
+func (q *Queries) UnassignContributionFromProject(ctx context.Context, arg UnassignContributionFromProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignContributionFromProject, arg.ProjectID, arg.ContributionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const unassignTagFromProject = `-- name: UnassignTagFromProject :execrows
+DELETE FROM project_tags
+WHERE project_id = $1 AND tag_id = $2
+`
+
+type UnassignTagFromProjectParams struct {
+	ProjectID uuid.UUID `json:"project_id"`
+	TagID     uuid.UUID `json:"tag_id"`
+}
+
+func (q *Queries) UnassignTagFromProject(ctx context.Context, arg UnassignTagFromProjectParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignTagFromProject, arg.ProjectID, arg.TagID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateProject = `-- name: UpdateProject :one
+UPDATE projects
+SET name          = $3,
+    tagline       = $4,
+    role          = $5,
+    status        = $6,
+    started_on    = $7,
+    ended_on      = $8,
+    repo_url      = $9,
+    live_url      = $10,
+    writeup_url   = $11,
+    force_include = $12,
+    force_exclude = $13,
+    updated_at    = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
+`
+
+type UpdateProjectParams struct {
+	ID           uuid.UUID   `json:"id"`
+	UserID       uuid.UUID   `json:"user_id"`
+	Name         string      `json:"name"`
+	Tagline      *string     `json:"tagline"`
+	Role         string      `json:"role"`
+	Status       string      `json:"status"`
+	StartedOn    pgtype.Date `json:"started_on"`
+	EndedOn      pgtype.Date `json:"ended_on"`
+	RepoUrl      *string     `json:"repo_url"`
+	LiveUrl      *string     `json:"live_url"`
+	WriteupUrl   *string     `json:"writeup_url"`
+	ForceInclude bool        `json:"force_include"`
+	ForceExclude bool        `json:"force_exclude"`
+}
+
+func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (Project, error) {
+	row := q.db.QueryRow(ctx, updateProject,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Tagline,
+		arg.Role,
+		arg.Status,
+		arg.StartedOn,
+		arg.EndedOn,
+		arg.RepoUrl,
+		arg.LiveUrl,
+		arg.WriteupUrl,
+		arg.ForceInclude,
+		arg.ForceExclude,
+	)
+	var i Project
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Tagline,
+		&i.Role,
+		&i.Status,
+		&i.StartedOn,
+		&i.EndedOn,
+		&i.RepoUrl,
+		&i.LiveUrl,
+		&i.WriteupUrl,
+		&i.ForceInclude,
+		&i.ForceExclude,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
