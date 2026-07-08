@@ -11,6 +11,181 @@ import (
 	"github.com/google/uuid"
 )
 
+const assignTagToContribution = `-- name: AssignTagToContribution :exec
+INSERT INTO contribution_tags (contribution_id, tag_id)
+VALUES ($1, $2)
+ON CONFLICT (contribution_id, tag_id) DO NOTHING
+`
+
+type AssignTagToContributionParams struct {
+	ContributionID uuid.UUID `json:"contribution_id"`
+	TagID          uuid.UUID `json:"tag_id"`
+}
+
+func (q *Queries) AssignTagToContribution(ctx context.Context, arg AssignTagToContributionParams) error {
+	_, err := q.db.Exec(ctx, assignTagToContribution, arg.ContributionID, arg.TagID)
+	return err
+}
+
+const countTagUsage = `-- name: CountTagUsage :one
+SELECT
+  (SELECT count(*) FROM contribution_tags ct WHERE ct.tag_id = $1) +
+  (SELECT count(*) FROM project_tags pt WHERE pt.tag_id = $1) AS total
+`
+
+func (q *Queries) CountTagUsage(ctx context.Context, tagID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, countTagUsage, tagID)
+	var total int32
+	err := row.Scan(&total)
+	return total, err
+}
+
+const countTagsInCategory = `-- name: CountTagsInCategory :one
+SELECT count(*) FROM tags
+WHERE user_id = $1 AND category = $2
+`
+
+type CountTagsInCategoryParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Category string    `json:"category"`
+}
+
+func (q *Queries) CountTagsInCategory(ctx context.Context, arg CountTagsInCategoryParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTagsInCategory, arg.UserID, arg.Category)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createTag = `-- name: CreateTag :one
+INSERT INTO tags (id, user_id, name, aliases, category, sort_order)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, name, aliases, category, sort_order, created_at
+`
+
+type CreateTagParams struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Name      string    `json:"name"`
+	Aliases   []string  `json:"aliases"`
+	Category  string    `json:"category"`
+	SortOrder int32     `json:"sort_order"`
+}
+
+func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error) {
+	row := q.db.QueryRow(ctx, createTag,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.Aliases,
+		arg.Category,
+		arg.SortOrder,
+	)
+	var i Tag
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Aliases,
+		&i.Category,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createTagCategory = `-- name: CreateTagCategory :one
+INSERT INTO tag_categories (id, user_id, name, sort_order)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, name, sort_order, created_at
+`
+
+type CreateTagCategoryParams struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Name      string    `json:"name"`
+	SortOrder int32     `json:"sort_order"`
+}
+
+func (q *Queries) CreateTagCategory(ctx context.Context, arg CreateTagCategoryParams) (TagCategory, error) {
+	row := q.db.QueryRow(ctx, createTagCategory,
+		arg.ID,
+		arg.UserID,
+		arg.Name,
+		arg.SortOrder,
+	)
+	var i TagCategory
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const deleteTag = `-- name: DeleteTag :execrows
+DELETE FROM tags
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteTagParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTag(ctx context.Context, arg DeleteTagParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTag, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteTagCategory = `-- name: DeleteTagCategory :execrows
+DELETE FROM tag_categories
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteTagCategoryParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) DeleteTagCategory(ctx context.Context, arg DeleteTagCategoryParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteTagCategory, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getTag = `-- name: GetTag :one
+SELECT id, user_id, name, aliases, category, sort_order, created_at FROM tags
+WHERE id = $1 AND user_id = $2
+`
+
+type GetTagParams struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetTag(ctx context.Context, arg GetTagParams) (Tag, error) {
+	row := q.db.QueryRow(ctx, getTag, arg.ID, arg.UserID)
+	var i Tag
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Name,
+		&i.Aliases,
+		&i.Category,
+		&i.SortOrder,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getTagsByContribution = `-- name: GetTagsByContribution :many
 SELECT t.id, t.name, t.category, t.sort_order
 FROM tags t
@@ -54,4 +229,88 @@ func (q *Queries) GetTagsByContribution(ctx context.Context, arg GetTagsByContri
 		return nil, err
 	}
 	return items, nil
+}
+
+const listTagCategories = `-- name: ListTagCategories :many
+SELECT id, user_id, name, sort_order, created_at FROM tag_categories
+WHERE user_id = $1
+ORDER BY sort_order, name
+`
+
+func (q *Queries) ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error) {
+	rows, err := q.db.Query(ctx, listTagCategories, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TagCategory
+	for rows.Next() {
+		var i TagCategory
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.SortOrder,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTags = `-- name: ListTags :many
+SELECT id, user_id, name, aliases, category, sort_order, created_at FROM tags
+WHERE user_id = $1
+ORDER BY sort_order, name
+`
+
+func (q *Queries) ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error) {
+	rows, err := q.db.Query(ctx, listTags, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Tag
+	for rows.Next() {
+		var i Tag
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.Aliases,
+			&i.Category,
+			&i.SortOrder,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const unassignTagFromContribution = `-- name: UnassignTagFromContribution :execrows
+DELETE FROM contribution_tags
+WHERE contribution_id = $1 AND tag_id = $2
+`
+
+type UnassignTagFromContributionParams struct {
+	ContributionID uuid.UUID `json:"contribution_id"`
+	TagID          uuid.UUID `json:"tag_id"`
+}
+
+func (q *Queries) UnassignTagFromContribution(ctx context.Context, arg UnassignTagFromContributionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, unassignTagFromContribution, arg.ContributionID, arg.TagID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
