@@ -15,6 +15,7 @@ type Config struct {
 	Environment     string
 	JWTSecret       string
 	AllowedOrigins  []string
+	RendererURL     string
 }
 
 func Load() Config {
@@ -38,6 +39,15 @@ func Load() Config {
 		}
 	}
 
+	rendererURL := os.Getenv("RENDERER_URL")
+	if rendererURL == "" {
+		if env == "development" {
+			rendererURL = "http://localhost:8000"
+		} else {
+			log.Println("WARNING: RENDERER_URL is not set; resume rendering will fail")
+		}
+	}
+
 	return Config{
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		AnthropicAPIKey: os.Getenv("ANTHROPIC_API_KEY"),
@@ -45,6 +55,7 @@ func Load() Config {
 		Environment:     env,
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		AllowedOrigins:  allowedOrigins,
+		RendererURL:     rendererURL,
 	}
 }
 

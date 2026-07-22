@@ -12,6 +12,7 @@ import (
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/project"
+	"github.com/shurikai/role-model/internal/renderer"
 	"github.com/shurikai/role-model/internal/stage0"
 )
 
@@ -23,6 +24,7 @@ type RouterDeps struct {
 	FitSvc         *fitgate.Service
 	ContribSvc     *contribution.Service
 	ProjectSvc     *project.Service
+	RendererClient *renderer.Client
 	JWTSecret      string
 	AllowedOrigins []string
 }
@@ -86,9 +88,10 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
 			r.Post("/applications/{id}/generate", generationHandler.Generate)
 
-			resumeVersionHandler := handlers.NewResumeVersionHandler(deps.Queries)
+			resumeVersionHandler := handlers.NewResumeVersionHandler(deps.Queries, deps.RendererClient)
 			r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
 			r.Get("/resume-versions/{id}", resumeVersionHandler.Get)
+			r.Post("/resume-versions/{id}/render", resumeVersionHandler.Render)
 
 			fitHandler := handlers.NewFitHandler(deps.Queries, deps.FitSvc)
 			r.Post("/applications/{applicationID}/fit", fitHandler.Run)
