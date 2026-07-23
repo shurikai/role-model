@@ -28,7 +28,7 @@ func (e *ValidationError) Error() string {
 	return "schema validation failed: " + e.Detail
 }
 
-type resumePromptData struct {
+type resumeBodyPromptData struct {
 	CompanyName   string
 	RoleTitle     string
 	JDSignals     string
@@ -39,6 +39,13 @@ type resumePromptData struct {
 	Credentials   string
 	ResumeSchema  string
 	PriorFeedback string
+}
+
+type resumeSummaryPromptData struct {
+	CompanyName string
+	RoleTitle   string
+	JDSignals   string
+	Body        string
 }
 
 // Generate runs the full resume generation pipeline for an application.
@@ -103,7 +110,9 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal credentials: %w", err)
 	}
 
-	prompt, err := renderPrompt("resume_generation.v1.tmpl", resumePromptData{
+	// Pass 2a: experience, skills, projects, education, and credentials.
+	// Summary is deliberately excluded — see 2b below.
+	bodyPrompt, err := renderPrompt("resume_body.v1.tmpl", resumeBodyPromptData{
 		CompanyName:   app.CompanyName,
 		RoleTitle:     app.RoleTitle,
 		JDSignals:     string(signalsJSON),
@@ -116,32 +125,82 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		PriorFeedback: "",
 	})
 	if err != nil {
-		return nil, fmt.Errorf("generate: render prompt: %w", err)
+		return nil, fmt.Errorf("generate: render body prompt: %w", err)
 	}
 
-	msg, err := s.client.api.Messages.New(ctx, anthropic.MessageNewParams{
+	bodyMsg, err := s.client.api.Messages.New(ctx, anthropic.MessageNewParams{
 		MaxTokens: 4096,
 		Model:     s.client.model,
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(bodyPrompt)),
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("anthropic messages: %w", err)
+		return nil, fmt.Errorf("anthropic messages (body): %w", err)
 	}
 
-	raw, err := extractText(msg)
+	bodyRaw, err := extractText(bodyMsg)
 	if err != nil {
 		return nil, err
 	}
 
-	cleaned := stripCodeFence(raw)
+	bodyCleaned := stripCodeFence(bodyRaw)
 
 	// Parse into a key-preserving map so untouched fields pass through byte-for-byte.
 	var doc map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(cleaned), &doc); err != nil {
-		return nil, fmt.Errorf("generate: parse resume json: %w (raw: %s)", err, cleaned)
+	if err := json.Unmarshal([]byte(bodyCleaned), &doc); err != nil {
+		return nil, fmt.Errorf("generate: parse resume body json: %w (raw: %s)", err, bodyCleaned)
 	}
+
+	// Pass 2b: summary, grounded ONLY in 2a's output — never the raw
+	// background corpus. This makes claims unsupported by any generated
+	// bullet structurally unreachable rather than relying on a prompt
+	// instruction to self-police.
+	bodyForSummary, err := json.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal body for summary pass: %w", err)
+	}
+
+	summaryPrompt, err := renderPrompt("resume_summary.v1.tmpl", resumeSummaryPromptData{
+		CompanyName: app.CompanyName,
+		RoleTitle:   app.RoleTitle,
+		JDSignals:   string(signalsJSON),
+		Body:        string(bodyForSummary),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("generate: render summary prompt: %w", err)
+	}
+
+	summaryMsg, err := s.client.api.Messages.New(ctx, anthropic.MessageNewParams{
+		MaxTokens: 512,
+		Model:     s.client.model,
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(summaryPrompt)),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("anthropic messages (summary): %w", err)
+	}
+
+	summaryRaw, err := extractText(summaryMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	summaryCleaned := stripCodeFence(summaryRaw)
+
+	var summaryOut struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal([]byte(summaryCleaned), &summaryOut); err != nil {
+		return nil, fmt.Errorf("generate: parse summary json: %w (raw: %s)", err, summaryCleaned)
+	}
+
+	summaryJSON, err := json.Marshal(summaryOut.Summary)
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal summary: %w", err)
+	}
+	doc["summary"] = summaryJSON
 
 	// Overwrite provenance fields the model must not own. The model generates
 	// resume *content*; the generator stamps the *facts* about generation.
@@ -193,11 +252,15 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	}
 
 	genParamsJSON, err := json.Marshal(struct {
-		Model         string `json:"model"`
-		PromptVersion string `json:"prompt_version"`
+		Model                string `json:"model"`
+		PromptVersion        string `json:"prompt_version"`
+		BodyPromptVersion    string `json:"body_prompt_version"`
+		SummaryPromptVersion string `json:"summary_prompt_version"`
 	}{
-		Model:         s.client.ModelName(),
-		PromptVersion: promptVersion,
+		Model:                s.client.ModelName(),
+		PromptVersion:        promptVersion,
+		BodyPromptVersion:    bodyPromptVersion,
+		SummaryPromptVersion: summaryPromptVersion,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal gen params: %w", err)

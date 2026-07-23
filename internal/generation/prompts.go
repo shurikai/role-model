@@ -7,7 +7,16 @@ import (
 	"text/template"
 )
 
-const promptVersion = "v1"
+// promptVersion identifies the overall generation pipeline shape. Bumped when
+// the sequence/contract of prompt calls changes (e.g. the 2a/2b summary split).
+const promptVersion = "v2"
+
+// Individual prompt template versions, recorded in generation_params for
+// per-call traceability now that generation is more than one LLM call.
+const (
+	bodyPromptVersion    = "resume_body.v1"
+	summaryPromptVersion = "resume_summary.v1"
+)
 
 //go:embed prompts/*.tmpl
 var promptFS embed.FS
