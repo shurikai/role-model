@@ -629,3 +629,4 @@ this framing without requiring production AI feature ownership.
    write directly to `contributions` or hold in `contribution_drafts` until a
    final confirm step? Recommendation: hold in drafts with explicit confirm;
    keeps canonical data clean.
+
