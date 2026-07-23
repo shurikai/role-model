@@ -195,12 +195,18 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "priority_skills": {
+        "required_skills": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "preferred_skills": {
           "type": "array",
           "items": { "type": "string" }
         },
         "seniority": { "type": ["string", "null"] },
-        "domain_vocabulary": {
+        "domain": { "type": ["string", "null"] },
+        "work_type": { "type": ["string", "null"] },
+        "culture_signals": {
           "type": "array",
           "items": { "type": "string" }
         }

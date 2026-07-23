@@ -38,7 +38,7 @@ function handleUnauthorized(): void {
   unauthorizedHandler?.();
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function rawFetch(path: string, init: RequestInit): Promise<Response> {
   const session = getSession();
   const headers = new Headers(init.headers);
 
@@ -73,9 +73,22 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     throw new ApiError(message, response.status, code);
   }
 
+  return response;
+}
+
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await rawFetch(path, init);
+
   if (response.status === 204) {
     return undefined as T;
   }
 
   return (await response.json()) as T;
+}
+
+// apiFetchBlob is for binary responses (e.g. the rendered .docx download) that
+// apiFetch's response.json() parsing can't handle.
+export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const response = await rawFetch(path, init);
+  return response.blob();
 }
