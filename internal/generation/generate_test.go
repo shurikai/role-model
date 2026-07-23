@@ -36,9 +36,12 @@ func TestGenerate(t *testing.T) {
 	svc := generation.NewService(queries, client)
 
 	signals := json.RawMessage(`{
-		"priority_skills": ["Go", "distributed systems", "PostgreSQL"],
+		"required_skills": ["Go", "distributed systems", "PostgreSQL"],
+		"preferred_skills": [],
 		"seniority": "senior",
-		"domain_vocabulary": ["microservices", "API design", "observability"]
+		"domain": "fintech",
+		"work_type": "remote",
+		"culture_signals": ["microservices", "API design", "observability"]
 	}`)
 
 	app, err := queries.CreateApplication(ctx, db.CreateApplicationParams{
