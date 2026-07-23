@@ -24,8 +24,27 @@ RULES:
 - Mirror the domain vocabulary from jd_signals where it is genuine and accurate
 - Prefer specificity over generality: "reduced p99 latency from 800ms to 120ms"
   beats "improved system performance"
-- For each employer, include 3-5 bullets per position unless the tenure was under
-  6 months, in which case 2-3 is appropriate
+- This resume has a length budget — see <length_budget> below. Do not emit
+  bullets proportional to how much background data happens to exist per
+  position; allocate the budget by relevance to jd_signals instead:
+  - The most recent and most JD-relevant 2-3 positions can take up to 4-5
+    bullets each.
+  - Older or less JD-relevant positions should get fewer, tighter bullets
+    (1-2), and a position with little to no relevance to the target role can
+    be reduced to a single, brief bullet rather than padded to fill space.
+  - Never omit a position or reduce it to zero bullets. Every position present
+    in the experience data must appear in the output with its employer,
+    title, dates, and at least one bullet — continuity of employment history
+    matters more than trimming one more bullet. Trimming bullet count is how
+    you save space on a position; dropping the position entirely is not an
+    option, since it creates an apparent employment gap.
+  - Meeting the <jd_requirement_checklist> takes priority within the budget,
+    but satisfy it efficiently — a Skills entry or a single well-placed
+    bullet can cover a checklist item; it does not need its own dedicated
+    bullet on every relevant position.
+  - The budget is a soft target, not an exact count — but treat it as a real
+    constraint on total output length, not an aspiration to gesture at while
+    still writing 3-5 bullets on every position out of habit.
 - Each bullet must cite the contribution_ids it draws from, using the ids provided
   in the contributions data
 - Each position's position_id in the output must be copied verbatim from the
@@ -64,6 +83,10 @@ Role: {{.RoleTitle}}
 <jd_requirement_checklist>
 {{.SkillsChecklist}}
 </jd_requirement_checklist>
+
+<length_budget>
+{{.LengthBudget}}
+</length_budget>
 
 <identity>
 {{.Identity}}

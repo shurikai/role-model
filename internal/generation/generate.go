@@ -34,6 +34,7 @@ type resumeBodyPromptData struct {
 	RoleTitle       string
 	JDSignals       string
 	SkillsChecklist string
+	LengthBudget    string
 	Identity        string
 	Experience      string
 	Projects        string
@@ -41,6 +42,32 @@ type resumeBodyPromptData struct {
 	Credentials     string
 	ResumeSchema    string
 	PriorFeedback   string
+}
+
+// buildLengthBudget renders a seniority-informed target length as soft
+// guidance for the 2a prompt. Output length previously scaled unbounded with
+// however much background data existed per role; this gives the model an
+// explicit target to allocate bullets against by relevance instead.
+func buildLengthBudget(raw *json.RawMessage) (string, error) {
+	seniority := ""
+	if raw != nil {
+		var signals JDSignals
+		if err := json.Unmarshal(*raw, &signals); err != nil {
+			return "", fmt.Errorf("parse jd_signals for length budget: %w", err)
+		}
+		seniority = signals.Seniority
+	}
+
+	switch seniority {
+	case "junior", "mid":
+		return "Target 1 page (~8-10 bullets total across ALL positions and projects combined).", nil
+	case "staff", "principal", "lead":
+		return "Target 2 pages (~15-18 bullets total across ALL positions and projects combined).", nil
+	default:
+		// senior, manager, director, vp, unknown, or anything unrecognized:
+		// senior IC length is the safest general default.
+		return "Target 1-2 pages (~12-15 bullets total across ALL positions and projects combined).", nil
+	}
 }
 
 // buildSkillsChecklist renders the JD's required/preferred skills as an
@@ -121,6 +148,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}
+	lengthBudget, err := buildLengthBudget(app.JdSignals)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
 	identityJSON, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal identity: %w", err)
@@ -158,11 +189,12 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 	// Pass 2a: experience, skills, projects, education, and credentials.
 	// Summary is deliberately excluded — see 2b below.
-	bodyPrompt, err := renderPrompt("resume_body.v2.tmpl", resumeBodyPromptData{
+	bodyPrompt, err := renderPrompt("resume_body.v3.tmpl", resumeBodyPromptData{
 		CompanyName:     app.CompanyName,
 		RoleTitle:       app.RoleTitle,
 		JDSignals:       string(signalsJSON),
 		SkillsChecklist: skillsChecklist,
+		LengthBudget:    lengthBudget,
 		Identity:        string(identityJSON),
 		Experience:      string(experienceJSON),
 		Projects:        string(projectsJSON),
