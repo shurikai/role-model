@@ -34,6 +34,14 @@ RULES:
 - Include projects only if their tags overlap meaningfully with priority_skills,
   unless force_include is true
 - Exclude projects where force_exclude is true regardless of relevance
+- Before finalizing your output, go through every entry in
+  <jd_requirement_checklist> one at a time. For each entry, check whether the
+  identity, experience, or projects data actually supports it. If it is
+  supported, that entry MUST appear somewhere in Skills or in at least one
+  bullet — do not silently drop a supported requirement because no single
+  bullet was already built around it. If an entry is NOT supported anywhere
+  in the provided data, leave it out; the checklist is for surfacing real,
+  present facts, not for satisfying the JD by fabricating coverage.
 - Each project's project_id in the output must be copied verbatim from the
   id field of the corresponding project in the projects data. Never invent
   or generate a project_id.
@@ -52,6 +60,10 @@ Role: {{.RoleTitle}}
 <jd_signals>
 {{.JDSignals}}
 </jd_signals>
+
+<jd_requirement_checklist>
+{{.SkillsChecklist}}
+</jd_requirement_checklist>
 
 <identity>
 {{.Identity}}

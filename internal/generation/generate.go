@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -29,16 +30,57 @@ func (e *ValidationError) Error() string {
 }
 
 type resumeBodyPromptData struct {
-	CompanyName   string
-	RoleTitle     string
-	JDSignals     string
-	Identity      string
-	Experience    string
-	Projects      string
-	Education     string
-	Credentials   string
-	ResumeSchema  string
-	PriorFeedback string
+	CompanyName     string
+	RoleTitle       string
+	JDSignals       string
+	SkillsChecklist string
+	Identity        string
+	Experience      string
+	Projects        string
+	Education       string
+	Credentials     string
+	ResumeSchema    string
+	PriorFeedback   string
+}
+
+// buildSkillsChecklist renders the JD's required/preferred skills as an
+// explicit checklist for the 2a prompt, rather than leaving cross-referencing
+// to implicit recall from the <jd_signals> blob. Falls back to the
+// deprecated priority_skills field for older stored jd_signals rows that
+// predate required_skills/preferred_skills.
+func buildSkillsChecklist(raw *json.RawMessage) (string, error) {
+	if raw == nil {
+		return "(no jd_signals available)", nil
+	}
+
+	var signals JDSignals
+	if err := json.Unmarshal(*raw, &signals); err != nil {
+		return "", fmt.Errorf("parse jd_signals for checklist: %w", err)
+	}
+
+	required := signals.RequiredSkills
+	if len(required) == 0 {
+		required = signals.PrioritySkills
+	}
+	preferred := signals.PreferredSkills
+
+	var b strings.Builder
+	b.WriteString("Required:\n")
+	if len(required) == 0 {
+		b.WriteString("(none listed)\n")
+	}
+	for _, skill := range required {
+		fmt.Fprintf(&b, "- %s\n", skill)
+	}
+	b.WriteString("Preferred:\n")
+	if len(preferred) == 0 {
+		b.WriteString("(none listed)\n")
+	}
+	for _, skill := range preferred {
+		fmt.Fprintf(&b, "- %s\n", skill)
+	}
+
+	return b.String(), nil
 }
 
 type resumeSummaryPromptData struct {
@@ -74,6 +116,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	signalsJSON, err := json.MarshalIndent(app.JdSignals, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal signals: %w", err)
+	}
+	skillsChecklist, err := buildSkillsChecklist(app.JdSignals)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
 	}
 	identityJSON, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
@@ -112,17 +158,18 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 	// Pass 2a: experience, skills, projects, education, and credentials.
 	// Summary is deliberately excluded — see 2b below.
-	bodyPrompt, err := renderPrompt("resume_body.v1.tmpl", resumeBodyPromptData{
-		CompanyName:   app.CompanyName,
-		RoleTitle:     app.RoleTitle,
-		JDSignals:     string(signalsJSON),
-		Identity:      string(identityJSON),
-		Experience:    string(experienceJSON),
-		Projects:      string(projectsJSON),
-		Education:     string(educationJSON),
-		Credentials:   string(credentialsJSON),
-		ResumeSchema:  string(resumeschema.ResumeV1JSON),
-		PriorFeedback: "",
+	bodyPrompt, err := renderPrompt("resume_body.v2.tmpl", resumeBodyPromptData{
+		CompanyName:     app.CompanyName,
+		RoleTitle:       app.RoleTitle,
+		JDSignals:       string(signalsJSON),
+		SkillsChecklist: skillsChecklist,
+		Identity:        string(identityJSON),
+		Experience:      string(experienceJSON),
+		Projects:        string(projectsJSON),
+		Education:       string(educationJSON),
+		Credentials:     string(credentialsJSON),
+		ResumeSchema:    string(resumeschema.ResumeV1JSON),
+		PriorFeedback:   "",
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: render body prompt: %w", err)
