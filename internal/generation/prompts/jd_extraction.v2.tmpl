@@ -32,6 +32,13 @@ Rules:
 - Keep skill names concise and canonical — "Go" not "Golang", "Kubernetes" not "K8s".
 - Do not include soft skills (communication, teamwork) in required_skills or
   preferred_skills — only technical skills and tools.
+- Named technologies and tools appear in two shapes — extract both the same way:
+  (1) a clean list, e.g. "Go, Kubernetes, PostgreSQL", and (2) named only as an
+  example inside a broader prose competency statement, e.g. "proficiency with
+  modern AI-assisted development tooling (e.g., Claude Code)". In case (2), still
+  extract the named tool ("Claude Code") — do not skip it just because it's a
+  parenthetical example rather than the main subject of the sentence, and do not
+  substitute the surrounding competency phrase for the named tool.
 - Return ONLY the JSON object. No preamble, no explanation, no markdown fences.
 
 Example output shape:
@@ -43,6 +50,12 @@ Example output shape:
   "work_type": "remote",
   "culture_signals": ["small team", "high ownership", "async-first"]
 }
+
+Example of extracting a named tool from a prose competency statement:
+Input bullet: "Active proficiency with modern AI-assisted development tooling
+(e.g., Claude Code) to accelerate product velocity."
+-> required_skills includes "Claude Code" (not just the general phrase
+"AI-assisted development tooling").
 
 <job_description>
 {{.JobDescription}}

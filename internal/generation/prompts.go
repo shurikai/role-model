@@ -14,7 +14,7 @@ const promptVersion = "v2"
 // Individual prompt template versions, recorded in generation_params for
 // per-call traceability now that generation is more than one LLM call.
 const (
-	bodyPromptVersion    = "resume_body.v1"
+	bodyPromptVersion    = "resume_body.v2"
 	summaryPromptVersion = "resume_summary.v1"
 )
 
