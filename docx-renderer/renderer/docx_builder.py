@@ -1,12 +1,43 @@
 from datetime import datetime
 
 from docx import Document
+from docx.document import Document as DocumentObject
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Pt, RGBColor, Twips
+from docx.text.paragraph import Paragraph
 
 from models import EducationEntry, EmployerBlock, Identity, ProjectEntry, Resume
 
+FONT_NAME = "Arial"
+ACCENT_COLOR = RGBColor(0x28, 0x01, 0x37)
+TENURE_COLOR = RGBColor(0x59, 0x59, 0x59)
 
-def build_resume_document(resume: Resume) -> Document:
+# Page geometry (dxa/twips, 1/20 pt). CONTENT_WIDTH_DXA is the tab stop
+# position for role/project header lines -- hardcoded per the canonical
+# formatting spec rather than derived from margins at render time.
+MARGIN_DXA = 1080
+CONTENT_WIDTH_DXA = 10240
+
+SECTION_HEADING_SPACE_BEFORE = Twips(320)
+SECTION_HEADING_SPACE_AFTER = Twips(20)
+RULE_SPACE_BEFORE = Twips(0)
+RULE_SPACE_AFTER = Twips(120)
+
+TITLE_SPACE_BEFORE = Twips(0)
+TITLE_SPACE_AFTER = Twips(60)
+
+BULLET_INDENT_LEFT = Twips(480)
+BULLET_INDENT_HANGING = Twips(280)
+BULLET_SPACE_BEFORE = Twips(20)
+BULLET_SPACE_AFTER = Twips(20)
+
+
+def build_resume_document(resume: Resume) -> DocumentObject:
     doc = Document()
+    _configure_page(doc)
+    _configure_base_style(doc)
 
     _render_identity(doc, resume.identity)
     _render_summary(doc, resume.summary)
@@ -18,85 +49,178 @@ def build_resume_document(resume: Resume) -> Document:
     return doc
 
 
-def _render_identity(doc: Document, identity: Identity) -> None:
-    doc.add_heading(identity.name, level=0)
-
-    if identity.headline:
-        doc.add_paragraph(identity.headline)
-
-    if identity.location:
-        doc.add_paragraph(identity.location)
-
-    contact_parts = [identity.email]
-    if identity.phone:
-        contact_parts.append(identity.phone)
-    if identity.linkedin_url:
-        contact_parts.append(identity.linkedin_url)
-    if identity.github_url:
-        contact_parts.append(identity.github_url)
-    if identity.site_url:
-        contact_parts.append(identity.site_url)
-    doc.add_paragraph(" · ".join(contact_parts))
+def _configure_page(doc: DocumentObject) -> None:
+    section = doc.sections[0]
+    section.top_margin = Twips(MARGIN_DXA)
+    section.bottom_margin = Twips(MARGIN_DXA)
+    section.left_margin = Twips(MARGIN_DXA)
+    section.right_margin = Twips(MARGIN_DXA)
 
 
-def _render_summary(doc: Document, summary: str) -> None:
-    doc.add_heading("SUMMARY", level=1)
+def _configure_base_style(doc: DocumentObject) -> None:
+    """Sets Arial as the document font and zeroes the Normal style's default
+    paragraph spacing. Word's built-in Normal style carries ~8pt space-after
+    by default; left alone, every paragraph we don't explicitly format would
+    inherit it and silently reintroduce the bloat this refactor removes."""
+    style = doc.styles["Normal"]
+    style.font.name = FONT_NAME
+    rpr = style.element.get_or_add_rPr()
+    rfonts = rpr.find(qn("w:rFonts"))
+    if rfonts is None:
+        rfonts = OxmlElement("w:rFonts")
+        rpr.append(rfonts)
+    rfonts.set(qn("w:eastAsia"), FONT_NAME)
+
+    style.paragraph_format.space_before = Twips(0)
+    style.paragraph_format.space_after = Twips(0)
+
+
+def _set_bottom_border(paragraph: Paragraph, color: str, size: int = 6) -> None:
+    p_pr = paragraph._p.get_or_add_pPr()
+    p_bdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), str(size))
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), color)
+    p_bdr.append(bottom)
+    p_pr.append(p_bdr)
+
+
+def _section_heading(doc: DocumentObject, text: str) -> None:
+    """Section heading (SUMMARY, SKILLS, EXPERIENCE, ...) with an accent-color
+    rule line below it. Explicit paragraph-level spacing, not a Word built-in
+    Heading style -- built-in heading styles carry spacing well beyond what's
+    needed and inflate page count independent of content."""
+    heading = doc.add_paragraph()
+    heading.paragraph_format.space_before = SECTION_HEADING_SPACE_BEFORE
+    heading.paragraph_format.space_after = SECTION_HEADING_SPACE_AFTER
+    run = heading.add_run(text)
+    run.bold = True
+    run.font.color.rgb = ACCENT_COLOR
+
+    rule = doc.add_paragraph()
+    rule.paragraph_format.space_before = RULE_SPACE_BEFORE
+    rule.paragraph_format.space_after = RULE_SPACE_AFTER
+    _set_bottom_border(rule, color="280137")
+
+
+def _add_bullet(doc: DocumentObject, text: str) -> Paragraph:
+    p = doc.add_paragraph(text, style="List Bullet")
+    pf = p.paragraph_format
+    pf.left_indent = BULLET_INDENT_LEFT
+    pf.first_line_indent = -BULLET_INDENT_HANGING
+    pf.space_before = BULLET_SPACE_BEFORE
+    pf.space_after = BULLET_SPACE_AFTER
+    return p
+
+
+def _header_line(doc: DocumentObject, primary: str, secondary: str | None) -> None:
+    """Two/three-run header line: primary (bold) + tab + secondary (gray),
+    on one line via a hardcoded right tab stop. Per spec, the tab is its own
+    run -- never embedded in the primary/secondary run text -- so the layout
+    is driven by the tab stop, not by whitespace baked into a string."""
+    p = doc.add_paragraph()
+    p.paragraph_format.tab_stops.add_tab_stop(
+        Twips(CONTENT_WIDTH_DXA), WD_TAB_ALIGNMENT.RIGHT
+    )
+
+    primary_run = p.add_run(primary)
+    primary_run.bold = True
+
+    if secondary:
+        p.add_run("\t")
+        secondary_run = p.add_run(secondary)
+        secondary_run.font.color.rgb = TENURE_COLOR
+
+
+def _subtitle_line(doc: DocumentObject, text: str) -> None:
+    """Italic subtitle line immediately below a header line (role title,
+    project tagline) -- own paragraph, tight spacing, 2 lines total for the
+    header block rather than 3."""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = TITLE_SPACE_BEFORE
+    p.paragraph_format.space_after = TITLE_SPACE_AFTER
+    run = p.add_run(text)
+    run.italic = True
+
+
+def _render_identity(doc: DocumentObject, identity: Identity) -> None:
+    name_p = doc.add_paragraph()
+    name_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    name_p.paragraph_format.space_after = Twips(20)
+    name_run = name_p.add_run(identity.name)
+    name_run.bold = True
+    name_run.font.size = Pt(16)
+
+    contact_fields = [
+        identity.headline,
+        identity.location,
+        identity.email,
+        identity.phone,
+        identity.linkedin_url,
+        identity.github_url,
+        identity.site_url,
+    ]
+    contact_line = " · ".join(field for field in contact_fields if field)
+    if contact_line:
+        contact_p = doc.add_paragraph()
+        contact_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        contact_p.paragraph_format.space_after = SECTION_HEADING_SPACE_AFTER
+        contact_p.add_run(contact_line)
+
+
+def _render_summary(doc: DocumentObject, summary: str) -> None:
+    _section_heading(doc, "SUMMARY")
     doc.add_paragraph(summary)
 
 
-def _render_skills(doc: Document, skills: dict[str, list[str]]) -> None:
-    doc.add_heading("SKILLS", level=1)
+def _render_skills(doc: DocumentObject, skills: dict[str, list[str]]) -> None:
+    _section_heading(doc, "SKILLS")
     for category, skills_list in skills.items():
         if skills_list:
             line = f"{category}: {', '.join(skills_list)}"
-            doc.add_paragraph(line, style="List Bullet")
+            _add_bullet(doc, line)
 
 
-def _render_experience(doc: Document, experience: list[EmployerBlock]) -> None:
-    doc.add_heading("EXPERIENCE", level=1)
+def _render_experience(doc: DocumentObject, experience: list[EmployerBlock]) -> None:
+    _section_heading(doc, "EXPERIENCE")
     for employer_block in experience:
-        doc.add_heading(employer_block.employer, level=2)
-
         for position in employer_block.positions:
-            doc.add_heading(position.title, level=3)
-            started = format_date(position.started_on)
-            ended = format_date(position.ended_on) if position.ended_on else "Present"
-            doc.add_paragraph(f"{started} – {ended}")
+            tenure = _format_tenure(position.started_on, position.ended_on)
+            _header_line(doc, employer_block.employer, tenure)
+            _subtitle_line(doc, position.title)
 
             for bullet in position.bullets:
-                doc.add_paragraph(bullet.text, style="List Bullet")
+                _add_bullet(doc, bullet.text)
 
 
-def _render_projects(doc: Document, projects: list[ProjectEntry]) -> None:
+def _render_projects(doc: DocumentObject, projects: list[ProjectEntry]) -> None:
     if not projects:
         return
 
-    doc.add_heading("PROJECTS", level=1)
+    _section_heading(doc, "PROJECTS")
     for project in projects:
-        p = doc.add_paragraph()
-        run = p.add_run(project.name)
-        run.bold = True
-
-        if project.tagline:
-            p.add_run(f" - {project.tagline}")
-
+        tenure = None
         if project.started_on:
             ended = format_date(project.ended_on) if project.ended_on else "Present"
-            doc.add_paragraph(f"{format_date(project.started_on)} – {ended}")
+            tenure = f"{format_date(project.started_on)} – {ended}"
+        _header_line(doc, project.name, tenure)
+
+        if project.tagline:
+            _subtitle_line(doc, project.tagline)
 
         for bullet in project.bullets:
-            doc.add_paragraph(bullet.text, style="List Bullet")
+            _add_bullet(doc, bullet.text)
 
-        if project.writeup_url:
-            doc.add_paragraph(project.writeup_url)
-        if project.repo_url:
-            doc.add_paragraph(project.repo_url)
-        if project.live_url:
-            doc.add_paragraph(project.live_url)
+        links = [project.writeup_url, project.repo_url, project.live_url]
+        link_line = " · ".join(link for link in links if link)
+        if link_line:
+            doc.add_paragraph(link_line)
 
 
-def _render_education(doc: Document, education: list[EducationEntry]) -> None:
-    doc.add_heading("EDUCATION", level=1)
+def _render_education(doc: DocumentObject, education: list[EducationEntry]) -> None:
+    _section_heading(doc, "EDUCATION")
     for education_block in education:
         parts = [education_block.institution]
         if education_block.degree:
@@ -106,6 +230,12 @@ def _render_education(doc: Document, education: list[EducationEntry]) -> None:
         if education_block.graduated:
             parts.append(education_block.graduated)
         doc.add_paragraph(" - ".join(parts))
+
+
+def _format_tenure(started_on: str, ended_on: str | None) -> str:
+    started = format_date(started_on)
+    ended = format_date(ended_on) if ended_on else "Present"
+    return f"{started} – {ended}"
 
 
 def format_date(value: str) -> str:
