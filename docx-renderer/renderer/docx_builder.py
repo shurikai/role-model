@@ -25,6 +25,8 @@ SECTION_HEADING_SPACE_AFTER = Twips(20)
 RULE_SPACE_BEFORE = Twips(0)
 RULE_SPACE_AFTER = Twips(120)
 
+HEADER_SPACE_BEFORE = Twips(160)
+
 TITLE_SPACE_BEFORE = Twips(0)
 TITLE_SPACE_AFTER = Twips(60)
 
@@ -119,8 +121,14 @@ def _header_line(doc: DocumentObject, primary: str, secondary: str | None) -> No
     """Two/three-run header line: primary (bold) + tab + secondary (gray),
     on one line via a hardcoded right tab stop. Per spec, the tab is its own
     run -- never embedded in the primary/secondary run text -- so the layout
-    is driven by the tab stop, not by whitespace baked into a string."""
+    is driven by the tab stop, not by whitespace baked into a string.
+
+    Carries its own space-before so consecutive role/project entries don't
+    run together -- everything else in a header block (subtitle, bullets)
+    is spaced tight against what precedes it, but the header line itself
+    needs separation from the previous entry's last bullet."""
     p = doc.add_paragraph()
+    p.paragraph_format.space_before = HEADER_SPACE_BEFORE
     p.paragraph_format.tab_stops.add_tab_stop(
         Twips(CONTENT_WIDTH_DXA), WD_TAB_ALIGNMENT.RIGHT
     )
