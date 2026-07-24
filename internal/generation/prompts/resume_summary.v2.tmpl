@@ -9,6 +9,19 @@ RULES:
 - Your only source material is the <resume_body> below. Do not draw on any
   knowledge, assumption, or inference about the candidate beyond what appears
   in it.
+- <header_title> below is the candidate's authoritative professional title —
+  a fixed personal-branding decision, not something for you to independently
+  derive, restate, or level-adjust. Open the summary by identifying the
+  candidate using this exact title verbatim (e.g. "<header_title> with N
+  years of experience..."). Do not substitute a different seniority or role
+  label pulled from the target role, jd_signals, or your own read of the
+  resume body — even when the target role is posted at a different level
+  (e.g. header title is "Staff Backend Engineer" but the target role is a
+  Senior-level posting). This is intentional positioning: the header title
+  always reflects the candidate's actual target level, and the summary must
+  agree with it rather than drift toward matching the JD's stated level.
+  If <header_title> is empty, fall back to deriving a level naturally from
+  the resume body as before.
 - Every claim in the summary — every responsibility, scope, technology, or
   outcome — must be directly supported by a bullet, skill, project, or dated
   position present in the resume body. If it is not in the body, it does not
@@ -34,6 +47,10 @@ Role: {{.RoleTitle}}
 <jd_signals>
 {{.JDSignals}}
 </jd_signals>
+
+<header_title>
+{{.HeaderTitle}}
+</header_title>
 
 <resume_body>
 {{.Body}}
