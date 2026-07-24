@@ -93,10 +93,17 @@ def _section_heading(doc: DocumentObject, text: str) -> None:
     """Section heading (SUMMARY, SKILLS, EXPERIENCE, ...) with an accent-color
     rule line below it. Explicit paragraph-level spacing, not a Word built-in
     Heading style -- built-in heading styles carry spacing well beyond what's
-    needed and inflate page count independent of content."""
+    needed and inflate page count independent of content.
+
+    keep_with_next is set on both the heading and rule paragraphs so the
+    heading, its rule line, and the first line of the section's content
+    are never split across a page boundary. keep_with_next only binds a
+    paragraph to the one immediately after it, so it has to be set on
+    each link in the chain, not just the first."""
     heading = doc.add_paragraph()
     heading.paragraph_format.space_before = SECTION_HEADING_SPACE_BEFORE
     heading.paragraph_format.space_after = SECTION_HEADING_SPACE_AFTER
+    heading.paragraph_format.keep_with_next = True
     run = heading.add_run(text)
     run.bold = True
     run.font.color.rgb = ACCENT_COLOR
@@ -104,6 +111,7 @@ def _section_heading(doc: DocumentObject, text: str) -> None:
     rule = doc.add_paragraph()
     rule.paragraph_format.space_before = RULE_SPACE_BEFORE
     rule.paragraph_format.space_after = RULE_SPACE_AFTER
+    rule.paragraph_format.keep_with_next = True
     _set_bottom_border(rule, color="280137")
 
 
@@ -126,9 +134,14 @@ def _header_line(doc: DocumentObject, primary: str, secondary: str | None) -> No
     Carries its own space-before so consecutive role/project entries don't
     run together -- everything else in a header block (subtitle, bullets)
     is spaced tight against what precedes it, but the header line itself
-    needs separation from the previous entry's last bullet."""
+    needs separation from the previous entry's last bullet.
+
+    keep_with_next ties this line to the subtitle line immediately below
+    it, so employer/date and title never land on opposite sides of a page
+    break."""
     p = doc.add_paragraph()
     p.paragraph_format.space_before = HEADER_SPACE_BEFORE
+    p.paragraph_format.keep_with_next = True
     p.paragraph_format.tab_stops.add_tab_stop(
         Twips(CONTENT_WIDTH_DXA), WD_TAB_ALIGNMENT.RIGHT
     )
@@ -145,10 +158,17 @@ def _header_line(doc: DocumentObject, primary: str, secondary: str | None) -> No
 def _subtitle_line(doc: DocumentObject, text: str) -> None:
     """Italic subtitle line immediately below a header line (role title,
     project tagline) -- own paragraph, tight spacing, 2 lines total for the
-    header block rather than 3."""
+    header block rather than 3.
+
+    keep_with_next ties this line to whatever comes right after it (the
+    first bullet, normally), so the header block's title never gets
+    stranded from its own content. Bullets themselves are deliberately
+    left free to break across a page boundary -- only the header chain
+    needs protection."""
     p = doc.add_paragraph()
     p.paragraph_format.space_before = TITLE_SPACE_BEFORE
     p.paragraph_format.space_after = TITLE_SPACE_AFTER
+    p.paragraph_format.keep_with_next = True
     run = p.add_run(text)
     run.italic = True
 
