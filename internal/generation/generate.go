@@ -114,6 +114,7 @@ type resumeSummaryPromptData struct {
 	CompanyName string
 	RoleTitle   string
 	JDSignals   string
+	HeaderTitle string
 	Body        string
 }
 
@@ -189,7 +190,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 	// Pass 2a: experience, skills, projects, education, and credentials.
 	// Summary is deliberately excluded — see 2b below.
-	bodyPrompt, err := renderPrompt("resume_body.v3.tmpl", resumeBodyPromptData{
+	bodyPrompt, err := renderPrompt("resume_body.v4.tmpl", resumeBodyPromptData{
 		CompanyName:     app.CompanyName,
 		RoleTitle:       app.RoleTitle,
 		JDSignals:       string(signalsJSON),
@@ -240,10 +241,19 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal body for summary pass: %w", err)
 	}
 
-	summaryPrompt, err := renderPrompt("resume_summary.v1.tmpl", resumeSummaryPromptData{
+	// Header title (identity.headline) is authoritative personal-branding
+	// input, not something 2b should independently derive or restate at a
+	// different level from the JD's own leveling language.
+	headerTitle := ""
+	if user.Headline != nil {
+		headerTitle = *user.Headline
+	}
+
+	summaryPrompt, err := renderPrompt("resume_summary.v2.tmpl", resumeSummaryPromptData{
 		CompanyName: app.CompanyName,
 		RoleTitle:   app.RoleTitle,
 		JDSignals:   string(signalsJSON),
+		HeaderTitle: headerTitle,
 		Body:        string(bodyForSummary),
 	})
 	if err != nil {
