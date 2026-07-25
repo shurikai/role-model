@@ -221,10 +221,23 @@ export function ApplicationDetail() {
                     <span className="font-medium">Preference score:</span>{" "}
                     {latestFitReport.preference_score}/100
                   </p>
+                  {latestFitReport.preference_conflicts &&
+                    latestFitReport.preference_conflicts.length > 0 && (
+                      <div>
+                        <span className="font-medium text-red-800">
+                          Preference conflicts:
+                        </span>
+                        <ul className="ml-4 list-disc text-red-700">
+                          {latestFitReport.preference_conflicts.map((conflict) => (
+                            <li key={conflict}>{conflict}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   {latestFitReport.preference_gaps &&
                     latestFitReport.preference_gaps.length > 0 && (
                       <div>
-                        <span className="font-medium">Preference gaps:</span>
+                        <span className="font-medium">Preferences not mentioned:</span>
                         <ul className="ml-4 list-disc text-gray-700">
                           {latestFitReport.preference_gaps.map((gap) => (
                             <li key={gap}>{gap}</li>

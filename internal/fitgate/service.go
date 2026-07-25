@@ -80,9 +80,9 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}
 
 	var (
-		wg                        sync.WaitGroup
-		technicalScore, prefScore float64
-		technicalGaps, prefGaps   []string
+		wg                                 sync.WaitGroup
+		technicalScore, prefScore          float64
+		technicalGaps, prefGaps, prefConfl []string
 	)
 	wg.Add(2)
 	go func() {
@@ -91,11 +91,11 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}()
 	go func() {
 		defer wg.Done()
-		prefScore, prefGaps = ScorePreferenceFit(prefs, signals)
+		prefScore, prefGaps, prefConfl = ScorePreferenceFit(prefs, signals)
 	}()
 	wg.Wait()
 
-	narrative, err := s.generateNarrative(ctx, app, signals, technicalScore, technicalGaps, prefScore, prefGaps)
+	narrative, err := s.generateNarrative(ctx, app, signals, technicalScore, technicalGaps, prefScore, prefGaps, prefConfl)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
@@ -108,17 +108,22 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal preference gaps: %w", err)
 	}
+	prefConflictsJSON, err := marshalRawNonEmpty(prefConfl)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal preference conflicts: %w", err)
+	}
 
 	report, err := s.q.CreateFitReport(ctx, db.CreateFitReportParams{
-		ID:                uuid.New(),
-		UserID:            userID,
-		ApplicationID:     appIDParam,
-		AntiPatternPassed: true,
-		TechnicalScore:    numericFromScore(technicalScore),
-		TechnicalGaps:     technicalGapsJSON,
-		PreferenceScore:   numericFromScore(prefScore),
-		PreferenceGaps:    prefGapsJSON,
-		Narrative:         &narrative,
+		ID:                  uuid.New(),
+		UserID:              userID,
+		ApplicationID:       appIDParam,
+		AntiPatternPassed:   true,
+		TechnicalScore:      numericFromScore(technicalScore),
+		TechnicalGaps:       technicalGapsJSON,
+		PreferenceScore:     numericFromScore(prefScore),
+		PreferenceGaps:      prefGapsJSON,
+		PreferenceConflicts: prefConflictsJSON,
+		Narrative:           &narrative,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: store report: %w", err)
@@ -127,12 +132,13 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 }
 
 type narrativeInput struct {
-	AntiPatternPassed bool     `json:"anti_pattern_passed"`
-	TechnicalScore    float64  `json:"technical_score"`
-	TechnicalGaps     []string `json:"technical_gaps"`
-	PreferenceScore   float64  `json:"preference_score"`
-	PreferenceGaps    []string `json:"preference_gaps"`
-	JDSummary         string   `json:"jd_summary"`
+	AntiPatternPassed   bool     `json:"anti_pattern_passed"`
+	TechnicalScore      float64  `json:"technical_score"`
+	TechnicalGaps       []string `json:"technical_gaps"`
+	PreferenceScore     float64  `json:"preference_score"`
+	PreferenceGaps      []string `json:"preference_gaps"`
+	PreferenceConflicts []string `json:"preference_conflicts"`
+	JDSummary           string   `json:"jd_summary"`
 }
 
 func (s *Service) generateNarrative(
@@ -143,6 +149,7 @@ func (s *Service) generateNarrative(
 	technicalGaps []string,
 	prefScore float64,
 	prefGaps []string,
+	prefConflicts []string,
 ) (string, error) {
 	prompt, err := generation.RawPrompt("fit_narrative.txt")
 	if err != nil {
@@ -150,12 +157,13 @@ func (s *Service) generateNarrative(
 	}
 
 	input := narrativeInput{
-		AntiPatternPassed: true,
-		TechnicalScore:    technicalScore,
-		TechnicalGaps:     technicalGaps,
-		PreferenceScore:   prefScore,
-		PreferenceGaps:    prefGaps,
-		JDSummary:         fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
+		AntiPatternPassed:   true,
+		TechnicalScore:      technicalScore,
+		TechnicalGaps:       technicalGaps,
+		PreferenceScore:     prefScore,
+		PreferenceGaps:      prefGaps,
+		PreferenceConflicts: prefConflicts,
+		JDSummary:           fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
 	}
 	inputJSON, err := json.Marshal(input)
 	if err != nil {

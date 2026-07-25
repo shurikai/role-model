@@ -120,17 +120,18 @@ type Employer struct {
 }
 
 type FitReport struct {
-	ID                uuid.UUID        `json:"id"`
-	UserID            uuid.UUID        `json:"user_id"`
-	ApplicationID     pgtype.UUID      `json:"application_id"`
-	AntiPatternPassed bool             `json:"anti_pattern_passed"`
-	AntiPatternHits   *json.RawMessage `json:"anti_pattern_hits"`
-	TechnicalScore    pgtype.Numeric   `json:"technical_score"`
-	TechnicalGaps     *json.RawMessage `json:"technical_gaps"`
-	PreferenceScore   pgtype.Numeric   `json:"preference_score"`
-	PreferenceGaps    *json.RawMessage `json:"preference_gaps"`
-	Narrative         *string          `json:"narrative"`
-	CreatedAt         time.Time        `json:"created_at"`
+	ID                  uuid.UUID        `json:"id"`
+	UserID              uuid.UUID        `json:"user_id"`
+	ApplicationID       pgtype.UUID      `json:"application_id"`
+	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
+	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
+	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
+	TechnicalGaps       *json.RawMessage `json:"technical_gaps"`
+	PreferenceScore     pgtype.Numeric   `json:"preference_score"`
+	PreferenceGaps      *json.RawMessage `json:"preference_gaps"`
+	Narrative           *string          `json:"narrative"`
+	CreatedAt           time.Time        `json:"created_at"`
+	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 }
 
 type ImportBatch struct {
