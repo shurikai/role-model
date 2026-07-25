@@ -16,24 +16,26 @@ import (
 const createFitReport = `-- name: CreateFitReport :one
 INSERT INTO fit_reports (
     id, user_id, application_id, anti_pattern_passed, anti_pattern_hits,
-    technical_score, technical_gaps, preference_score, preference_gaps, narrative
+    technical_score, technical_gaps, preference_score, preference_gaps, narrative,
+    preference_conflicts
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
 )
 RETURNING id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts
 `
 
 type CreateFitReportParams struct {
-	ID                uuid.UUID        `json:"id"`
-	UserID            uuid.UUID        `json:"user_id"`
-	ApplicationID     pgtype.UUID      `json:"application_id"`
-	AntiPatternPassed bool             `json:"anti_pattern_passed"`
-	AntiPatternHits   *json.RawMessage `json:"anti_pattern_hits"`
-	TechnicalScore    pgtype.Numeric   `json:"technical_score"`
-	TechnicalGaps     *json.RawMessage `json:"technical_gaps"`
-	PreferenceScore   pgtype.Numeric   `json:"preference_score"`
-	PreferenceGaps    *json.RawMessage `json:"preference_gaps"`
-	Narrative         *string          `json:"narrative"`
+	ID                  uuid.UUID        `json:"id"`
+	UserID              uuid.UUID        `json:"user_id"`
+	ApplicationID       pgtype.UUID      `json:"application_id"`
+	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
+	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
+	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
+	TechnicalGaps       *json.RawMessage `json:"technical_gaps"`
+	PreferenceScore     pgtype.Numeric   `json:"preference_score"`
+	PreferenceGaps      *json.RawMessage `json:"preference_gaps"`
+	Narrative           *string          `json:"narrative"`
+	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 }
 
 func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams) (FitReport, error) {
@@ -48,6 +50,7 @@ func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams
 		arg.PreferenceScore,
 		arg.PreferenceGaps,
 		arg.Narrative,
+		arg.PreferenceConflicts,
 	)
 	var i FitReport
 	err := row.Scan(
