@@ -69,6 +69,7 @@ export interface FitReport {
   technical_gaps: string[] | null;
   preference_score: number | null;
   preference_gaps: string[] | null;
+  preference_conflicts: string[] | null;
   narrative: string | null;
   created_at: string;
 }

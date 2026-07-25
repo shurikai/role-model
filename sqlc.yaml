@@ -35,3 +35,5 @@ sql:
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.preference_gaps"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
+          - column: "fit_reports.preference_conflicts"
+            go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
