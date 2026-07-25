@@ -5,8 +5,19 @@ The narrative should:
 - Open with a direct assessment: strong fit, moderate fit, or weak fit
 - Summarize the technical alignment in one or two sentences, calling out key matched
   skills and any significant gaps
-- Summarize the preference alignment in one or two sentences, noting what about the
-  role matches or conflicts with stated preferences
+- Summarize the preference alignment in one or two sentences, distinguishing two
+  different things:
+  - preference_gaps are preferences the JD simply doesn't mention. Describe these
+    neutrally as unmentioned or unaddressed ("the posting doesn't speak to...",
+    "no mention of..."). Never call these conflicts, and never say the role
+    "misses" or "conflicts with" these — the JD is silent on them, not opposed
+    to them.
+  - preference_conflicts are preferences the JD actively signals against
+    (something Jason dislikes that the role does appear to involve). These are
+    the only items that should be described using conflict language ("conflicts
+    with", "runs against", "at odds with").
+  - If preference_conflicts is empty, do not imply any conflicts exist even if
+    preference_gaps is long.
 - Close with a concrete recommendation: apply, apply with caveats, or pass
 
 Rules:
@@ -21,5 +32,8 @@ Input will be provided as a JSON object with these fields:
 - technical_score: number 0-100
 - technical_gaps: array of tag name strings
 - preference_score: number 0-100
-- preference_gaps: array of preference description strings
+- preference_gaps: array of preference description strings the JD doesn't mention
+  (neutral, not conflicts)
+- preference_conflicts: array of preference description strings the JD actively
+  signals against (genuine conflicts — may be empty)
 - jd_summary: brief description of the role (company, title, domain)

@@ -61,10 +61,19 @@ func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, g
 // ScorePreferenceFit scores JD alignment against the user's non-hard-exclude
 // preferences (hard excludes are handled by RunAntiPatternGate). A matched
 // positive preference earns its weight; a matched negative preference costs
-// its weight. An unmatched positive preference is reported as a gap; an
-// unmatched negative preference earns its weight, since avoiding a stated
-// dislike is the ideal outcome.
-func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64, gaps []string) {
+// its weight.
+//
+// The two ways a preference can fail to earn points are semantically
+// different and are reported separately rather than lumped into one list:
+//   - An unmatched positive preference means the JD simply doesn't mention
+//     something Jason wants — a gap, not a conflict.
+//   - A matched negative preference means the JD actively signals something
+//     Jason dislikes — a genuine conflict.
+//
+// An unmatched negative preference earns its weight, since avoiding a
+// stated dislike is the ideal outcome, and isn't reported at all (there's
+// nothing notable to say about an absence of an absence).
+func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64, gaps []string, conflicts []string) {
 	fields := signalFields(signals)
 
 	var earned, possible float64
@@ -92,6 +101,7 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64
 		case "negative":
 			if matched {
 				earned -= weight
+				conflicts = append(conflicts, p.Label)
 			} else {
 				earned += weight
 			}
@@ -99,9 +109,9 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64
 	}
 
 	if !counted || possible == 0 {
-		return 100.0, nil
+		return 100.0, nil, nil
 	}
-	return clampScore(earned / possible * 100), gaps
+	return clampScore(earned / possible * 100), gaps, conflicts
 }
 
 // signalFields collects the JD's free-text signal fields for matching
