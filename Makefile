@@ -4,7 +4,7 @@ export
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run run-frontend run-renderer dev
 
 # Build
 all: build
@@ -56,3 +56,18 @@ sqlc:
 
 run:
 	go run ./cmd/server
+
+run-frontend:
+	cd frontend && npm run dev -- --host
+
+run-renderer:
+	cd docx-renderer && uv run uvicorn main:app --reload --port 8000
+
+# Runs backend, frontend, and renderer together in one terminal.
+# Ctrl-C stops all three.
+dev:
+	@trap 'kill $$(jobs -p) 2>/dev/null' EXIT INT TERM; \
+	$(MAKE) run & \
+	$(MAKE) run-frontend & \
+	$(MAKE) run-renderer & \
+	wait
