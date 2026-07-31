@@ -31,6 +31,13 @@ go.work.sum
 database/seed
 scripts
 
+# Renderer scratch output. Deliberately not a blanket *.docx rule -- the
+# regression fixtures under tests/fixtures/ are tracked on purpose.
+/out.docx
+/docx-renderer/out.docx
+/docx-renderer/__pycache__/
+/docx-renderer/renderer/__pycache__/
+
 # Editor/IDE
 # .idea/
 # .vscode/
