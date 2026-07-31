@@ -83,10 +83,46 @@ paragraph chains for widow/orphan protection. Bullets are deliberately left
 free to break across pages.
 
 ### Prompt management
-Prompts are versioned files in /internal/generation/prompts, embedded into the
-binary at compile time via go:embed. Prompt version is recorded in
-resume_versions.generation_params so every generated resume can be traced back
-to the exact prompt that produced it.
+Prompts live in /internal/generation/prompts, embedded into the binary at
+compile time via go:embed.
+
+**Prompt filenames carry no version number.** A prompt's identity is the git
+blob hash of its content, computed from the embedded bytes by
+`promptFingerprint` and recorded in `resume_versions.generation_params`. This
+is the same hash git computes for the same bytes, so a recorded blob resolves
+directly against the repository:
+
+```
+git cat-file -p <blob>          # the exact prompt text used
+git log --find-object=<blob>    # the commit that introduced it, and why
+git diff <blobA> <blobB>        # what changed between two generations
+```
+
+A prompt's *history* is `git log` on its path; its *rationale* is the commit
+message plus the `{{/* */}}` header in the file.
+
+Rules:
+- **Never put a version number in a prompt filename or in a Go constant.** The
+  scheme exists because a filename and a constant are two sources of truth for
+  one fact, and they drifted — resumes were recorded against a prompt file that
+  did not exist. Do not reintroduce that.
+- **Commit prompt changes before generating anything you need to trace.** An
+  uncommitted edit still hashes correctly and stably, but the blob exists in no
+  commit and cannot be recovered later. `make check-prompts` warns; it runs
+  automatically before `make run` and `make dev`. It warns rather than blocks
+  on purpose — edit-and-regenerate is the normal tuning loop.
+- Template `{{/* */}}` headers must end with the `-}}` trim marker, or the
+  rendered prompt gains a leading newline. `TestPromptCommentsDoNotLeak` guards
+  both the leak and the newline.
+- `pipelineVersion` in prompts.go is separate and still hand-maintained. It
+  names the *call sequence* (currently the 2a/2b split), which no individual
+  file's content captures. Bump it when the shape of the pipeline changes, not
+  when prompt text changes.
+- `schema/resume.v1.json` requires a `prompt_version` field in the document
+  `meta` block and sets `additionalProperties: false`, so the portable document
+  carries `pipelineVersion` only. Per-prompt hashes live in generation_params
+  on the DB row. Putting them in the document would require a schema v2 and a
+  matching change to the renderer's Pydantic models.
 
 ## Project Structure
 /cmd/server                      — main entry point
@@ -204,8 +240,10 @@ seems genuinely warranted.
 - Add dependencies without a clear justification
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
-- Invent prompt improvements — prompts live in /internal/generation/prompts and
-  are versioned explicitly (/prompts holds per-session task specs, not prompts)
+- Invent prompt improvements — prompts live in /internal/generation/prompts
+  (/prompts holds per-session task specs, not prompts)
+- Add a version number to a prompt filename or a prompt version constant — see
+  Prompt management above; content hashing replaced both
 - Open new issues unprompted during a session focused on something else. If you
   notice unrelated work that should be tracked, mention it and let the human decide.
 - Use the `claude-code-action` GitHub App or any webhook-triggered automation.

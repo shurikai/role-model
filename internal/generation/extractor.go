@@ -35,7 +35,7 @@ type extractPromptData struct {
 
 // ExtractSignals runs JD signal extraction against the given job description text.
 func (s *Service) ExtractSignals(ctx context.Context, jdText string) (*JDSignals, error) {
-	prompt, err := renderPrompt("jd_extraction.v2.tmpl", extractPromptData{
+	prompt, err := renderPrompt(jdExtractionPrompt, extractPromptData{
 		JobDescription: jdText,
 	})
 	if err != nil {

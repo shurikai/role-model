@@ -1,22 +1,23 @@
 package generation
 
 import (
+	"crypto/sha1"
 	"embed"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"text/template"
 )
 
-// promptVersion identifies the overall generation pipeline shape. Bumped when
-// the sequence/contract of prompt calls changes (e.g. the 2a/2b summary split).
-const promptVersion = "v2"
-
-// Individual prompt template versions, recorded in generation_params for
-// per-call traceability now that generation is more than one LLM call.
-const (
-	bodyPromptVersion    = "resume_body.v4"
-	summaryPromptVersion = "resume_summary.v2"
-)
+// pipelineVersion identifies the overall generation pipeline shape -- how many
+// LLM calls run, in what order, and what each is responsible for. Bumped when
+// that sequence changes (e.g. the 2a body / 2b summary split), NOT when the
+// text of an individual prompt changes.
+//
+// This is the one prompt-related constant still maintained by hand, because it
+// names something no single file's content captures. Individual prompt versions
+// are content-addressed instead -- see promptFingerprint.
+const pipelineVersion = "v2"
 
 //go:embed prompts/*.tmpl
 var promptFS embed.FS
@@ -26,6 +27,16 @@ var rawPromptFS embed.FS
 
 var templates = template.Must(
 	template.ParseFS(promptFS, "prompts/*.tmpl"),
+)
+
+// Prompt template filenames. These are deliberately unversioned: a prompt's
+// identity is the content hash recorded in generation_params, and its history
+// is the git log of the file. Renaming per revision would reintroduce two
+// sources of truth for one fact, which is what this scheme exists to avoid.
+const (
+	jdExtractionPrompt  = "jd_extraction.tmpl"
+	resumeBodyPrompt    = "resume_body.tmpl"
+	resumeSummaryPrompt = "resume_summary.tmpl"
 )
 
 // renderPrompt executes a named template with the given data.
@@ -46,4 +57,46 @@ func RawPrompt(name string) (string, error) {
 		return "", fmt.Errorf("read prompt %q: %w", name, err)
 	}
 	return string(b), nil
+}
+
+// promptFingerprint returns the git blob SHA of an embedded prompt file. This
+// is the prompt's version: it changes exactly when the content changes, and it
+// is identical to the hash git computes for the same bytes, so a fingerprint
+// recorded in generation_params round-trips against the repository:
+//
+//	git cat-file -p <sha>           -- the exact prompt text
+//	git log --find-object=<sha>     -- the commit that introduced it
+//	git diff <shaA> <shaB>          -- what changed between two generations
+//
+// Caveat: those lookups only resolve once the content is committed. A prompt
+// edited but not yet committed still fingerprints correctly and stably, but
+// the blob exists nowhere retrievable -- see `make check-prompts`.
+//
+// SHA-1 here is git's object format, not a security boundary.
+func promptFingerprint(name string) (string, error) {
+	b, err := promptFS.ReadFile("prompts/" + name)
+	if err != nil {
+		return "", fmt.Errorf("fingerprint prompt %q: %w", name, err)
+	}
+
+	// Git hashes a blob as sha1("blob <bytelen>\x00" + content).
+	h := sha1.New()
+	fmt.Fprintf(h, "blob %d\x00", len(b))
+	h.Write(b)
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// promptRef identifies one prompt used during a generation run: the file it
+// came from, and the content hash that pins the exact text.
+type promptRef struct {
+	File string `json:"file"`
+	Blob string `json:"blob"`
+}
+
+func newPromptRef(name string) (promptRef, error) {
+	blob, err := promptFingerprint(name)
+	if err != nil {
+		return promptRef{}, err
+	}
+	return promptRef{File: name, Blob: blob}, nil
 }
