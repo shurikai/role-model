@@ -4,7 +4,7 @@ export
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run run-frontend run-renderer dev
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run run-frontend run-renderer dev check-prompts
 
 # Build
 all: build
@@ -54,7 +54,24 @@ seed:
 sqlc:
 	sqlc generate
 
-run:
+# Prompt provenance is content-addressed: generation records the git blob hash
+# of each template it used. An uncommitted prompt edit still hashes correctly,
+# but the blob exists in no commit, so `git cat-file` can't recover it later --
+# and if you edit again, that exact text is gone.
+#
+# Warn only, never fail: editing a prompt and regenerating to see the effect is
+# the normal tuning loop, and blocking it would be worse than the risk.
+check-prompts:
+	@git diff --quiet HEAD -- internal/generation/prompts/ 2>/dev/null || { \
+		echo ""; \
+		echo "  WARNING: uncommitted changes in internal/generation/prompts/"; \
+		echo "  Resumes generated now will record prompt hashes that cannot be"; \
+		echo "  resolved from git history. Commit before generating anything"; \
+		echo "  you need to trace later."; \
+		echo ""; \
+	}
+
+run: check-prompts
 	go run ./cmd/server
 
 run-frontend:

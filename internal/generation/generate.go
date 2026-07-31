@@ -190,7 +190,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 	// Pass 2a: experience, skills, projects, education, and credentials.
 	// Summary is deliberately excluded — see 2b below.
-	bodyPrompt, err := renderPrompt("resume_body.v4.tmpl", resumeBodyPromptData{
+	bodyPrompt, err := renderPrompt(resumeBodyPrompt, resumeBodyPromptData{
 		CompanyName:     app.CompanyName,
 		RoleTitle:       app.RoleTitle,
 		JDSignals:       string(signalsJSON),
@@ -249,7 +249,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		headerTitle = *user.Headline
 	}
 
-	summaryPrompt, err := renderPrompt("resume_summary.v2.tmpl", resumeSummaryPromptData{
+	summaryPrompt, err := renderPrompt(resumeSummaryPrompt, resumeSummaryPromptData{
 		CompanyName: app.CompanyName,
 		RoleTitle:   app.RoleTitle,
 		JDSignals:   string(signalsJSON),
@@ -301,7 +301,11 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		"target_role":      app.RoleTitle,
 		"jd_signals":       app.JdSignals,
 		"generation_model": s.client.ModelName(),
-		"prompt_version":   promptVersion,
+		// schema/resume.v1.json requires this field and forbids additional
+		// ones, so the portable document carries the coarse pipeline version
+		// only. Per-prompt content hashes live in generation_params on the
+		// resume_versions row, which is unconstrained JSONB.
+		"prompt_version": pipelineVersion,
 	}
 	metaJSON, err := json.Marshal(meta)
 	if err != nil {
@@ -340,16 +344,30 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: next version number: %w", err)
 	}
 
+	// Prompt provenance is content-addressed: each ref pins the exact template
+	// text by git blob hash, recoverable with `git cat-file -p <blob>`. See
+	// promptFingerprint. pipelineVersion covers the call sequence, which no
+	// individual file's content describes.
+	bodyRef, err := newPromptRef(resumeBodyPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+	summaryRef, err := newPromptRef(resumeSummaryPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
 	genParamsJSON, err := json.Marshal(struct {
-		Model                string `json:"model"`
-		PromptVersion        string `json:"prompt_version"`
-		BodyPromptVersion    string `json:"body_prompt_version"`
-		SummaryPromptVersion string `json:"summary_prompt_version"`
+		Model    string               `json:"model"`
+		Pipeline string               `json:"pipeline_version"`
+		Prompts  map[string]promptRef `json:"prompts"`
 	}{
-		Model:                s.client.ModelName(),
-		PromptVersion:        promptVersion,
-		BodyPromptVersion:    bodyPromptVersion,
-		SummaryPromptVersion: summaryPromptVersion,
+		Model:    s.client.ModelName(),
+		Pipeline: pipelineVersion,
+		Prompts: map[string]promptRef{
+			"body":    bodyRef,
+			"summary": summaryRef,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal gen params: %w", err)

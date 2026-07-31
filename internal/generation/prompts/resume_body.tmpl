@@ -1,3 +1,18 @@
+{{/*
+Pass 2a of the generation pipeline: experience, skills, projects, education,
+and credentials. Deliberately excludes the summary -- that is 2b's job, and it
+runs against this pass's selected bullets so it cannot overclaim.
+
+Deliberate constraints, do not "fix" these without reading the reasoning:
+  - Skills are relevance-filtered against the JD the same way bullets are. This
+    is an interim measure: skills carry no depth signal of their own (every row
+    backfilled at a uniform proficiency), so filtering is the only lever that
+    keeps a one-off prototype from sitting beside a decade of production use.
+  - LengthBudget is seniority-informed and passed in, not decided here.
+
+This file is unversioned by design. Its identity is the git blob hash recorded
+in generation_params; its history is `git log` on this path.
+*/ -}}
 You are an expert technical resume writer specializing in senior and staff-level
 software engineering roles. You write with precision, confidence, and specificity.
 You never fabricate experience or embellish outcomes. You compress and reframe
