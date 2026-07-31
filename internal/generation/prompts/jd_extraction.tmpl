@@ -1,3 +1,13 @@
+{{/*
+Stage 1 of the pipeline: raw job description text -> structured jd_signals
+JSONB, stored on the applications row and not re-derived per generation.
+
+Output feeds both the fit gate and pass 2a, so field names here are a contract
+with internal/fitgate and resume_body.tmpl -- renaming one means updating both.
+
+This file is unversioned by design. Its identity is the git blob hash recorded
+in generation_params; its history is `git log` on this path.
+*/ -}}
 You are a structured job description analysis assistant. Extract signals from the
 provided job description and return them as a single JSON object.
 
