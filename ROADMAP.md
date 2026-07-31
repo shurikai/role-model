@@ -1,6 +1,6 @@
 # Role Model — Architecture Checkpoint & Roadmap
 
-**Last updated:** June 2026  
+**Last updated:** July 2026  
 **Repo:** github.com/shurikai/role-model  
 **Data repo:** private, accessed via `SEED_DIR` env var from `make seed`  
 **Companion docs:** `docs/discovery-design.md`
@@ -43,7 +43,8 @@ is the moat, not the prompts).
 | Schema validation | santhosh-tekuri/jsonschema |
 | Auth | golang-jwt/jwt/v5 + golang.org/x/crypto/bcrypt |
 | Config | joho/godotenv |
-| Frontend (planned) | React + TypeScript + Vite |
+| Frontend | React + TypeScript + Vite, TanStack Query, Vitest |
+| Renderer | Python 3.14, FastAPI + python-docx, managed with uv |
 
 ---
 
@@ -51,16 +52,23 @@ is the moat, not the prompts).
 
 ### Infrastructure
 - Docker Compose managing PostgreSQL 16 on host port 5433
-- golang-migrate: 4 migrations applied
-- Makefile with `db-up`, `db-down`, `migrate`, `seed`, `reset` targets
+- golang-migrate: 9 migrations applied
+- Makefile with `db-up`, `db-down`, `migrate`, `seed`, `reset` targets, plus
+  `run`, `run-frontend`, `run-renderer`, and `dev` (all three processes at once)
 - `make seed` reads `SEED_DIR` and applies SQL files in order
 - `internal/httputil` package (resolved the handlers↔middleware circular import)
 
-### Schema — 18 tables
-`users`, `employers`, `positions`, `contributions`, `tags`, `contribution_tags`,
-`position_tags`, `education`, `education_tags`, `credentials`, `projects`,
-`project_tags`, `applications`, `jd_signals` (JSONB), `resume_versions`,
-`contribution_feedback`, `generation_params` (JSONB), `structured_output` (JSONB)
+### Schema — 22 tables + 1 view
+`users`, `employers`, `positions`, `contributions`, `tags`, `tag_categories`,
+`contribution_tags`, `education`, `education_tags`, `credentials`,
+`credential_tags`, `projects`, `project_tags`, `project_contributions`,
+`applications`, `resume_versions`, `contribution_feedback`, `skills`,
+`preferences`, `fit_reports`, `import_batches`, `contribution_drafts`,
+and the `v_skill_provenance` view.
+
+`jd_signals`, `generation_params`, and `structured_output` are JSONB *columns*
+(on `applications` and `resume_versions`), not tables — an earlier revision of
+this doc listed them as tables.
 
 Key design decisions baked in:
 - All tenant-scoped tables carry `user_id`; isolation enforced at every query
@@ -134,13 +142,30 @@ GET    /api/v1/applications/:id
 PUT    /api/v1/applications/:id
 DELETE /api/v1/applications/:id
 
-POST   /api/v1/applications/:id/extract    — Stage 1: JD → jd_signals JSONB
-POST   /api/v1/applications/:id/generate   — Stage 2: signals + context → resume_version
+POST   /api/v1/applications/:id/extract-signals  — Stage 1: JD → jd_signals JSONB
+POST   /api/v1/applications/:id/generate         — Stage 2 (2a body + 2b summary)
 GET    /api/v1/applications/:id/versions
 GET    /api/v1/resume-versions/:id
+POST   /api/v1/resume-versions/:id/render        — → .docx via docx-renderer
+
+POST   /api/v1/applications/:id/fit              — fit gate scoring
+GET    /api/v1/applications/:id/fit
+GET    /api/v1/applications/:id/fit/:reportID
+
+POST   /api/v1/import                            — Stage 0 batch create
+GET    /api/v1/import/:batchID
+GET    /api/v1/import/:batchID/drafts
+GET    /api/v1/import/drafts/:draftID
+PUT    /api/v1/import/drafts/:draftID
+POST   /api/v1/import/drafts/:draftID/approve
+POST   /api/v1/import/drafts/:draftID/reject
+
+GET/POST/DELETE /api/v1/tags, /api/v1/tag-categories
+POST/DELETE     /api/v1/contributions/:id/tags[/:tagId]
+GET/POST/DELETE /api/v1/education, /api/v1/credentials, /api/v1/projects
 ```
 
-### Two-Stage LLM Pipeline — Built and Verified
+### LLM Pipeline — Built and Verified
 **Stage 1 — JD Signal Extraction**
 - Input: raw JD text
 - Anthropic API call against `jd_extraction.v1.tmpl`
@@ -167,16 +192,36 @@ GET    /api/v1/resume-versions/:id
 
 ---
 
-## Schema Gaps — Identified, Not Yet Built
+## Schema Gaps
 
-These are confirmed design decisions parked for a dedicated session:
+### Skills table — BUILT (migration 005, backfilled in 008)
+Shipped, but in a materially different shape than proposed below. Note the
+differences before working on this:
 
-### Skills table (proposed)
-Skills are currently emergent from contribution tags — there is no standalone
-record expressing "Java, 25 years, expert" as a fact independent of the
-contributions that prove it. Provenance exists; the fact itself does not.
+- `skills` keys to `tag_id`, not a free-text `name` + `category`. Skills are
+  therefore constrained to the existing tag corpus by construction.
+- `proficiency` is `NOT NULL` and checks `novice | proficient | expert`
+  (the proposal said `familiar`, not `novice`).
+- **`skill_provenance` is a view (`v_skill_provenance`), not a table.** It
+  derives skill→contribution links from `contribution_tags`, so provenance is
+  automatic and never needs writing to. The proposed junction table below was
+  not built and is not needed.
 
-Proposed additions:
+**Remaining gap — depth signal, not provenance.** Migration 008 backfilled
+every used tag at a uniform `'proficient'` with `years_experience = NULL`, on
+the explicit reasoning that the migration had no basis to distinguish depth.
+So the columns are populated but carry no differentiating information:
+a single Daugherty GCP cohort prototype and a decade of AWS are both
+`proficient / NULL`. JD-relevance filtering in `resume_body.v4.tmpl` is the
+current stopgap (issue #34); the permanent fix is reweighting proficiency and
+years per skill, which nothing does yet.
+
+Migration 008 also flags a review task: it treated every used tag as
+skill-worthy regardless of `tag_categories`, so domain/outcome-type tags may
+have become skills and should be deactivated. Rerunning is safe
+(`ON CONFLICT DO NOTHING`).
+
+Original proposal, retained for contrast:
 ```sql
 CREATE TABLE skills (
     id              UUID PRIMARY KEY,
@@ -196,12 +241,17 @@ CREATE TABLE skill_provenance (
 );
 ```
 
-### Preferences table (proposed)
-Preferences currently live only in conversation memory and in the pattern of
-job-search decisions made across sessions. They are not queryable by the
-pipeline. This is a real gap for fit scoring.
+### Preferences table — BUILT (migration 005)
+Preferences are now queryable by the pipeline and drive the preference half of
+fit-gate scoring in `internal/fitgate/scorer.go`. Matched negative preferences
+surface as `preference_conflicts` (migration 009) and are kept distinct from
+merely-unmet positives — see the note in Phase 2 below.
 
-Proposed additions:
+Shipped shape differs from the proposal below: `preference_type` and
+`sentiment` are `TEXT` with `CHECK` constraints rather than Postgres enums,
+and the proposed `preference_contexts` table was collapsed into a single
+nullable `context_type` column (`permanent | contract | fractional`) plus a
+1–10 `weight`. Original proposal retained for contrast:
 ```sql
 CREATE TYPE preference_type AS ENUM
     ('domain', 'work_type', 'culture', 'anti_pattern');
@@ -226,7 +276,7 @@ CREATE TABLE preference_contexts (
 );
 ```
 
-Known preference profile (from memory, needs to be seeded once table exists):
+Known preference profile (the canonical list this table is seeded from):
 
 | Type | Sentiment | Label |
 |---|---|---|
@@ -258,11 +308,13 @@ Known preference profile (from memory, needs to be seeded once table exists):
 without touching the terminal.*
 
 **Backend remaining:**
-- Projects, education, credentials write-CRUD (read endpoints exist; write not yet built)
+- ~~Projects, education, credentials write-CRUD~~ — BUILT
+- ~~Skills + preferences schema and seed~~ — BUILT (migrations 005, 008, 009)
 - Pending seed tasks (MySQL tag, Groovy verification)
-- Skills + preferences schema and seed (design session needed first)
+- Skill provenance population — the tables exist but nothing writes to them
 
-**Stage 0 — LLM-assisted data entry pipeline** (new; designed this session)  
+**Stage 0 — LLM-assisted data entry pipeline** — BUILT (migration 006,
+`internal/stage0`, endpoints under `/api/v1/import`). Design retained below.  
 The data-entry onboarding path for non-technical users. Without this, the
 only path to seeding career data is hand-written SQL, which is not generalizeable.
 
@@ -348,9 +400,10 @@ Return ONLY valid JSON: {suggested_text, confidence, flagged_inferences[], missi
 ```
 
 **Frontend:**
-- React + TypeScript + Vite (decided)
-- AppShell + SidebarNav first build targets
-- QuickLaunchPanel (JD paste/submit) + RecentApplicationsTable on dashboard
+- React + TypeScript + Vite (decided) — BUILT: auth shell plus the application
+  generation flow (`Applications`, `ApplicationNew`, `ApplicationDetail`)
+- Remaining: career-data views (employer/position/contribution browsing and
+  editing), and the Stage 0 review UI
 - Data-entry UI must be designed with Stage 0 review flow in mind from the start
   — do not design plain forms and retrofit LLM-assist later
 
@@ -361,21 +414,28 @@ Return ONLY valid JSON: {suggested_text, confidence, flagged_inferences[], missi
 ---
 
 ### Phase 2 — Complete end-to-end pipeline
-*Gate: JD input → .docx download without leaving the UI.*
+*Gate: JD input → .docx download without leaving the UI.* **Gate met.**
 
-1. Stage 1 + Stage 2 fully wired as API endpoints with UI surfaces
+1. ~~Stage 1 + Stage 2 fully wired as API endpoints with UI surfaces~~ — BUILT.
+   Stage 2 was subsequently split into two calls: 2a body (bullet + skill
+   selection, seniority-informed length budget) and 2b summary (scoped to the
+   bullets 2a selected, so it cannot assert unsupported claims). Facts both
+   calls would otherwise decide independently — the header title, notably —
+   are threaded through as explicit inputs. Keep that pattern.
 2. Human-in-the-loop signal review gate (UI for reviewing jd_signals before
-   generation runs — this is a product requirement, not just a nice-to-have)
-3. **Go/no-go fit gate** — deterministic scoring pass before Stage 2 runs:
-   - Score dimensions: tech stack coverage (tag matching), level match,
-     domain match, gap list
-   - LLM writes prose narrative from the deterministic scores; it interprets,
-     it does not score
-   - Output: scored breakdown + recommendation (strong / marginal / hard pass)
-   - Human reviews fit assessment and explicitly proceeds to generation
-   - Schema: `fit_assessments` table linked to `applications`
-   - Implementation note: deterministic v1 first; calibrate against outcome
-     data once enough `applications` rows exist with real outcomes recorded
+   generation runs — this is a product requirement, not just a nice-to-have).
+   **Still outstanding** — the fit gate landed, but jd_signals themselves are
+   not yet reviewable before generation.
+3. ~~**Go/no-go fit gate**~~ — BUILT (`internal/fitgate`, migrations 007/009,
+   `POST /api/v1/applications/{id}/fit`). Deterministic scoring in Go, LLM
+   writes narrative only.
+   - Shipped as a `fit_reports` table, not `fit_assessments` as named here
+   - Unmet positive preferences and matched negative preferences are tracked
+     as **separate** lists (`preference_gaps` vs `preference_conflicts`).
+     Collapsing them made the narrative describe unmentioned preferences as
+     active conflicts; do not re-merge them.
+   - Still open: calibrate against outcome data once enough `applications`
+     rows carry real outcomes
 4. **Feedback loop:**
    - Two levels: whole-resume and per-contribution
    - `feedback_type` enum: `correction` | `selection` | `phrasing`
@@ -384,9 +444,16 @@ Return ONLY valid JSON: {suggested_text, confidence, flagged_inferences[], missi
      - `phrasing`: correct content, wrong wording; feeds prompt-steering table
    - Prompt-steering accumulation: separate table injected into future generation
      calls (schema TBD, defer until feedback UI is in scope)
-5. Renderer (docx output):
-   - Python-based, `resume.v1.json` → `.docx`
-   - In Phase 2: runs as a synchronous step or simple worker
+5. ~~Renderer (docx output)~~ — BUILT. `docx-renderer/` (FastAPI +
+   python-docx), one `POST /render` endpoint, called synchronously from Go via
+   `internal/renderer.Client` and surfaced as
+   `POST /api/v1/resume-versions/{id}/render`.
+   - Layout is explicit and compact — Word heading styles were deliberately
+     dropped; do not reintroduce them
+   - `keep_with_next` on section-heading and role-header paragraph chains for
+     widow/orphan protection; bullets intentionally left free to break
+   - Rendered bytes are returned to the caller, not persisted (see blob
+     storage, Phase 4)
    - In Phase 3: becomes a Temporal activity (see below)
 6. **Output reviewer (three-pass)** — runs after generation, before human
    approval gate:
@@ -623,8 +690,11 @@ this framing without requiring production AI feature ownership.
    is actively being built but track as a known gap.
 5. **Lever adapter** — verify `api.lever.co/v0/postings/{company}?mode=json`
    against a real target slug before writing the adapter.
-6. **Skills + preferences schema design session** — needed before Phase 2 fit
-   scoring work begins; both tables must be queryable by the pipeline.
+6. ~~**Skills + preferences schema design session**~~ — RESOLVED, both tables
+   built and queryable (migrations 005/008/009). Successor question: how do
+   `skills.proficiency` / `years_experience` / `skill_provenance` actually get
+   populated? Nothing writes to them today, which is why generation still can't
+   tell a prototype from production depth.
 7. **`contribution_drafts` writethrough flow** — does the Stage 0 review UI
    write directly to `contributions` or hold in `contribution_drafts` until a
    final confirm step? Recommendation: hold in drafts with explicit confirm;
