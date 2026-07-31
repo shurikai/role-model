@@ -11,12 +11,18 @@ a schema redesign.
 
 ## Status
 Active development. Backend: employer/position/contribution CRUD, application
-CRUD, JWT auth (signup/login/me), JD signal extraction and resume generation
-pipeline, Stage 0 import (extract + enrich + approve/reject), fit gate
-scoring, CORS. Frontend: auth shell (login/signup/session persistence/401
-handling) with test coverage, built on Vite + React + TypeScript.
-internal/renderer was deleted (dead code, no consumer) — resume rendering
-is not yet built; see Open Questions below for the deferred design question.
+CRUD, tags and tag-categories CRUD, education/credentials/projects, JWT auth
+(signup/login/me), JD signal extraction and resume generation pipeline,
+Stage 0 import (extract + enrich + approve/reject), fit gate scoring with
+skills and preferences tables, CORS. Frontend: auth shell plus the
+application generation flow (JD paste → fit → generate → render), built on
+Vite + React + TypeScript.
+
+Resume rendering is built: a Python docx-renderer service (FastAPI +
+python-docx) owns document output, and internal/renderer is the Go HTTP
+client that calls it. Note that internal/renderer was deleted once as dead
+code and later reintroduced with an actual consumer — the current package is
+the client, not the old renderer implementation.
 
 ## Stack
 - **Language:** Go
@@ -28,14 +34,35 @@ is not yet built; see Open Questions below for the deferred design question.
 - **Prompt storage:** internal/generation/prompts directory, embedded via go:embed
 - **Prompt templating:** text/template
 - **JSON schema validation:** santhosh-tekuri/jsonschema
+- **Renderer:** Python 3.14 (FastAPI + python-docx), managed with uv,
+  run as a separate process — not part of the Go binary
+- **Frontend:** React + TypeScript on Vite, TanStack Query, Vitest
 
 ## Architecture
 
-### Two-prompt LLM pipeline
-1. **JD signal extraction** — takes raw job description text, returns structured
-   jd_signals JSON (priority skills, seniority, domain vocabulary)
-2. **Resume generation** — takes jd_signals + contributions + identity + prior
-   feedback, returns a complete intermediate resume JSON document
+### LLM pipeline
+1. **JD signal extraction (Stage 1)** — takes raw job description text, returns
+   structured jd_signals JSON (priority skills, seniority, domain vocabulary)
+2. **Resume generation (Stage 2)** — split into two calls:
+   - **2a body** (`resume_body.v4.tmpl`) — selects and writes bullets and
+     skills against jd_signals, under a seniority-informed length budget
+   - **2b summary** (`resume_summary.*.tmpl`) — writes the summary scoped to
+     the bullets 2a already selected, so it cannot assert unsupported claims
+
+   Facts that both calls would otherwise decide independently (e.g. the header
+   title) are threaded through as explicit inputs rather than re-derived. This
+   is the established pattern for cross-call consistency — follow it.
+
+Both calls are recorded separately in generation_params for per-call
+traceability.
+
+### Fit gate
+`internal/fitgate` runs a deterministic scoring pass before generation:
+technical coverage plus preference fit, scored in Go. The LLM only writes
+prose narrative from those scores — it interprets, it does not score.
+Unmet preferences (JD simply doesn't mention something) and genuine conflicts
+(JD involves something actively unwanted) are tracked as separate lists and
+must stay that way; collapsing them produces false conflict language.
 
 ### Intermediate resume JSON
 Generation produces a structured JSON document (see /schema/resume.v1.json)
@@ -43,9 +70,17 @@ that is the contract between the generation pipeline and the renderer.
 The renderer never touches the database. The JSON document is self-contained.
 
 ### Renderer
-Not yet built. Will be a separate concern, likely a small Python service
-using python-docx, communicating with the Go service over HTTP.
-The Go service owns generation; the renderer owns document output.
+Built. `docx-renderer/` is a small Python service (FastAPI + python-docx)
+exposing a single `POST /render` endpoint that takes the intermediate resume
+JSON and returns a `.docx`. The Go service reaches it through
+`internal/renderer.Client`, surfaced as
+`POST /api/v1/resume-versions/{id}/render`.
+
+The renderer never touches the database — the JSON document it receives is
+self-contained. Layout is explicit and compact: it does not use Word heading
+styles, and it sets `keep_with_next` on section-heading and role-header
+paragraph chains for widow/orphan protection. Bullets are deliberately left
+free to break across pages.
 
 ### Prompt management
 Prompts are versioned files in /internal/generation/prompts, embedded into the
@@ -56,14 +91,23 @@ to the exact prompt that produced it.
 ## Project Structure
 /cmd/server                      — main entry point
 /internal/api/handlers           — HTTP handlers
+/internal/auth                   — JWT issuance/validation, bcrypt
 /internal/config                 — environment-based config loading
 /internal/db                     — sqlc generated code
+/internal/fitgate                — deterministic fit scoring + narrative
 /internal/generation             — LLM pipeline (signal extraction + resume generation)
 /internal/generation/prompts     — LLM prompt template files (embedded at compile time)
-/internal/renderer               — intermediate JSON -> output format
+/internal/httputil               — shared HTTP helpers (breaks handlers↔middleware cycle)
+/internal/renderer               — HTTP client for the docx-renderer service
+/internal/stage0                 — LLM-assisted import (extract + enrich + review)
+/docx-renderer                   — Python service: resume JSON -> .docx
+/frontend                        — React + TypeScript + Vite UI
 /database/seed                   — seed SQL scripts
 /migrations                      — golang-migrate SQL migration files
 /schema                          — JSON schema documents
+/tests/fixtures                  — JD, resume JSON, and .docx regression fixtures
+/prompts/cc_sessions             — per-session task specs (scaffolding record)
+/notes                           — working notes
 
 ## Key Files
 - /CLAUDE.md                 — project instructions and conventions (this file)
@@ -160,15 +204,24 @@ seems genuinely warranted.
 - Add dependencies without a clear justification
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
-- Invent prompt improvements — prompts live in /prompts and are versioned explicitly
+- Invent prompt improvements — prompts live in /internal/generation/prompts and
+  are versioned explicitly (/prompts holds per-session task specs, not prompts)
 - Open new issues unprompted during a session focused on something else. If you
   notice unrelated work that should be tracked, mention it and let the human decide.
 - Use the `claude-code-action` GitHub App or any webhook-triggered automation.
   All `gh` usage is interactive, inside a human-initiated session only.
 
 ## Open Questions
-- Blob storage interface for rendered documents (local disk now, S3 later)
-- Renderer service: Go-native vs Python/python-docx (deferred — no
-  implementation exists yet; do not pre-define an interface for this ahead
-  of the actual session, per the internal/renderer lesson)
+- Blob storage interface for rendered documents (local disk now, S3 later).
+  Rendered .docx bytes are currently returned to the caller, not persisted.
 - Evaluation strategy for prompt quality across versions (deferred)
+- Skill depth signal. The schema supports it — `skills.proficiency` and
+  `years_experience` exist, and `v_skill_provenance` derives skill→contribution
+  links from `contribution_tags` automatically — but migration 008 backfilled
+  every skill at a uniform `proficient` / `NULL`, so the data carries no
+  differentiation. A one-off prototype and a decade of production use look
+  identical to generation. JD-relevance filtering is the current stopgap; the
+  fix is populating real per-skill depth, not more schema.
+
+Resolved: the renderer service question (Go-native vs Python) — Python won,
+see Architecture above.
