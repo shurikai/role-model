@@ -36,6 +36,59 @@ culture_signals: array of strings — short phrases describing work culture, tea
   "consulting culture", "large enterprise", "cross-functional collaboration".
   Empty array if no clear signals.
 
+screening_summary: object — the plain-language facts a human scans a job posting
+  for before deciding whether a role is worth considering at all. These are not
+  skills-match signals; they are the practical and identifying details that
+  decide whether someone would take the role regardless of how well their
+  skills fit. Fields:
+
+  location: string — where the role is based, as stated. e.g. "Providence, RI",
+    "Remote, US", "London, UK". Use "not stated" if absent.
+
+  work_arrangement: string — how the work is done, with any detail the JD gives.
+    e.g. "fully remote", "hybrid, 2 days/week Minneapolis", "onsite".
+    Use "not stated" if absent.
+
+  travel: string — travel expectations as stated. e.g. "up to 25%",
+    "occasional customer site visits". Use "not mentioned" if absent.
+
+  industry: string — plain-language description of what the company or team
+    actually works on. NOT constrained to the fixed `domain` list above — write
+    what is true, e.g. "defense/autonomous systems", "themed entertainment",
+    "developer telemetry SaaS", "freight logistics".
+
+  clearance_citizenship: string — clearance, citizenship, work authorization,
+    or residency requirements as stated. e.g. "U.S. citizenship + active TS/SCI
+    clearance required", "must be authorized to work in the EU".
+    Use "not mentioned" if absent.
+
+  other_flags: array of strings — anything else identifying or discriminating
+    about the role that is not a skills match. This field is deliberately
+    open-ended; it is not limited to any one dimension. Empty array if nothing
+    is notable.
+
+Rules for screening_summary:
+- This section DESCRIBES the role. It does not judge it. No sentiment, no
+  "this is a red flag because...", no recommendations. Plain facts only.
+  The human reading it does the judging.
+- Infer other_flags from framing and language, not only from explicit
+  statements. "A platform for our engineering teams", "shared services", or
+  "internal developer experience" all imply an internal-engineering audience
+  even when the word "internal" never appears — say so.
+- Worked examples of other_flags entries, spanning different categories:
+  - audience/customer type: "serves internal engineering teams rather than
+    external customers"
+  - industry framing: "military-coded language throughout (mission, warfighter,
+    operational tempo)"
+  - compliance/regulatory: "FedRAMP and SOC 2 compliance work is a named part
+    of the role"
+  - posting quality: "employer is not named; posting is by a recruiting agency"
+  - compensation structure: "compensation is commission-heavy with a low base"
+  - working hours: "requires 4 hours daily overlap with UTC+9"
+- Do not repeat the same fact in other_flags that a dedicated field already
+  captures. If clearance is in clearance_citizenship, it does not also belong
+  in other_flags.
+
 Rules:
 - Extract only what is present in the JD. Do not infer required skills from context
   if they are not stated.
@@ -58,7 +111,18 @@ Example output shape:
   "seniority": "senior",
   "domain": "observability",
   "work_type": "remote",
-  "culture_signals": ["small team", "high ownership", "async-first"]
+  "culture_signals": ["small team", "high ownership", "async-first"],
+  "screening_summary": {
+    "location": "Remote, US",
+    "work_arrangement": "fully remote",
+    "travel": "not mentioned",
+    "industry": "developer telemetry SaaS",
+    "clearance_citizenship": "not mentioned",
+    "other_flags": [
+      "serves internal engineering teams rather than external customers",
+      "on-call rotation is a named responsibility"
+    ]
+  }
 }
 
 Example of extracting a named tool from a prose competency statement:
