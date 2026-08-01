@@ -76,6 +76,38 @@ It is a statement about role shape, which is either a skills question (Group A)
 or a screening-summary observation. Whichever it becomes, it is not doing
 anything where it currently sits.
 
+## False positive: any `staff`-level JD trips row 5
+
+Found while smoke-testing the non-blocking change, and confirmed directly
+against `RunAntiPatternGate`:
+
+```
+seniority="staff"     passed=false  hits=1
+seniority="senior"    passed=true   hits=0
+seniority="principal" passed=true   hits=0
+```
+
+`matchesSignal` compares in **both** directions — label containing field, or
+field containing label. `signalFields` includes `signals.Seniority`. So the
+label `IT consulting / staff augmentation model` contains the string `staff`,
+and every JD extracted as staff-level matches it.
+
+Under the old blocking behavior this meant **every staff-level job description
+was hard-failed**: no technical score, no preference score, no narrative, no
+resume, and the only explanation surfaced was "IT consulting / staff
+augmentation model" — which the JD had nothing to do with. Staff is one of the
+most common seniority levels for the roles this tool exists to target.
+
+The bidirectional match is deliberate and documented (short canonical field
+tokens vs. longer descriptive labels), so this is not a careless bug. But
+substring matching in both directions across a shared field list has no way to
+distinguish "staff" the seniority from "staff" inside "staff augmentation",
+and it will keep producing collisions like this.
+
+Not fixed here — this session deliberately left `scorer.go` logic alone, and
+the gate is no longer load-bearing, so the false positive is now cosmetic
+rather than destructive. Worth tracking separately.
+
 ## Recommendation
 
 Change nothing yet. The useful conclusion is not "delete these rows" — it is
