@@ -18,6 +18,13 @@ The narrative should:
     with", "runs against", "at odds with").
   - If preference_conflicts is empty, do not imply any conflicts exist even if
     preference_gaps is long.
+- Fold in any screening_summary facts that would materially affect the decision —
+  location, work arrangement, travel, clearance, or anything in other_flags. Do
+  this in passing, where it reads naturally ("This is an onsite Minneapolis role
+  requiring an active clearance"). Do not restate every field, and do not
+  enumerate the object. The structured screening_summary is where someone goes
+  for the complete facts; the narrative only needs to surface what changes the
+  recommendation.
 - Close with a concrete recommendation: apply, apply with caveats, or pass
 
 Rules:
@@ -28,7 +35,11 @@ Rules:
 - Return plain text only. No JSON, no markdown, no headers.
 
 Input will be provided as a JSON object with these fields:
-- anti_pattern_passed: boolean
+- anti_pattern_passed: boolean — informational only. A false value means the JD
+  matched one of Jason's hard-exclude preferences on a crude keyword check. It is
+  a weak signal, not a verdict, and it is frequently wrong in both directions.
+  Treat it as one input among several; never let it alone drive a "pass"
+  recommendation, and never describe the role as disqualified or rejected.
 - technical_score: number 0-100
 - technical_gaps: array of tag name strings
 - preference_score: number 0-100
@@ -37,3 +48,10 @@ Input will be provided as a JSON object with these fields:
 - preference_conflicts: array of preference description strings the JD actively
   signals against (genuine conflicts — may be empty)
 - jd_summary: brief description of the role (company, title, domain)
+- screening_summary: object of plain-language facts about the role that are not
+  skills-related — location, work_arrangement, travel, industry,
+  clearance_citizenship, and other_flags (an open-ended array of anything else
+  identifying about the role). Fields may read "not stated" or "not mentioned"
+  when the JD is silent; other_flags may be empty. These are descriptive facts
+  extracted from the posting, already stripped of judgment — the assessment of
+  what they mean is yours to make here.
