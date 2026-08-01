@@ -5,7 +5,9 @@
 package fitgate
 
 import (
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
@@ -15,16 +17,17 @@ import (
 type JDSignals = generation.JDSignals
 
 // RunAntiPatternGate checks JD signals against the user's hard-exclude
-// preferences. Matching is a case-insensitive substring check of the
-// preference label against the JD's domain, work type, seniority, and
-// culture signal fields. The first match fails the gate.
+// preferences. Each preference is matched, on word boundaries, only against
+// the signal fields its preference_type names — see gateFieldsFor. The first
+// match fails the gate.
+//
+// The result is advisory: RunFitEvaluation records it but does not act on it.
 func RunAntiPatternGate(prefs []db.Preference, signals JDSignals) (passed bool, hits []db.Preference) {
-	fields := signalFields(signals)
 	for _, p := range prefs {
 		if p.Sentiment != "hard_exclude" {
 			continue
 		}
-		if matchesSignal(p.Label, fields) {
+		if matchesSignal(p.Label, gateFieldsFor(p.PreferenceType, signals)) {
 			return false, []db.Preference{p}
 		}
 	}
@@ -120,20 +123,84 @@ func signalFields(signals JDSignals) []string {
 	return append([]string{signals.Domain, signals.WorkType, signals.Seniority}, signals.CultureSignals...)
 }
 
-// matchesSignal reports whether label matches any of fields via a
-// case-insensitive substring check in either direction — label containing
-// field, or field containing label. Fields are typically short canonical
-// tokens (e.g. "defense") while labels are often broader descriptive
-// phrases (e.g. "defense / aerospace"), so a single fixed direction would
-// miss legitimate matches.
+// gateFieldsFor returns the JD signal fields a hard-exclude preference of the
+// given type should be compared against.
+//
+// Routing by type is what stops a label colliding with an unrelated field.
+// Matching every preference against every field meant "IT consulting / staff
+// augmentation model" — a business-model exclude — was compared against the
+// seniority field, and since "staff" is a whole word inside that label, every
+// staff-level JD tripped it. Word-boundary matching does not help here: the
+// overlap is a genuine whole word, just one that means something different in
+// each place. Only routing fixes it.
+//
+// Seniority is deliberately absent from every branch. No preference type
+// describes a seniority level, so nothing should be matched against it. Add a
+// case if that ever changes.
+func gateFieldsFor(prefType string, signals JDSignals) []string {
+	switch prefType {
+	case "domain":
+		return []string{signals.Domain}
+	case "work_type":
+		return []string{signals.WorkType}
+	case "culture":
+		return signals.CultureSignals
+	default:
+		// anti_pattern is the catch-all type and has no single corresponding
+		// signal field. It is also where every skills-shaped exclude lives
+		// ("expert Python as primary requirement" and friends), which is why
+		// this is the only branch that sees the skills arrays — a domain or
+		// culture exclude has no business matching against a tech stack.
+		fields := []string{signals.Domain, signals.WorkType}
+		fields = append(fields, signals.CultureSignals...)
+		fields = append(fields, signals.RequiredSkills...)
+		fields = append(fields, signals.PreferredSkills...)
+		return fields
+	}
+}
+
+// matchesSignal reports whether label matches any of fields on word
+// boundaries, in either direction — label containing field, or field
+// containing label. Fields are typically short canonical tokens (e.g.
+// "defense") while labels are often broader descriptive phrases (e.g.
+// "defense / aerospace"), so a single fixed direction would miss legitimate
+// matches.
+//
+// Bidirectional matching is only safe because callers control which fields a
+// given label is compared against. Comparing every label against every field
+// is what produced the staff-seniority collision — see gateFieldsFor.
 func matchesSignal(label string, fields []string) bool {
-	needle := strings.ToLower(label)
 	for _, f := range fields {
 		if f == "" {
 			continue
 		}
-		hay := strings.ToLower(f)
-		if strings.Contains(hay, needle) || strings.Contains(needle, hay) {
+		if containsPhrase(f, label) || containsPhrase(label, f) {
+			return true
+		}
+	}
+	return false
+}
+
+// tokenize splits s into lowercase word tokens, discarding punctuation and
+// separators. "TypeScript / Node.js" becomes ["typescript", "node", "js"].
+func tokenize(s string) []string {
+	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+}
+
+// containsPhrase reports whether needle appears as a contiguous run of whole
+// words within haystack. Unlike a raw substring check it will not match "go"
+// inside "mongodb" or "ai" inside "maintain" — the overlap has to fall on
+// word boundaries.
+func containsPhrase(needle, haystack string) bool {
+	n := tokenize(needle)
+	h := tokenize(haystack)
+	if len(n) == 0 || len(n) > len(h) {
+		return false
+	}
+	for i := 0; i+len(n) <= len(h); i++ {
+		if slices.Equal(h[i:i+len(n)], n) {
 			return true
 		}
 	}

@@ -4,6 +4,13 @@ Read-only audit performed 2026-08-01, alongside the change making the
 anti-pattern gate non-blocking. **No preference rows were modified.** This is
 input for a human decision, not a change proposal.
 
+> **Status update.** Both defects this audit identified have since been fixed
+> in `RunAntiPatternGate` — see "Resolution" at the bottom. The analysis below
+> describes the code as it stood when the audit was written, and is kept
+> because the reasoning about which rows are skills-shaped still holds. The
+> claim that four rows "have never been able to fire" is no longer true of the
+> current code.
+
 ## What the matcher can actually see
 
 `RunAntiPatternGate` and `ScorePreferenceFit` both match preference labels via
@@ -115,3 +122,38 @@ that **half the hard-exclude list has never been able to fire**, which is a
 much better explanation for the gate's poor track record than the gate logic
 itself. That is worth knowing before investing in either the skills-matching
 work or the retirement decision.
+
+## Resolution
+
+Both defects are fixed. `RunAntiPatternGate` now routes each preference to the
+signal fields its `preference_type` names, via `gateFieldsFor`, and matches on
+word boundaries via `containsPhrase`. Covered by `internal/fitgate/scorer_test.go`.
+
+**Word-boundary matching alone did not fix the staff collision, contrary to
+the plan this work started from.** The assumption was that `"staff"` matching
+inside `"staff augmentation"` was a character-level accident that tokenizing
+would eliminate. It isn't: `"staff"` is a genuine whole word in that label.
+Tokenizing changes nothing about that pair, and a test written to the original
+plan fails. Verified before changing approach.
+
+The real defect was comparing every label against every field. `"staff"` means
+a seniority level in one place and part of a business-model phrase in the
+other; no lexical rule can separate those, because structurally the false
+positive is identical to the legitimate `domain: "defense"` → `"defense /
+aerospace"` match. Routing separates them by asking which field a preference is
+*about*. Seniority is now matched by nothing at all, since no preference type
+describes a seniority level.
+
+Skills reach only the `anti_pattern` branch, which is where all four
+skills-shaped rows live. Domain, culture, and work_type excludes are not
+compared against a tech stack. Row 5 (`IT consulting / staff augmentation
+model`) is classification-shaped but shares the `anti_pattern` type, so it is
+now compared against skills too — harmless in practice, since no extracted
+skill will contain that phrase or be contained by it, but it is the one place
+where routing by type is coarser than routing by intent.
+
+Still open: the retirement question for rows 5–7, and row 8's
+miscategorization. `work_type` can only ever be remote/hybrid/onsite/unknown,
+so `"pure frontend"` stored under that type still cannot fire — routing makes
+this clearer rather than fixing it. Rewording labels or recategorizing rows is
+a data change and was deliberately left alone.
