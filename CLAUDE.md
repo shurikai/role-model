@@ -126,6 +126,7 @@ Rules:
 
 ## Project Structure
 /cmd/server                      — main entry point
+/cmd/resetpw                     — CLI to reset a user's password (no UI flow yet)
 /internal/api/handlers           — HTTP handlers
 /internal/auth                   — JWT issuance/validation, bcrypt
 /internal/config                 — environment-based config loading
