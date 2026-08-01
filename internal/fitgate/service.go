@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"sync"
 
@@ -33,8 +34,12 @@ func NewService(q *db.Queries, client *generation.Client) *Service {
 }
 
 // RunFitEvaluation loads an application's JD signals and the user's skills
-// and preferences, runs the anti-pattern gate and scoring, and persists the
+// and preferences, scores technical and preference fit, and persists the
 // result as a new fit_reports row.
+//
+// Every evaluation produces a complete report. The anti-pattern gate runs and
+// its result is recorded, but it does not block: a JD that trips it is still
+// scored and still gets a narrative.
 func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uuid.UUID) (*db.FitReport, error) {
 	app, err := s.q.GetApplication(ctx, db.GetApplicationParams{ID: applicationID, UserID: userID})
 	if err != nil {
@@ -61,22 +66,21 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 
 	appIDParam := pgtype.UUID{Bytes: [16]byte(applicationID), Valid: true}
 
-	if passed, hits := RunAntiPatternGate(prefs, signals); !passed {
-		hitsJSON, err := marshalRawNonEmpty(hits)
-		if err != nil {
-			return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
-		}
-		report, err := s.q.CreateFitReport(ctx, db.CreateFitReportParams{
-			ID:                uuid.New(),
-			UserID:            userID,
-			ApplicationID:     appIDParam,
-			AntiPatternPassed: false,
-			AntiPatternHits:   hitsJSON,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("fit evaluation: store gate failure: %w", err)
-		}
-		return &report, nil
+	// The gate is informational. It still records which hard_exclude
+	// preferences a JD's extracted fields happened to match, but it no longer
+	// decides anything: substring matching over lossy enum fields was making
+	// an irreversible call — no score, no narrative, no way to override —
+	// from evidence too thin to carry it. screening_summary surfaces the
+	// facts instead and leaves the judgment to the human reading them.
+	gatePassed, gateHits := RunAntiPatternGate(prefs, signals)
+	gateHitsJSON, err := marshalRawNonEmpty(gateHits)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
+	}
+
+	screeningJSON, err := marshalScreeningSummary(signals.ScreeningSummary)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal screening summary: %w", err)
 	}
 
 	var (
@@ -95,7 +99,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}()
 	wg.Wait()
 
-	narrative, err := s.generateNarrative(ctx, app, signals, technicalScore, technicalGaps, prefScore, prefGaps, prefConfl)
+	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technicalScore, technicalGaps, prefScore, prefGaps, prefConfl)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
@@ -117,12 +121,14 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		ID:                  uuid.New(),
 		UserID:              userID,
 		ApplicationID:       appIDParam,
-		AntiPatternPassed:   true,
+		AntiPatternPassed:   gatePassed,
+		AntiPatternHits:     gateHitsJSON,
 		TechnicalScore:      numericFromScore(technicalScore),
 		TechnicalGaps:       technicalGapsJSON,
 		PreferenceScore:     numericFromScore(prefScore),
 		PreferenceGaps:      prefGapsJSON,
 		PreferenceConflicts: prefConflictsJSON,
+		ScreeningSummary:    screeningJSON,
 		Narrative:           &narrative,
 	})
 	if err != nil {
@@ -132,19 +138,21 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 }
 
 type narrativeInput struct {
-	AntiPatternPassed   bool     `json:"anti_pattern_passed"`
-	TechnicalScore      float64  `json:"technical_score"`
-	TechnicalGaps       []string `json:"technical_gaps"`
-	PreferenceScore     float64  `json:"preference_score"`
-	PreferenceGaps      []string `json:"preference_gaps"`
-	PreferenceConflicts []string `json:"preference_conflicts"`
-	JDSummary           string   `json:"jd_summary"`
+	AntiPatternPassed   bool                        `json:"anti_pattern_passed"`
+	TechnicalScore      float64                     `json:"technical_score"`
+	TechnicalGaps       []string                    `json:"technical_gaps"`
+	PreferenceScore     float64                     `json:"preference_score"`
+	PreferenceGaps      []string                    `json:"preference_gaps"`
+	PreferenceConflicts []string                    `json:"preference_conflicts"`
+	JDSummary           string                      `json:"jd_summary"`
+	ScreeningSummary    generation.ScreeningSummary `json:"screening_summary"`
 }
 
 func (s *Service) generateNarrative(
 	ctx context.Context,
 	app db.Application,
 	signals JDSignals,
+	gatePassed bool,
 	technicalScore float64,
 	technicalGaps []string,
 	prefScore float64,
@@ -157,13 +165,14 @@ func (s *Service) generateNarrative(
 	}
 
 	input := narrativeInput{
-		AntiPatternPassed:   true,
+		AntiPatternPassed:   gatePassed,
 		TechnicalScore:      technicalScore,
 		TechnicalGaps:       technicalGaps,
 		PreferenceScore:     prefScore,
 		PreferenceGaps:      prefGaps,
 		PreferenceConflicts: prefConflicts,
 		JDSummary:           fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
+		ScreeningSummary:    signals.ScreeningSummary,
 	}
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
@@ -171,6 +180,23 @@ func (s *Service) generateNarrative(
 	}
 
 	return s.client.Complete(ctx, prompt, string(inputJSON), narrativeMaxTokens)
+}
+
+// marshalScreeningSummary marshals the summary to a *json.RawMessage,
+// returning nil (NULL in the DB) for the zero value. Signals extracted before
+// the screening_summary prompt field existed unmarshal to an empty struct;
+// storing that as an object of empty strings would be indistinguishable from
+// a JD that genuinely stated nothing.
+func marshalScreeningSummary(s generation.ScreeningSummary) (*json.RawMessage, error) {
+	if reflect.ValueOf(s).IsZero() {
+		return nil, nil
+	}
+	b, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	raw := json.RawMessage(b)
+	return &raw, nil
 }
 
 // marshalRawNonEmpty marshals v to a *json.RawMessage, returning nil (NULL
