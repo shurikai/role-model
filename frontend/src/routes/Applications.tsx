@@ -33,17 +33,12 @@ function PipelineStatusBadge({ application }: { application: Application }) {
     );
   }
 
-  if (!latestFitReport.anti_pattern_passed) {
-    return (
-      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-        Fit failed
-      </span>
-    );
-  }
-
+  // No pass/fail here anymore — the anti-pattern check is advisory, so a
+  // report existing is the whole status. Its scores are what matter, and
+  // they live on the detail page.
   return (
     <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-      Fit passed
+      Fit evaluated
     </span>
   );
 }

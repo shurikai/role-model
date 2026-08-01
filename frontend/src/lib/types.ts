@@ -26,6 +26,22 @@ export type ApplicationStatus =
   | "rejected"
   | "withdrawn";
 
+/**
+ * Plain-language facts about a role that aren't skills-match signals —
+ * the things you scan for before deciding whether a posting is worth
+ * considering at all. Deliberately descriptive rather than judgmental:
+ * the backend prompt is instructed not to editorialize, and neither
+ * should the UI.
+ */
+export interface ScreeningSummary {
+  location: string;
+  work_arrangement: string;
+  travel: string;
+  industry: string;
+  clearance_citizenship: string;
+  other_flags: string[];
+}
+
 export interface JdSignals {
   required_skills: string[];
   preferred_skills: string[];
@@ -33,6 +49,21 @@ export interface JdSignals {
   domain: string;
   work_type: string;
   culture_signals: string[];
+  // Absent on signals extracted before screening_summary was added.
+  screening_summary: ScreeningSummary | null;
+}
+
+/**
+ * A preference row the anti-pattern check matched. The API returns whole
+ * preference records here, not labels — `anti_pattern_hits` is a raw JSONB
+ * passthrough of []db.Preference.
+ */
+export interface PreferenceHit {
+  id: string;
+  label: string;
+  preference_type: string;
+  sentiment: string;
+  notes: string | null;
 }
 
 export interface Application {
@@ -64,13 +95,16 @@ export interface FitReport {
   user_id: string;
   application_id: string;
   anti_pattern_passed: boolean;
-  anti_pattern_hits: string[] | null;
+  anti_pattern_hits: PreferenceHit[] | null;
   technical_score: number | null;
   technical_gaps: string[] | null;
   preference_score: number | null;
   preference_gaps: string[] | null;
   preference_conflicts: string[] | null;
   narrative: string | null;
+  // Copy captured at fit-evaluation time. Null for reports predating the
+  // screening_summary migration.
+  screening_summary: ScreeningSummary | null;
   created_at: string;
 }
 
