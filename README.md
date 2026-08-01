@@ -56,6 +56,7 @@ make db-up              # start Postgres in Docker
 make migrate-up         # apply schema migrations
 make sqlc               # generate query code from SQL
 make seed               # load career history from $SEED_DIR (see note below)
+                        # -- or `make seed-sample` for the bundled fictional dataset
 make dev                # start the API, the frontend, and the renderer together
 ```
 
@@ -63,7 +64,9 @@ A full stack is three processes. `make dev` runs all of them and stops the whole
 
 Other useful targets: `make test` (unit tests), `make test-integration` (requires a running database), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
 
-Career history itself — employers, positions, contributions — lives outside this repo as a set of versioned, idempotent SQL seed files, pointed to by `SEED_DIR`. This is intentional (see "Career data is seeded, not written through the API" above); there's no bundled sample data, since the whole point is that this seeds *your* career, not a demo one.
+Career history itself — employers, positions, contributions — lives outside this repo as a set of versioned, idempotent SQL seed files, pointed to by `SEED_DIR`. This is intentional (see "Career data is seeded, not written through the API" above): the whole point is that this seeds *your* career, not a demo one.
+
+To try the pipeline without a career-history seed set of your own, `make seed-sample` loads a bundled fictional dataset from `database/sample/` — a backend/platform engineer in freight logistics, with three employers, six positions, 35 contributions, varied skill depth, and a full preference set. Three paired JD fixtures in `tests/fixtures/` exercise a strong match, a poor match, and the anti-pattern hard gate. See [`database/sample/README.md`](database/sample/README.md). It is a separate target from `make seed` on purpose, so an absent-minded invocation can't mix invented employers into real career history.
 
 ### Frontend
 
