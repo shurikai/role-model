@@ -23,10 +23,43 @@ type JDSignals struct {
 	// Culture and preference signals
 	CultureSignals []string `json:"culture_signals"`
 
+	// Screening facts a human scans for before considering a role at all.
+	ScreeningSummary ScreeningSummary `json:"screening_summary"`
+
 	// Deprecated: retained for backward compatibility with existing jd_signals rows.
 	// Do not use in new code. Will be removed in a future cleanup.
 	PrioritySkills   []string `json:"priority_skills,omitempty"`
 	DomainVocabulary []string `json:"domain_vocabulary,omitempty"`
+}
+
+// ScreeningSummary holds plain-language facts a human would scan a JD for
+// before seriously considering it — criteria that don't relate to skills
+// match but often decide whether a role is worth pursuing at all. This is
+// deliberately descriptive, not classificatory: no fixed enums, because the
+// set of things worth flagging is open-ended and person-specific.
+//
+// It exists because the classificatory fields above could not represent most
+// real exclude criteria — audience, timezone, travel, clearance — and every
+// new category needed a new field. Describing the role and letting a human
+// judge it scales where an exclude taxonomy does not.
+type ScreeningSummary struct {
+	// e.g. "Providence, RI", "Remote, US", "not stated"
+	Location string `json:"location"`
+	// e.g. "fully remote", "hybrid, 2 days/week Minneapolis", "onsite"
+	WorkArrangement string `json:"work_arrangement"`
+	// e.g. "occasional customer site visits", "not mentioned"
+	Travel string `json:"travel"`
+	// Plain-language description, not constrained to a fixed list — e.g.
+	// "defense/autonomous systems", "themed entertainment",
+	// "developer telemetry SaaS".
+	Industry string `json:"industry"`
+	// e.g. "U.S. citizenship + active clearance required", "not mentioned"
+	ClearanceCitizenship string `json:"clearance_citizenship"`
+	// Free text: anything else identifying or discriminating that isn't a
+	// skills match — military-coded language, FedRAMP mentions, "serves
+	// internal engineering teams" framing, anonymous postings, unusual comp
+	// structure, notable red flags. Empty array if nothing notable.
+	OtherFlags []string `json:"other_flags"`
 }
 
 type extractPromptData struct {

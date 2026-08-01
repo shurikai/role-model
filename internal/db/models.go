@@ -132,6 +132,7 @@ type FitReport struct {
 	Narrative           *string          `json:"narrative"`
 	CreatedAt           time.Time        `json:"created_at"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
+	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
 }
 
 type ImportBatch struct {
