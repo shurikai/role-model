@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password
 
 # Build
 all: build
@@ -64,6 +64,14 @@ seed-sample:
 		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
 	done
 	@echo "Done. Log in as sample@example.com / sample-password."
+
+# Reset a user's password. Stopgap until the UI grows a real reset flow.
+# Prompts on the terminal; set NEWPASS to supply the password non-interactively.
+reset-password:
+ifndef EMAIL
+	$(error EMAIL is required, e.g. make reset-password EMAIL=you@example.com)
+endif
+	@go run ./cmd/resetpw -email "$(EMAIL)"
 
 sqlc:
 	sqlc generate
