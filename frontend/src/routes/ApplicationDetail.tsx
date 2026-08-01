@@ -10,7 +10,50 @@ import {
   useRenderResumeVersion,
 } from "../hooks/useApplications";
 import { formatApiError } from "../lib/api-client";
-import type { ResumeVersion } from "../lib/types";
+import type { ResumeVersion, ScreeningSummary } from "../lib/types";
+
+/**
+ * Screening facts, presented plainly. This answers "should I even consider
+ * this role", which is a different question from the skills-match signals
+ * below it — hence the separate callout.
+ *
+ * Deliberately free of sentiment styling: no red/green, no severity ordering
+ * on other_flags. The backend extracts these descriptively and leaves the
+ * judgment to the reader; colouring them here would put the judgment back.
+ */
+function ScreeningSummaryPanel({ summary }: { summary: ScreeningSummary }) {
+  const fields: Array<[string, string]> = [
+    ["Location", summary.location],
+    ["Work arrangement", summary.work_arrangement],
+    ["Travel", summary.travel],
+    ["Industry", summary.industry],
+    ["Clearance / citizenship", summary.clearance_citizenship],
+  ];
+
+  return (
+    <div className="mb-3 rounded border border-gray-300 bg-gray-50 p-4">
+      <h3 className="mb-2 text-sm font-semibold text-gray-900">Screening summary</h3>
+      <dl className="space-y-1 text-sm">
+        {fields.map(([label, value]) => (
+          <div key={label} className="flex gap-2">
+            <dt className="font-medium text-gray-700">{label}:</dt>
+            <dd className="text-gray-800">{value || "—"}</dd>
+          </div>
+        ))}
+      </dl>
+      {summary.other_flags.length > 0 && (
+        <div className="mt-2 text-sm">
+          <p className="font-medium text-gray-700">Other flags:</p>
+          <ul className="ml-4 list-disc text-gray-800">
+            {summary.other_flags.map((flag) => (
+              <li key={flag}>{flag}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -97,7 +140,10 @@ export function ApplicationDetail() {
   }
 
   const latestFitReport = fitReports?.[0];
-  const canGenerate = !!latestFitReport?.anti_pattern_passed;
+  // A fit report existing is the only precondition. The anti-pattern check is
+  // advisory — it no longer blocks anything on the backend, so it must not
+  // block anything here either.
+  const canGenerate = !!latestFitReport;
   const filenameBase = `${application.company_name}-${application.role_title}`
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-");
@@ -132,6 +178,9 @@ export function ApplicationDetail() {
           </div>
         ) : (
           <div className="space-y-2 rounded border border-gray-200 p-4 text-sm">
+            {application.jd_signals.screening_summary && (
+              <ScreeningSummaryPanel summary={application.jd_signals.screening_summary} />
+            )}
             <p>
               <span className="font-medium">Seniority:</span> {application.jd_signals.seniority}
             </p>
@@ -189,66 +238,68 @@ export function ApplicationDetail() {
 
           {latestFitReport && (
             <div className="mt-4 space-y-3 text-sm">
-              {!latestFitReport.anti_pattern_passed ? (
-                <div className="rounded border border-red-300 bg-red-50 p-3">
-                  <p className="font-medium text-red-800">Hard gate failed</p>
-                  <ul className="mt-1 list-inside list-disc text-red-700">
-                    {latestFitReport.anti_pattern_hits?.map((hit) => (
-                      <li key={hit}>{hit}</li>
+              {/*
+                Advisory only, and shown only when there's something to say.
+                A standing "passed" badge would be noise now that nothing is
+                gated on it, and "failed" would overstate a keyword match.
+              */}
+              {latestFitReport.anti_pattern_hits &&
+                latestFitReport.anti_pattern_hits.length > 0 && (
+                  <div className="rounded border border-amber-300 bg-amber-50 p-3">
+                    <p className="font-medium text-amber-900">Anti-pattern flag</p>
+                    <p className="text-xs text-amber-800">
+                      Matched against your hard-exclude preferences. Informational — it
+                      does not block generation.
+                    </p>
+                    <ul className="mt-1 list-inside list-disc text-amber-900">
+                      {latestFitReport.anti_pattern_hits.map((hit) => (
+                        <li key={hit.id}>{hit.label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              <p>
+                <span className="font-medium">Technical score:</span>{" "}
+                {latestFitReport.technical_score}/100
+              </p>
+              {latestFitReport.technical_gaps && latestFitReport.technical_gaps.length > 0 && (
+                <div>
+                  <span className="font-medium">Technical gaps:</span>
+                  <ul className="ml-4 list-disc text-gray-700">
+                    {latestFitReport.technical_gaps.map((gap) => (
+                      <li key={gap}>{gap}</li>
                     ))}
                   </ul>
                 </div>
-              ) : (
-                <>
-                  <div className="rounded border border-green-300 bg-green-50 p-3">
-                    <p className="font-medium text-green-800">Hard gate passed</p>
+              )}
+              <p>
+                <span className="font-medium">Preference score:</span>{" "}
+                {latestFitReport.preference_score}/100
+              </p>
+              {latestFitReport.preference_conflicts &&
+                latestFitReport.preference_conflicts.length > 0 && (
+                  <div>
+                    <span className="font-medium text-red-800">Preference conflicts:</span>
+                    <ul className="ml-4 list-disc text-red-700">
+                      {latestFitReport.preference_conflicts.map((conflict) => (
+                        <li key={conflict}>{conflict}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <p>
-                    <span className="font-medium">Technical score:</span>{" "}
-                    {latestFitReport.technical_score}/100
-                  </p>
-                  {latestFitReport.technical_gaps && latestFitReport.technical_gaps.length > 0 && (
-                    <div>
-                      <span className="font-medium">Technical gaps:</span>
-                      <ul className="ml-4 list-disc text-gray-700">
-                        {latestFitReport.technical_gaps.map((gap) => (
-                          <li key={gap}>{gap}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <p>
-                    <span className="font-medium">Preference score:</span>{" "}
-                    {latestFitReport.preference_score}/100
-                  </p>
-                  {latestFitReport.preference_conflicts &&
-                    latestFitReport.preference_conflicts.length > 0 && (
-                      <div>
-                        <span className="font-medium text-red-800">
-                          Preference conflicts:
-                        </span>
-                        <ul className="ml-4 list-disc text-red-700">
-                          {latestFitReport.preference_conflicts.map((conflict) => (
-                            <li key={conflict}>{conflict}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  {latestFitReport.preference_gaps &&
-                    latestFitReport.preference_gaps.length > 0 && (
-                      <div>
-                        <span className="font-medium">Preferences not mentioned:</span>
-                        <ul className="ml-4 list-disc text-gray-700">
-                          {latestFitReport.preference_gaps.map((gap) => (
-                            <li key={gap}>{gap}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  {latestFitReport.narrative && (
-                    <p className="text-gray-700 italic">{latestFitReport.narrative}</p>
-                  )}
-                </>
+                )}
+              {latestFitReport.preference_gaps &&
+                latestFitReport.preference_gaps.length > 0 && (
+                  <div>
+                    <span className="font-medium">Preferences not mentioned:</span>
+                    <ul className="ml-4 list-disc text-gray-700">
+                      {latestFitReport.preference_gaps.map((gap) => (
+                        <li key={gap}>{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              {latestFitReport.narrative && (
+                <p className="text-gray-700 italic">{latestFitReport.narrative}</p>
               )}
             </div>
           )}
@@ -263,13 +314,13 @@ export function ApplicationDetail() {
             onClick={() => generateResume.mutate(application.id)}
             disabled={generateResume.isPending || !canGenerate}
             className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            title={!canGenerate ? "Run the fit gate and pass the hard gate first" : undefined}
+            title={!canGenerate ? "Run the fit evaluation first" : undefined}
           >
             {generateResume.isPending ? "Generating..." : "Generate Resume"}
           </button>
           {!canGenerate && (
             <p className="mt-2 text-xs text-gray-500">
-              Generation is available once the fit gate has been run and passed.
+              Run the fit evaluation first to see scores before generating.
             </p>
           )}
           {generateResume.isError && (
