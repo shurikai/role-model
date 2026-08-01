@@ -4,7 +4,10 @@ export
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed sqlc run run-frontend run-renderer dev check-prompts
+# Fictional sample dataset, tracked in this repo (see database/sample/README.md).
+SAMPLE_DIR ?= database/sample
+
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts
 
 # Build
 all: build
@@ -47,9 +50,20 @@ seed:
 	@echo "Seeding from $(SEED_DIR)..."
 	@for f in $(SEED_DIR)/0*.sql; do \
 		echo "  -> $$f"; \
-		psql "$(DATABASE_URL)" -f "$$f" || exit 1; \
+		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
 	done
 	@echo "Done."
+
+# Fictional sample data, tracked in this repo. Deliberately a separate target
+# rather than a default for SEED_DIR: an absent-minded `make seed` must never
+# inject invented employers into a database holding real career history.
+seed-sample:
+	@echo "Seeding FICTIONAL sample data from $(SAMPLE_DIR) into $(DATABASE_URL)..."
+	@for f in $(SAMPLE_DIR)/0*.sql; do \
+		echo "  -> $$f"; \
+		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
+	done
+	@echo "Done. Log in as sample@example.com / sample-password."
 
 sqlc:
 	sqlc generate
