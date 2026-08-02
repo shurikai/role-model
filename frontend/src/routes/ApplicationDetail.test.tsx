@@ -205,6 +205,42 @@ describe("ApplicationDetail", () => {
       // The old always-on "passed" badge is gone too.
       expect(screen.queryByText(/Hard gate/)).not.toBeInTheDocument();
     });
+
+    // Reports written before the gate stopped blocking returned early, so they
+    // carry no scores and no narrative. Those rows are still in the database.
+    it("shows a dash rather than a bare /100 for a legacy report with null scores", async () => {
+      vi.stubGlobal(
+        "fetch",
+        stubFetch(makeApplication(), [
+          makeFitReport({
+            anti_pattern_passed: false,
+            technical_score: null,
+            preference_score: null,
+            preference_gaps: null,
+            narrative: null,
+            anti_pattern_hits: [
+              {
+                id: "pref-1",
+                label: "IT consulting / staff augmentation model",
+                preference_type: "anti_pattern",
+                sentiment: "hard_exclude",
+                notes: null,
+              },
+            ],
+          }),
+        ]),
+      );
+      renderDetail();
+
+      expect(await screen.findByText("Anti-pattern flag")).toBeInTheDocument();
+      expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
+      expect(screen.getByText("Technical score:").closest("p")).toHaveTextContent(
+        "Technical score: —",
+      );
+      expect(screen.getByText("Preference score:").closest("p")).toHaveTextContent(
+        "Preference score: —",
+      );
+    });
   });
 
   describe("screening summary", () => {
