@@ -260,7 +260,9 @@ export function ApplicationDetail() {
                 )}
               <p>
                 <span className="font-medium">Technical score:</span>{" "}
-                {latestFitReport.technical_score}/100
+                {latestFitReport.technical_score === null
+                  ? "—"
+                  : `${latestFitReport.technical_score}/100`}
               </p>
               {latestFitReport.technical_gaps && latestFitReport.technical_gaps.length > 0 && (
                 <div>
@@ -274,7 +276,9 @@ export function ApplicationDetail() {
               )}
               <p>
                 <span className="font-medium">Preference score:</span>{" "}
-                {latestFitReport.preference_score}/100
+                {latestFitReport.preference_score === null
+                  ? "—"
+                  : `${latestFitReport.preference_score}/100`}
               </p>
               {latestFitReport.preference_conflicts &&
                 latestFitReport.preference_conflicts.length > 0 && (
