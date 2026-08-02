@@ -93,6 +93,16 @@ Rules:
 - Extract only what is present in the JD. Do not infer required skills from context
   if they are not stated.
 - Keep skill names concise and canonical — "Go" not "Golang", "Kubernetes" not "K8s".
+  This covers adjectival and expanded forms too: emit the bare technology name,
+  not the phrase the JD wraps around it. Trailing nouns like "APIs", "services",
+  "implementations", "pipelines", or "architecture" describe what a technology is
+  used for, not a different technology — drop them.
+  - "RESTful APIs and GraphQL implementations" -> "REST" and "GraphQL",
+    not "RESTful APIs" and "GraphQL implementations"
+  - "gRPC services" -> "gRPC"; "Kafka streaming" -> "Kafka";
+    "Terraform modules" -> "Terraform"
+  The exception is a name where the noun is genuinely part of it — "GitHub
+  Actions", "Spring Boot", "Google Cloud Platform" — which stays whole.
 - Do not include soft skills (communication, teamwork) in required_skills or
   preferred_skills — only technical skills and tools.
 - When the JD offers several technologies as interchangeable ways to satisfy
