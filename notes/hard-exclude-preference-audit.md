@@ -10,6 +10,11 @@ input for a human decision, not a change proposal.
 > because the reasoning about which rows are skills-shaped still holds. The
 > claim that four rows "have never been able to fire" is no longer true of the
 > current code.
+>
+> A later pass narrowed the gate again: it reads `required_skills` only, not
+> `preferred_skills`. See "Second resolution" at the bottom. Wherever the text
+> below says the matcher cannot see skills at all, read it as a description of
+> the original code, not of today's.
 
 ## What the matcher can actually see
 
@@ -22,6 +27,12 @@ append([]string{signals.Domain, signals.WorkType, signals.Seniority}, signals.Cu
 
 `required_skills` and `preferred_skills` are **not** in that list. Nothing in
 `fitgate` matches a preference against a JD's extracted skills.
+
+> **No longer accurate.** `RunAntiPatternGate` stopped using `signalFields`
+> and now routes through `gateFieldsFor`, whose `anti_pattern` branch does read
+> `required_skills` — and only that one. `preferred_skills` was briefly
+> included and then deliberately removed; `signalFields` itself is unchanged,
+> so this paragraph still describes `ScorePreferenceFit` correctly.
 
 This matters, because the session spec assumed the opposite — that a
 primary-language exclude such as Ruby/Node/Python "*is* reliably
@@ -157,3 +168,35 @@ miscategorization. `work_type` can only ever be remote/hybrid/onsite/unknown,
 so `"pure frontend"` stored under that type still cannot fire — routing makes
 this clearer rather than fixing it. Rewording labels or recategorizing rows is
 a data change and was deliberately left alone.
+
+## Second resolution: the gate reads required skills only
+
+Letting the `anti_pattern` branch see both skills arrays produced a false
+positive of its own, and row 1 is the row that produced it.
+
+On a Principal Java Engineer JD, `Angular` appeared exactly once — inside a
+nice-to-have bullet, "exposure to front-end technologies such as React or
+Angular" — which extraction correctly placed in `preferred_skills`. That
+single optional mention tripped `Angular as co-equal frontend requirement`,
+and the narrative then described Angular as a co-equal frontend requirement,
+which is the label's wording rather than anything the JD said.
+
+`gateFieldsFor`'s `anti_pattern` branch now reads `required_skills` only. A
+hard exclude is a claim about what a job actually demands, so it should fire
+on a requirement and not on a nice-to-have. `preferred_skills` still feeds
+`ScoreTechnicalFit` and `ScorePreferenceFit` normally — the narrowing is
+scoped to the gate.
+
+This is the same shape of defect as the staff collision, one level up. There
+the fix was routing by *which field* a preference is about; here it is routing
+by *how strongly the JD asserts* the field. Both are cases where the matcher
+had access to more text than the question warranted.
+
+Consequence for the table above: rows 1–4 fire against required skills, and
+no longer against optional ones. Row 1's entry ("No — skills-shaped") is
+doubly out of date — it can fire, but only on a genuine requirement.
+
+Extraction also changed alongside this. Interchangeable alternatives now
+arrive as one entry joined with `" | "` ("Spring Boot | Quarkus | Micronaut |
+Vert.x") instead of one entry each, so `gateFieldsFor` splits them back apart
+before matching — an exclude still reaches a single option buried in a group.
