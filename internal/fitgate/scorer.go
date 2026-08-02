@@ -260,12 +260,33 @@ func containsPhrase(needle, haystack string) bool {
 	return false
 }
 
-// matchesAny reports whether tag appears as a case-insensitive substring of
-// any name in skillNames.
+// matchesAny reports whether any name in skillNames answers the JD term tag.
+// Two directions count, and they are deliberately asymmetric:
+//
+//   - tag as a case-insensitive substring of the skill name, the original
+//     behavior: a JD asking for "SQL" is answered by "PostgreSQL".
+//   - the skill name as a whole-word phrase inside tag: a JD asking for
+//     "REST APIs" is answered by the stored skill "REST".
+//
+// Only one direction may be a raw substring. Reversing "SQL" ⊂ "PostgreSQL"
+// unguarded is what makes a stored "Go" satisfy a JD's "Google Cloud" or
+// "MongoDB", so the second direction is word-boundary matched instead. That
+// still bridges the case that matters — a short canonical skill name sitting
+// inside a longer JD phrase — without inventing matches from shared letters.
+//
+// Neither direction bridges a morphological difference: "REST" and "RESTful
+// APIs" share no whole word and neither contains the other, so an adjectival
+// JD phrase is not matchable here at all. It has to be canonicalized upstream
+// — see the canonicalization rule in jd_extraction.tmpl. A stored skill named
+// "REST" reporting a 10-year expertise as a gap against "RESTful APIs" is the
+// case that surfaced both halves of this.
 func matchesAny(skillNames []string, tag string) bool {
 	needle := strings.ToLower(tag)
 	for _, name := range skillNames {
 		if strings.Contains(strings.ToLower(name), needle) {
+			return true
+		}
+		if containsPhrase(name, tag) {
 			return true
 		}
 	}
