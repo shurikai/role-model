@@ -95,6 +95,21 @@ Rules:
 - Keep skill names concise and canonical — "Go" not "Golang", "Kubernetes" not "K8s".
 - Do not include soft skills (communication, teamwork) in required_skills or
   preferred_skills — only technical skills and tools.
+- When the JD offers several technologies as interchangeable ways to satisfy
+  ONE requirement, emit ONE entry joining them with " | " (space, pipe, space)
+  instead of one entry per technology. The test is whether the JD is offering
+  them as substitutes for each other, or requiring them separately:
+  - "Java frameworks including Spring Boot, Quarkus, Micronaut, or Vert.x" is
+    one requirement met by any one of them
+    -> "Spring Boot | Quarkus | Micronaut | Vert.x"
+  - "CI/CD tooling such as Tekton, Harness, CircleCI, or Jenkins" is likewise
+    one requirement -> "Tekton | Harness | CircleCI | Jenkins"
+  - "Docker, Kubernetes, and Terraform" are three separate competencies —
+    none substitutes for another -> three entries, no " | "
+  Phrasings that signal substitutes: "X, Y, or Z", "any of", "one of the
+  following", "such as", "e.g." introducing a list of like-for-like options.
+  Use " | " and never "/" alone as the separator — a slash is part of real
+  skill names like "CI/CD" and "TCP/IP".
 - Named technologies and tools appear in two shapes — extract both the same way:
   (1) a clean list, e.g. "Go, Kubernetes, PostgreSQL", and (2) named only as an
   example inside a broader prose competency statement, e.g. "proficiency with
@@ -124,6 +139,14 @@ Example output shape:
     ]
   }
 }
+
+Example of interchangeable alternatives collapsed into one entry:
+Input bullet: "Experience with Java frameworks including Spring Boot, Quarkus,
+Micronaut, or Vert.x, and with CI/CD tooling such as Tekton, Harness, CircleCI,
+or Jenkins. Familiarity with Docker, Kubernetes, and Terraform."
+-> required_skills includes "Spring Boot | Quarkus | Micronaut | Vert.x" and
+"Tekton | Harness | CircleCI | Jenkins", plus "Docker", "Kubernetes", and
+"Terraform" as three separate entries.
 
 Example of extracting a named tool from a prose competency statement:
 Input bullet: "Active proficiency with modern AI-assisted development tooling
