@@ -34,10 +34,51 @@ func RunAntiPatternGate(prefs []db.Preference, signals JDSignals) (passed bool, 
 	return true, nil
 }
 
+// alternativesDelimiter separates interchangeable alternatives inside a single
+// required_skills or preferred_skills entry. Extraction emits one entry per
+// requirement, so "Spring Boot, Quarkus, Micronaut, or Vert.x" — one
+// requirement satisfiable four ways — arrives as
+// "Spring Boot | Quarkus | Micronaut | Vert.x" rather than four entries.
+//
+// Flattening those into separate entries scored each one independently:
+// holding Spring Boot earned a quarter of the points and reported the other
+// three as gaps, for a requirement that was fully met. The delimiter is " | "
+// and not "/" because real skill names contain slashes (CI/CD, TCP/IP).
+const alternativesDelimiter = " | "
+
+// splitAlternatives returns the interchangeable alternatives in a skills
+// entry. An entry with no delimiter is a set of one. Blank alternatives are
+// dropped, so a malformed entry yields none — which reads as unsatisfied
+// rather than matching every skill, as an empty needle otherwise would.
+func splitAlternatives(entry string) []string {
+	var out []string
+	for _, part := range strings.Split(entry, alternativesDelimiter) {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
+// satisfies reports whether skillNames covers the requirement in entry — that
+// is, whether it matches any one of the entry's alternatives.
+func satisfies(skillNames []string, entry string) bool {
+	for _, alt := range splitAlternatives(entry) {
+		if matchesAny(skillNames, alt) {
+			return true
+		}
+	}
+	return false
+}
+
 // ScoreTechnicalFit scores how well skillNames (the user's resolved skill
 // tag names) cover the JD's required and preferred skills. Required matches
 // are worth twice a preferred match. Gaps list required skills with no
 // matching entry in skillNames.
+//
+// Each entry counts once toward the total no matter how many alternatives it
+// offers, and an unmet entry is reported as a single gap holding the whole
+// original string — one requirement, one gap.
 func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, gaps []string) {
 	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
 	if pointsPossible == 0 {
@@ -46,14 +87,14 @@ func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, g
 
 	var pointsEarned float64
 	for _, req := range signals.RequiredSkills {
-		if matchesAny(skillNames, req) {
+		if satisfies(skillNames, req) {
 			pointsEarned += 2
 		} else {
 			gaps = append(gaps, req)
 		}
 	}
 	for _, pref := range signals.PreferredSkills {
-		if matchesAny(skillNames, pref) {
+		if satisfies(skillNames, pref) {
 			pointsEarned += 1
 		}
 	}
@@ -137,6 +178,15 @@ func signalFields(signals JDSignals) []string {
 // Seniority is deliberately absent from every branch. No preference type
 // describes a seniority level, so nothing should be matched against it. Add a
 // case if that ever changes.
+//
+// preferred_skills is deliberately absent too. A hard exclude is a statement
+// about what the job actually demands, so it should fire on a genuine
+// requirement and not on an optional mention. The Angular exclude — "Angular
+// as co-equal frontend requirement" — tripped on a JD whose only Angular
+// reference was a nice-to-have bullet ("exposure to front-end technologies
+// such as React or Angular"), and the narrative then described Angular as a
+// co-equal requirement the JD never made it out to be. preferred_skills still
+// feeds ScoreTechnicalFit normally; it is only the gate that ignores it.
 func gateFieldsFor(prefType string, signals JDSignals) []string {
 	switch prefType {
 	case "domain":
@@ -153,8 +203,11 @@ func gateFieldsFor(prefType string, signals JDSignals) []string {
 		// culture exclude has no business matching against a tech stack.
 		fields := []string{signals.Domain, signals.WorkType}
 		fields = append(fields, signals.CultureSignals...)
-		fields = append(fields, signals.RequiredSkills...)
-		fields = append(fields, signals.PreferredSkills...)
+		// Alternatives are split back out so an exclude still matches a single
+		// option buried in a group — "Ruby" against "Java | Ruby | Python".
+		for _, req := range signals.RequiredSkills {
+			fields = append(fields, splitAlternatives(req)...)
+		}
 		return fields
 	}
 }
