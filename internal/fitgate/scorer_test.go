@@ -289,6 +289,98 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 	}
 }
 
+// citiSkills is a subset of the real stored skill tag names, kept verbatim
+// because the whole failure was about their exact shape: the tag is "REST",
+// not "REST APIs", and the JD phrase never contained it.
+var citiSkills = []string{
+	"Java", "REST", "GraphQL", "Spring Boot", "Jenkins", "Docker",
+	"PostgreSQL", "Go", "Kafka", "React", "Splunk", "Harness",
+}
+
+// The Citi Principal Java Engineer JD again, this time for skill-name shape.
+// Its extraction emitted "RESTful APIs" as a required skill while the stored
+// tag is "REST", and the one-directional substring check reported a 10-year
+// expert strength as a technical gap.
+func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
+	tests := []struct {
+		name       string
+		skillNames []string
+		required   []string
+		wantGaps   []string
+	}{
+		{
+			// The fix. The canonical tag sits as a whole word inside the JD's
+			// longer phrase, which the reverse direction now matches.
+			name:       "a stored skill matches a longer JD phrase containing it",
+			skillNames: citiSkills,
+			required:   []string{"REST APIs"},
+			wantGaps:   nil,
+		},
+		{
+			// The forward direction still has to work: a JD naming the general
+			// technology is answered by a specific implementation of it.
+			name:       "a JD term inside a longer skill name still matches",
+			skillNames: citiSkills,
+			required:   []string{"SQL"},
+			wantGaps:   nil,
+		},
+		{
+			// GraphQL is genuinely held, so it is genuinely not a gap. Asserted
+			// because the session that produced this test began from the
+			// opposite assumption.
+			name:       "graphql is held and does not gap",
+			skillNames: citiSkills,
+			required:   []string{"GraphQL"},
+			wantGaps:   nil,
+		},
+		{
+			// The reason the reverse direction is word-boundary matched rather
+			// than a raw substring. Both of these would match unguarded.
+			name:       "a short skill name does not match an unrelated JD term containing its letters",
+			skillNames: []string{"Go"},
+			required:   []string{"Google Cloud", "MongoDB", "Django"},
+			wantGaps:   []string{"Google Cloud", "MongoDB", "Django"},
+		},
+		{
+			// Whole post-fix Citi requirement set. Terraform | CloudFormation
+			// is the only genuine miss, and it is preferred, so no gaps at all.
+			name:       "the citi requirements are fully covered",
+			skillNames: citiSkills,
+			required: []string{
+				"Java",
+				"Docker | Kubernetes | OpenShift",
+				"REST",
+				"GraphQL",
+				"Spring Boot | Quarkus | Micronaut | Vert.x",
+				"Tekton | Harness | CircleCI | Jenkins",
+			},
+			wantGaps: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, gaps := ScoreTechnicalFit(tt.skillNames, JDSignals{RequiredSkills: tt.required})
+			if !slices.Equal(gaps, tt.wantGaps) {
+				t.Errorf("gaps = %q, want %q", gaps, tt.wantGaps)
+			}
+		})
+	}
+}
+
+// Known limitation, asserted so it stays a decision rather than a surprise.
+// "REST" and "RESTful APIs" share no whole word and neither contains the
+// other, so no amount of matching in this file connects them. Canonicalizing
+// the adjectival form is jd_extraction.tmpl's job; if that regresses, this is
+// the shape the gap comes back in.
+func TestScoreTechnicalFitDoesNotBridgeAdjectivalForms(t *testing.T) {
+	_, gaps := ScoreTechnicalFit(citiSkills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	if len(gaps) == 0 {
+		t.Error("matchesAny appears to bridge RESTful->REST now; update this test, " +
+			"the matchesAny doc comment, and the canonicalization rule in jd_extraction.tmpl")
+	}
+}
+
 func TestSplitAlternatives(t *testing.T) {
 	tests := []struct {
 		entry string
