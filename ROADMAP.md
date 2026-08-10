@@ -1,9 +1,10 @@
 # Role Model — Architecture Checkpoint & Roadmap
 
-**Last updated:** July 2026  
+**Last updated:** August 2026  
 **Repo:** github.com/shurikai/role-model  
 **Data repo:** private, accessed via `SEED_DIR` env var from `make seed`  
-**Companion docs:** `docs/discovery-design.md`
+**Companion docs:** `CLAUDE.md`, `notes/discovery-design.md`,
+`notes/role-model-schema-design.md`, `notes/hard-exclude-preference-audit.md`
 
 ---
 
@@ -52,7 +53,7 @@ is the moat, not the prompts).
 
 ### Infrastructure
 - Docker Compose managing PostgreSQL 16 on host port 5433
-- golang-migrate: 9 migrations applied
+- golang-migrate: 10 migrations applied
 - Makefile with `db-up`, `db-down`, `migrate`, `seed`, `reset` targets, plus
   `run`, `run-frontend`, `run-renderer`, and `dev` (all three processes at once)
 - `make seed` reads `SEED_DIR` and applies SQL files in order
@@ -82,7 +83,10 @@ Key design decisions baked in:
   nullable columns (`db_type` override alone does not work in sqlc 1.31.1)
 - Assembly skips positions/employers with no active contributions
 
-### Seed Data — 12 files, complete canonical career history
+### Seed Data — 19 files, complete canonical career history
+Lives in the private data repo (`SEED_DIR`, e.g. `../role-model-seed`), not in
+this repo — `database/seed` is gitignored. Numbering runs 001–016 and 018–020;
+**there is no 017**.
 ```
 001_foundation.sql      — users, employers, positions, 54 tags across 9 categories
 002_disney.sql          — 7 contributions
@@ -96,14 +100,26 @@ Key design decisions baked in:
 010_projects.sql        — 4 projects (including Role Model itself)
 011_education_credentials.sql — Tulane BS CS 1999; 0 active credentials
 012_additions_lua_groovy_scheme.sql — Groovy/Lua/DynamoDB tags; Neovim project; Tulane notes
+013_skills.sql          — 41 skills rows, plus the tags they need that 001 lacked
+014_preferences.sql     — 24 preference rows (the profile tabulated below)
+015_mysql.sql           — MySQL tag + its contribution_tags link (Lockheed WARSIM, L0005)
+016_corrections.sql     — reactivates the Jenkins skill; backfills users.phone
+018_skill_curation.sql  — closes four open items from the 2026-07-31 provenance audit
+019_spring_mvc_deactivate.sql — deactivates Spring MVC (real but unplaceable in time)
+020_deactivate_graphql_artifact.sql — deactivates GraphQL (not real usable depth)
 ```
 
-**Pending seed tasks (tracked in memory):**
-1. Verify DynamoDB tag and contribution text in `003_daugherty.sql` are accurate
-   for the Edward Jones engagement (DynamoDB Global Tables, cross-region caching,
-   integration-context framing — same level as Cassandra at Manifold)
-2. Verify and add Groovy tag to active Manifold contribution once canonical
-   story is confirmed with "built and deployed in one week" detail
+**Pending seed tasks:** none blocking. Both items previously listed here are
+closed — the DynamoDB tag and contribution text landed in `012`, as did the
+Groovy tag on the active Manifold contribution.
+
+Low-priority cleanup, tracked but not urgent:
+1. `013_skills.sql:77` still carries a `TODO` to identify which contribution
+   UUIDs should carry MySQL. `015_mysql.sql` already did exactly that; the
+   comment is stale and should be deleted.
+2. The MySQL tag row (`90…058`) is inserted by both `013` and `015`. Harmless —
+   `015` uses `ON CONFLICT (id) DO UPDATE` and the values agree — but it is two
+   sources of truth for one row.
 
 ### Authentication
 - bcrypt password hashing
@@ -115,32 +131,32 @@ Key design decisions baked in:
 ```
 GET  /health
 
-POST /api/v1/auth/register
+POST /api/v1/auth/signup
 POST /api/v1/auth/login
+GET  /api/v1/auth/me                  (authenticated)
 
 GET    /api/v1/employers
 POST   /api/v1/employers
 GET    /api/v1/employers/:id
-PUT    /api/v1/employers/:id
+PATCH  /api/v1/employers/:id
 DELETE /api/v1/employers/:id          (guarded)
 
-GET    /api/v1/employers/:id/positions
-POST   /api/v1/employers/:id/positions
+GET    /api/v1/employers/:employerID/positions
+POST   /api/v1/positions              (employer_id in body)
 GET    /api/v1/positions/:id
-PUT    /api/v1/positions/:id
+PATCH  /api/v1/positions/:id
 DELETE /api/v1/positions/:id          (guarded)
 
-GET    /api/v1/positions/:id/contributions
-POST   /api/v1/positions/:id/contributions
+GET    /api/v1/positions/:positionID/contributions
+POST   /api/v1/contributions          (position_id in body)
 GET    /api/v1/contributions/:id
-PUT    /api/v1/contributions/:id
+PATCH  /api/v1/contributions/:id
 DELETE /api/v1/contributions/:id      (transactional join-table cleanup)
 
 POST   /api/v1/applications
 GET    /api/v1/applications
 GET    /api/v1/applications/:id
-PUT    /api/v1/applications/:id
-DELETE /api/v1/applications/:id
+PATCH  /api/v1/applications/:id
 
 POST   /api/v1/applications/:id/extract-signals  — Stage 1: JD → jd_signals JSONB
 POST   /api/v1/applications/:id/generate         — Stage 2 (2a body + 2b summary)
@@ -148,9 +164,9 @@ GET    /api/v1/applications/:id/versions
 GET    /api/v1/resume-versions/:id
 POST   /api/v1/resume-versions/:id/render        — → .docx via docx-renderer
 
-POST   /api/v1/applications/:id/fit              — fit gate scoring
-GET    /api/v1/applications/:id/fit
-GET    /api/v1/applications/:id/fit/:reportID
+POST   /api/v1/applications/:applicationID/fit   — fit gate scoring
+GET    /api/v1/applications/:applicationID/fit
+GET    /api/v1/applications/:applicationID/fit/:reportID
 
 POST   /api/v1/import                            — Stage 0 batch create
 GET    /api/v1/import/:batchID
@@ -162,20 +178,39 @@ POST   /api/v1/import/drafts/:draftID/reject
 
 GET/POST/DELETE /api/v1/tags, /api/v1/tag-categories
 POST/DELETE     /api/v1/contributions/:id/tags[/:tagId]
-GET/POST/DELETE /api/v1/education, /api/v1/credentials, /api/v1/projects
+
+GET/POST        /api/v1/education, /api/v1/credentials
+PATCH/DELETE    /api/v1/education/:id, /api/v1/credentials/:id
+                (no GET-by-id on either — list only)
+
+GET    /api/v1/projects
+POST   /api/v1/projects
+GET    /api/v1/projects/:id
+PATCH  /api/v1/projects/:id
+DELETE /api/v1/projects/:id
+POST   /api/v1/projects/:id/contributions
+DELETE /api/v1/projects/:id/contributions/:contribID
+POST   /api/v1/projects/:id/tags
+DELETE /api/v1/projects/:id/tags/:tagId
 ```
+
+Mutations are `PATCH`, not `PUT` — partial update is the contract everywhere
+except `PUT /api/v1/import/drafts/:draftID`, which still replaces the draft
+wholesale. Nested creates are flat (`POST /api/v1/positions` with `employer_id`
+in the body), with parent ownership verified server-side. There is no
+`DELETE /api/v1/applications/:id`.
 
 ### LLM Pipeline — Built and Verified
 **Stage 1 — JD Signal Extraction**
 - Input: raw JD text
-- Anthropic API call against `jd_extraction.v1.tmpl`
+- Anthropic API call against `jd_extraction.tmpl`
 - Output: `jd_signals` JSONB stored on `applications` row
 - Verified against real job descriptions
 
 **Stage 2 — Resume Generation**
 - `AssembleContext`: composes employer/position/contribution/project/education/
   credential data via sqlc queries into the structure the prompt expects
-- Renders `resume_generation.v1.tmpl`
+- Renders `resume_body.tmpl`, then `resume_summary.tmpl` (2a/2b split)
 - Anthropic API call
 - JSON Schema validation against `schema/resume.v1.json`
   (santhosh-tekuri/jsonschema)
@@ -212,13 +247,15 @@ every used tag at a uniform `'proficient'` with `years_experience = NULL`, on
 the explicit reasoning that the migration had no basis to distinguish depth.
 So the columns are populated but carry no differentiating information:
 a single Daugherty GCP cohort prototype and a decade of AWS are both
-`proficient / NULL`. JD-relevance filtering in `resume_body.v4.tmpl` is the
-current stopgap (issue #34); the permanent fix is reweighting proficiency and
-years per skill, which nothing does yet.
+`proficient / NULL`. JD-relevance filtering in `resume_body.tmpl` is the
+current stopgap (shipped, issue #34 closed); the permanent fix is reweighting
+proficiency and years per skill, which nothing does yet.
 
-Migration 008 also flags a review task: it treated every used tag as
-skill-worthy regardless of `tag_categories`, so domain/outcome-type tags may
-have become skills and should be deactivated. Rerunning is safe
+Migration 008 also flagged a review task: it treated every used tag as
+skill-worthy regardless of `tag_categories`, so domain/outcome-type tags became
+skills. That curation pass has since run — seed files `016`, `018`, `019`, and
+`020` reactivated Jenkins and deactivated Spring MVC, GraphQL, and the rest of
+the 2026-07-31 provenance audit's open items. Rerunning 008 is still safe
 (`ON CONFLICT DO NOTHING`).
 
 Original proposal, retained for contrast:
@@ -276,28 +313,43 @@ CREATE TABLE preference_contexts (
 );
 ```
 
-Known preference profile (the canonical list this table is seeded from):
+Known preference profile — 24 rows, transcribed from `014_preferences.sql`,
+which is the source of truth. Note that several are typed differently than an
+earlier revision of this doc claimed: Big Four is `culture`, not `anti_pattern`,
+and `defense / aerospace` and `pure frontend` are `domain` and `work_type`
+respectively. `hard_exclude` rows carry no weight.
 
-| Type | Sentiment | Label |
-|---|---|---|
-| domain | positive | distributed systems |
-| domain | positive | IoT / telemetry / real-time data |
-| domain | positive | consumer-facing product |
-| work_type | positive | product over platform/internal tooling |
-| work_type | positive | small team, high ownership |
-| work_type | positive | greenfield over pure maintenance |
-| culture | positive | remote-first |
-| culture | positive | low-ego, async |
-| anti_pattern | hard_exclude | Big Four consulting |
-| anti_pattern | hard_exclude | defense / aerospace |
-| anti_pattern | hard_exclude | pure frontend |
-| anti_pattern | hard_exclude | TypeScript/Node as primary language |
-| anti_pattern | hard_exclude | expert Python as primary requirement |
-| anti_pattern | hard_exclude | production LLM/AI as hard requirement |
-| anti_pattern | hard_exclude | Angular as co-equal frontend requirement |
-| anti_pattern | negative | full-stack where frontend is co-equal |
-| anti_pattern | negative | platform/internal tooling over product |
-| culture | negative | military-coded culture |
+| Type | Sentiment | Weight | Label |
+|---|---|---|---|
+| domain | positive | 9 | distributed systems |
+| domain | positive | 8 | IoT / telemetry / real-time data |
+| domain | positive | 7 | observability |
+| domain | positive | 7 | consumer-facing product |
+| domain | positive | 5 | fintech / blockchain |
+| domain | hard_exclude | — | defense / aerospace |
+| work_type | positive | 9 | small team, high ownership |
+| work_type | positive | 8 | product over platform / internal tooling |
+| work_type | positive | 6 | greenfield over pure maintenance |
+| work_type | negative | 7 | full-stack where frontend is co-equal |
+| work_type | negative | 5 | platform / internal tooling over product |
+| work_type | hard_exclude | — | pure frontend |
+| culture | positive | 8 | remote-first |
+| culture | positive | 7 | low-ego / async |
+| culture | negative | 6 | military-coded culture |
+| culture | hard_exclude | — | Big Four consulting culture |
+| anti_pattern | negative | 8 | Jenkins administration as primary responsibility |
+| anti_pattern | negative | 6 | Oracle DBA or heavy Oracle stack |
+| anti_pattern | negative | 5 | large enterprise / Big Co process-heavy |
+| anti_pattern | hard_exclude | — | TypeScript / Node.js as primary language |
+| anti_pattern | hard_exclude | — | expert Python as primary requirement |
+| anti_pattern | hard_exclude | — | production LLM / AI engineering as hard requirement |
+| anti_pattern | hard_exclude | — | Angular as co-equal frontend requirement |
+| anti_pattern | hard_exclude | — | IT consulting / staff augmentation model |
+
+Not every row can actually fire against extracted JD signals — the
+skills-shaped anti-patterns in particular depend on what `gateFieldsFor` reads.
+See `notes/hard-exclude-preference-audit.md`, which is current as of its two
+appended resolutions.
 
 ---
 
@@ -309,9 +361,12 @@ without touching the terminal.*
 
 **Backend remaining:**
 - ~~Projects, education, credentials write-CRUD~~ — BUILT
-- ~~Skills + preferences schema and seed~~ — BUILT (migrations 005, 008, 009)
-- Pending seed tasks (MySQL tag, Groovy verification)
-- Skill provenance population — the tables exist but nothing writes to them
+- ~~Skills + preferences schema and seed~~ — BUILT (migrations 005, 008, 009;
+  seeded in `013`/`014`, curated in `016`/`018`/`019`/`020`)
+- ~~Pending seed tasks (MySQL tag, Groovy verification)~~ — DONE (`012`, `015`)
+- Skill *depth* population — provenance itself needs no work (`v_skill_provenance`
+  derives it from `contribution_tags`), but `proficiency` and `years_experience`
+  are still uniform, so generation can't tell a prototype from a decade
 
 **Stage 0 — LLM-assisted data entry pipeline** — BUILT (migration 006,
 `internal/stage0`, endpoints under `/api/v1/import`). Design retained below.  
@@ -494,7 +549,7 @@ approval wait states, must be recoverable. Temporal's canonical shape.
 These are complementary, not competing. Kafka gets a JD from discovery to
 "signals extracted, ready for review." Temporal takes over from there.
 
-**`cmd/discovery` worker** (see `docs/discovery-design.md` for full design):
+**`cmd/discovery` worker** (see `notes/discovery-design.md` for full design):
 - Lives in this repo as a second binary; shares `go.mod`, separate process
 - Config: `companies.yaml` — one entry per target company with platform +
   identifier + poll_interval
@@ -648,12 +703,12 @@ Tracked for honest fit assessment; not to be invented into resumes:
 
 | Gap | Status |
 |---|---|
-| Angular | Zero signal — hard pass on roles requiring it |
-| React | Thin/old (Dignitas co-development); Role Model frontend will close this |
-| Python at expert/production level | Real but thin: AEMWAS, The Budgeteer |
+| Angular | Real but thin exposure, not zero signal — still a hard pass as a co-equal frontend requirement |
+| React | Thin/old (Dignitas co-development); actively closing — the Role Model frontend is built and shipping (auth shell, application generation flow, Vitest coverage) |
+| Python at expert/production level | Real but thin: AEMWAS, The Budgeteer, plus the `docx-renderer` FastAPI service |
 | OIDC/SAML/OAuth2 design ownership | JWT validation present; auth design not owned |
-| Go at production API depth | Role Model closes this gap when complete |
-| MongoDB/NoSQL | DynamoDB confirmed at Edward Jones (Global Tables, integration context) |
+| Go at production API depth | Substantially closed — the Role Model backend is built: chi router, ~60 endpoints, pgx/sqlc, JWT auth, LLM pipeline, integration tests |
+| MongoDB | No signal. The confirmed NoSQL experience is **DynamoDB, not MongoDB** — Edward Jones via Daugherty, Global Tables and cross-region caching, integration context. Cassandra at Manifold is the other NoSQL data point. Do not let "NoSQL" on a JD read as MongoDB. |
 | TypeScript/Node | ~4 weeks at Pelotech; surfaces only for roles explicitly requiring it |
 | Flutter | Appears in Disney prose; excluded — support context only, not a skill claim |
 
@@ -664,15 +719,34 @@ Tracked for honest fit assessment; not to be invented into resumes:
 Established across ~35+ JDs processed:
 - TypeScript/Node.js as the primary required language
 - Expert-level Python as the primary required language
+- Ruby/Rails as the primary required language
+- C# / .NET as the primary stack
 - Angular as a co-equal frontend requirement
 - Production LLM/AI-feature experience as a hard requirement
-- Defense / aerospace domain (cultural fatigue)
+- Defense-coded / clearance-required work (cultural fatigue). **Commercial
+  aerospace is not excluded** — the filter is the clearance-and-culture shape,
+  not the industry
 - Big Four consulting roles
 - Full-stack roles where frontend depth is co-equal to backend
+- Crypto/blockchain product companies
+- Onsite outside Orlando, FL
 
 Exception pattern: "use AI tools to build faster" framing at a product company
 does not trigger the LLM hard-pass — Disney pilot and Role Model itself satisfy
 this framing without requiring production AI feature ownership.
+
+**This list has diverged from the seeded `preferences` rows** and the two are
+not currently reconcilable by hand:
+- The seed stores `domain / defense / aerospace / hard_exclude`, which is the
+  broader industry framing this list has now narrowed
+- The seed stores `domain / fintech / blockchain` as a **positive** at weight 5
+  ("Manifold experience; not a primary target but not a negative either"),
+  which directly contradicts the crypto/blockchain hard-pass above
+- Ruby/Rails, C#/.NET, and the Orlando onsite constraint have no preference
+  rows at all, so nothing in `fitgate` can act on them
+
+Reconciling the two is a data change, not a doc change — deferred to the
+architectural pass rather than silently edited here.
 
 ---
 
@@ -683,9 +757,12 @@ this framing without requiring production AI feature ownership.
 2. **Stage 0 review UI shape** — single-page side-by-side bulk approve, or
    step-by-step per contribution? Recommendation: single-page with bulk approve
    and per-row override.
-3. **Fit scoring rubric** — define explicit dimension weights and score ranges
-   before building the go/no-go gate; first version must be deterministic and
-   auditable.
+3. ~~**Fit scoring rubric**~~ — RESOLVED. Shipped in `internal/fitgate/scorer.go`:
+   deterministic technical + preference scoring in Go with 1–10 preference
+   weights, `fit_reports` persistence (migrations 007/009/010), and the LLM
+   confined to writing narrative from the computed scores. Successor question:
+   calibration against real outcome data, which needs `applications` rows
+   carrying screen/no-screen results that do not exist yet.
 4. **Prompt-steering accumulation table** — schema TBD; defer until feedback UI
    is actively being built but track as a known gap.
 5. **Lever adapter** — verify `api.lever.co/v0/postings/{company}?mode=json`
@@ -695,8 +772,9 @@ this framing without requiring production AI feature ownership.
    `skills.proficiency` / `years_experience` / `skill_provenance` actually get
    populated? Nothing writes to them today, which is why generation still can't
    tell a prototype from production depth.
-7. **`contribution_drafts` writethrough flow** — does the Stage 0 review UI
-   write directly to `contributions` or hold in `contribution_drafts` until a
-   final confirm step? Recommendation: hold in drafts with explicit confirm;
-   keeps canonical data clean.
+7. ~~**`contribution_drafts` writethrough flow**~~ — RESOLVED as recommended.
+   `stage0.ApproveDraft` holds rows in `contribution_drafts` until an explicit
+   `POST /api/v1/import/drafts/{draftID}/approve`, which verifies parent-position
+   ownership and writes through to `contributions` in a transaction. Only the
+   review *UI* remains unbuilt — the flow behind it is settled (see question 2).
 
