@@ -79,7 +79,7 @@ Check against the current state:
 ### 8. Hard-Pass Filters table
 
 Current state (do NOT add the FDE exception or other architectural changes
-in this pass — that's session 022):
+in this pass — that's the next session):
 - The "defense / aerospace" line should say "defense-coded / clearance-required"
   not "defense / aerospace" (commercial aerospace is not excluded)
 - Add "Crypto/blockchain product companies" if not present
