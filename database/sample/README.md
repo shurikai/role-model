@@ -7,8 +7,9 @@ that someone who clones this repository can run the full pipeline — fit gate,
 generation, render — and see real output without access to a private
 career-history seed set.
 
-Real career data lives outside the repo in `$SEED_DIR` and is gitignored. See
-the README section "Career data is seeded, not written through the API."
+Real career data lives in a separate private repo at `$SEED_DIR`, checked out in
+place at `database/seed` and gitignored, so it is never tracked here. See the
+README section "Career data is seeded, not written through the API."
 
 ## Loading it
 

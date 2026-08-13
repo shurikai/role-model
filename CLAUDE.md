@@ -139,7 +139,8 @@ Rules:
 /internal/stage0                 — LLM-assisted import (extract + enrich + review)
 /docx-renderer                   — Python service: resume JSON -> .docx
 /frontend                        — React + TypeScript + Vite UI
-/database/seed                   — seed SQL scripts
+/database/seed                   — real career seed SQL; a separate private git
+                                   repo checked out in place, gitignored here
 /migrations                      — golang-migrate SQL migration files
 /schema                          — JSON schema documents
 /tests/fixtures                  — JD, resume JSON, and .docx regression fixtures

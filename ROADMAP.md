@@ -84,9 +84,10 @@ Key design decisions baked in:
 - Assembly skips positions/employers with no active contributions
 
 ### Seed Data — 19 files, complete canonical career history
-Lives in the private data repo (`SEED_DIR`, e.g. `../role-model-seed`), not in
-this repo — `database/seed` is gitignored. Numbering runs 001–016 and 018–020;
-**there is no 017**.
+Lives in a separate private data repo (`shurikai/role-model-seed`), checked out
+in place at `database/seed` — gitignored here, so it is never tracked by this
+repo. `SEED_DIR` points at it (`./database/seed`). Numbering runs 001–016 and
+018–020; **there is no 017**.
 ```
 001_foundation.sql      — users, employers, positions, 54 tags across 9 categories
 002_disney.sql          — 7 contributions
