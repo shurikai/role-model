@@ -19,9 +19,16 @@ The LLM layer synthesizes and personalizes. SQL retrieves and filters. These
 roles are not interchangeable, and the architecture enforces that separation.
 
 This is bespoke RAG: deterministic SQL retrieval driven by Stage 1 LLM signal
-extraction. LangChain-style orchestration, the Claude Agent SDK, and general
-agentic loop patterns are all explicitly out of scope — the pipeline is
-sequential, human-in-the-loop, and deterministic by design.
+extraction. The resume generation pipeline is sequential, human-in-the-loop, and
+deterministic by design. The LLM's role in generation is synthesis from
+structured data, not autonomous decision-making.
+
+The data-entry surface is a different story. An agent-driven onboarding
+interview (see Phase 1) uses a multi-step, tool-calling agent framework to walk
+users through populating their career data conversationally. Agent patterns are
+appropriate here because the task is exploratory and conversational; they remain
+inappropriate for the generation pipeline itself, where auditability and
+determinism are the point.
 
 **Positioning:** personal career knowledge base, not a resume generator.
 The distinction matters for retention (value compounds over time), for honest
@@ -46,6 +53,9 @@ is the moat, not the prompts).
 | Config | joho/godotenv |
 | Frontend | React + TypeScript + Vite, TanStack Query, Vitest |
 | Renderer | Python 3.14, FastAPI + python-docx, managed with uv |
+
+This table covers shipped stack. Planned technology commitments live in their
+phase sections.
 
 ---
 
@@ -455,6 +465,43 @@ performance," do not suggest "improved performance by 40%." Flag the gap.
 Return ONLY valid JSON: {suggested_text, confidence, flagged_inferences[], missing_fields[]}
 ```
 
+**Onboarding agent — conversational data entry** (planned; parallel to Stage 0,
+not a replacement for it).
+
+Stage 0 handles the "paste a resume or LinkedIn export" case: there is already a
+document, and the work is segmenting and enriching it. The onboarding agent
+handles the case Stage 0 cannot — a user with no clean document to start from,
+or whose career does not decompose neatly into pre-written bullets. Both paths
+write to the same tables; they differ in how the raw material is obtained.
+
+- **Framework: LangGraph. Decided — do not substitute CrewAI or another
+  framework.** The task is a single structured interview with conditional
+  branching and state, not multi-agent collaboration, which matches LangGraph's
+  graph-of-nodes model rather than CrewAI's crew/role abstraction. LangGraph's
+  checkpointing/interrupt pattern also mirrors the Temporal Signal-based
+  human-in-the-loop design already planned for Phase 3, so the mental model
+  transfers between them.
+- Conducts a structured interview modeled on a recruiter/career-coach
+  conversation, writing contributions as the conversation progresses.
+- **It calls the existing REST API endpoints.** It does not bypass the API or
+  write directly to Postgres.
+- Deliberate skill-acquisition project: hands-on experience with a production
+  agent framework on a real feature rather than a throwaway spike. Supports the
+  FDE track (see Hard-Pass Filters).
+- Eval story for v1 is self-referential: run it against the existing career data,
+  where the right answers are already known, and evaluate whether it asks good
+  questions and writes accurate contributions.
+
+Design principles:
+1. The trust boundary is **structural honesty, not fact-checking** — the system
+   enforces that every skill claim links to a supporting contribution, but does
+   not verify whether the underlying claim is true.
+2. The interview produces the field's tag vocabulary as a byproduct, which is
+   cheaper than pre-building a vocabulary per field.
+3. Sequencing: get base functionality and the frontend solid first, then
+   validate against a second field (e.g. education) before designing for many
+   fields speculatively.
+
 **Frontend:**
 - React + TypeScript + Vite (decided) — BUILT: auth shell plus the application
   generation flow (`Applications`, `ApplicationNew`, `ApplicationDetail`)
@@ -530,6 +577,65 @@ Return ONLY valid JSON: {suggested_text, confidence, flagged_inferences[], missi
      running all three passes, returning combined report. No new schema needed.
    - Latency: ~15-45 seconds for three passes, absorbed by Temporal wait state.
    - Token cost: ~$0.05-0.07 per generation run — negligible at single-user volume.
+7. **Eval harness — correctness verification.** Distinct from the Phase 4
+   "prompt evaluation framework," which compares quality *across prompt
+   versions*. This asks a different question: is the pipeline's output
+   **correct** for a known input?
+   - A fixture set of JDs with known-correct signal extractions, scored
+     automatically. The assertion is that Stage 1 extracts the *right* signals
+     from a known JD — not merely that it produced valid JSON, which is all the
+     schema check proves today.
+   - Extends to Stage 2: given known signals and known career data, does
+     generation select the right contributions and produce accurate bullets?
+   - Builds on `tests/fixtures/`, which already holds pipeline regression
+     fixtures — extend that set, do not stand up a parallel one.
+   - Also an FDE credibility artifact: "I built and evaluated a production
+     agentic system" is the sentence FDE screens are listening for in 2026, and
+     the eval harness is what makes it true rather than aspirational.
+
+---
+
+### MCP Server — Protocol Surface for Career Data
+*Not a phase. Infrastructure that serves several of them, placed here because it
+depends on Phase 2's pipeline existing and is depended on by later work.*
+
+Exposes the career data Role Model already holds as **MCP tools**, so any MCP
+client can query it directly rather than through a copy.
+
+- **Tools, not a static resource.** The server does not serve
+  `canonical-context.md`. The entire premise of SQL-as-retrieval is that queries
+  are live and parameterized; `canonical-context.md` is a derived,
+  third-generation copy useful for bootstrapping a chat thread and nothing more.
+  It has no role in the MCP surface.
+- **Implementation:** a thin layer in front of the existing Go backend — the
+  same pgx/sqlc queries the pipeline already uses, exposed as tools. No second
+  retrieval path, no duplicated query logic.
+- **Transport:** Streamable HTTP, the current MCP spec standard as of
+  2026-07-28. HTTP+SSE is deprecated; do not build against it.
+- **Process boundary is an open question.** Either a separate process alongside
+  the chi API — which needs its own pgx pool and forces a decision about
+  importing versus duplicating the sqlc code — or a second protocol surface in
+  the same binary, which shares code cleanly but changes the deployment shape.
+  Decide during implementation, not now. (Open question 8.)
+
+Candidate initial tool surface, not exhaustive:
+
+| Tool | Purpose |
+|---|---|
+| `search_contributions(query, tags?, employer?, limit?)` | The core retrieval primitive, live against Postgres |
+| `get_skill(skill_name)` | Status, proficiency, supporting contributions, and honest framing notes |
+| `list_employment_timeline()` | The canonical never-omit timeline |
+| `check_hard_excludes(jd_signals)` | The Stage 1 gate, as a callable tool |
+| `get_gap_analysis(required_skills[])` | Stage 2 gap identification |
+
+Resources — the MCP primitive for read-only addressable data — may have a role
+for stable reference data such as the tag taxonomy or the anti-pattern list.
+**Career facts themselves must be tools, not resources**, for the same reason
+the server does not serve a markdown snapshot.
+
+If the pipeline is eventually orchestrated by Temporal (Phase 3), MCP tools will
+need to decide whether they trigger Temporal workflows or sit below that layer.
+Blocked on Temporal actually being built. (Open question 9.)
 
 ---
 
@@ -549,6 +655,13 @@ approval wait states, must be recoverable. Temporal's canonical shape.
 
 These are complementary, not competing. Kafka gets a JD from discovery to
 "signals extracted, ready for review." Temporal takes over from there.
+
+Building the Temporal integration also serves the FDE credibility story, and
+does so from a different direction than the agent work: Temporal is general
+distributed-systems orchestration infrastructure, not AI-agent technology.
+Shipping it demonstrates the DIS/dead-reckoning distributed-coordination
+background applied to a new domain — durable workflows rather than simulation
+state — rather than a second entry in the same category as LangGraph.
 
 **`cmd/discovery` worker** (see `notes/discovery-design.md` for full design):
 - Lives in this repo as a second binary; shares `go.mod`, separate process
@@ -712,6 +825,7 @@ Tracked for honest fit assessment; not to be invented into resumes:
 | MongoDB | No signal. The confirmed NoSQL experience is **DynamoDB, not MongoDB** — Edward Jones via Daugherty, Global Tables and cross-region caching, integration context. Cassandra at Manifold is the other NoSQL data point. Do not let "NoSQL" on a JD read as MongoDB. |
 | TypeScript/Node | ~4 weeks at Pelotech; surfaces only for roles explicitly requiring it |
 | Flutter | Appears in Disney prose; excluded — support context only, not a skill claim |
+| Agent frameworks (LangGraph) | No hands-on experience yet; onboarding agent (Phase 1) is the planned closure path — LangGraph specifically, decision final |
 
 ---
 
@@ -723,7 +837,8 @@ Established across ~35+ JDs processed:
 - Ruby/Rails as the primary required language
 - C# / .NET as the primary stack
 - Angular as a co-equal frontend requirement
-- Production LLM/AI-feature experience as a hard requirement
+- Production LLM/AI-feature experience as a hard requirement — **no longer a
+  blanket exclude; see "AI requirements — three categories" below**
 - Defense-coded / clearance-required work (cultural fatigue). **Commercial
   aerospace is not excluded** — the filter is the clearance-and-culture shape,
   not the industry
@@ -736,6 +851,29 @@ Exception pattern: "use AI tools to build faster" framing at a product company
 does not trigger the LLM hard-pass — Disney pilot and Role Model itself satisfy
 this framing without requiring production AI feature ownership.
 
+**AI requirements — three categories.** The single "production LLM experience"
+line collapsed three different situations that need different handling:
+
+1. **FDE-shaped roles** — deploying and operating agents against a customer's
+   real business problem. A conscious exception, evaluated on its own track
+   rather than filtered. Bridge story: Manifold/RBC embedded customer work plus
+   Lockheed direct customer interaction.
+2. **Agent orchestration / runtime / framework platform roles** — where the
+   deliverable *is* the agent-building infrastructure and the customers are
+   other engineers. Still excluded, but on **values** grounds
+   (product-over-platform), not skill grounds. Closing the skill gap does not
+   reopen this category.
+3. **"AI-production-required" as a qualifications-line technicality** on an
+   otherwise-normal role — softened from a blanket Stage 1 auto-fail to Stage 2
+   case-by-case judgment. Gated on the MCP server and eval harness actually
+   shipping; until then there is nothing to point at.
+
+Learning agent frameworks (LangGraph/CrewAI), multi-agent coordination patterns,
+and building the Temporal integration are skill-acquisition moves supporting
+category 1. Note that the exclude in category 2 is scoped to **who consumes the
+output**, not to any particular technology — the same LangGraph skill that
+serves category 1 does not make category 2 acceptable.
+
 **This list has diverged from the seeded `preferences` rows** and the two are
 not currently reconcilable by hand:
 - The seed stores `domain / defense / aerospace / hard_exclude`, which is the
@@ -745,9 +883,16 @@ not currently reconcilable by hand:
   which directly contradicts the crypto/blockchain hard-pass above
 - Ruby/Rails, C#/.NET, and the Orlando onsite constraint have no preference
   rows at all, so nothing in `fitgate` can act on them
+- The three-category AI breakdown above is **not representable in the current
+  `preferences` schema at all.** A conscious exception evaluated on its own
+  track, an exclude held on values rather than skill grounds, and a
+  Stage-1-to-Stage-2 downgrade gated on unshipped work are three different
+  shapes; `fitgate` knows only flat `hard_exclude` at a weight. This is a
+  scoring-model gap, not a missing row.
 
-Reconciling the two is a data change, not a doc change — deferred to the
-architectural pass rather than silently edited here.
+Reconciling the seeded rows is a data change and stays deferred. The
+representability gap is a `fitgate` change and belongs in Phase 2 planning —
+neither is silently edited here.
 
 ---
 
@@ -778,4 +923,12 @@ architectural pass rather than silently edited here.
    `POST /api/v1/import/drafts/{draftID}/approve`, which verifies parent-position
    ownership and writes through to `contributions` in a transaction. Only the
    review *UI* remains unbuilt — the flow behind it is settled (see question 2).
+8. **MCP process boundary** — separate process alongside the chi API (own pgx
+   pool, and a decision about importing vs. duplicating the sqlc code) or a
+   second protocol surface in the same binary (cleaner sharing, different
+   deployment shape)? Decide during implementation, not now. See the MCP Server
+   section.
+9. **MCP tools vs. Temporal workflows** — if Phase 3 lands and the pipeline is
+   orchestrated by Temporal, do MCP tools trigger workflows or stay below that
+   layer? Blocked on Temporal actually being built. See the MCP Server section.
 
