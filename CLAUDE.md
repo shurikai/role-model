@@ -254,13 +254,23 @@ seems genuinely warranted.
 - Blob storage interface for rendered documents (local disk now, S3 later).
   Rendered .docx bytes are currently returned to the caller, not persisted.
 - Evaluation strategy for prompt quality across versions (deferred)
-- Skill depth signal. The schema supports it — `skills.proficiency` and
-  `years_experience` exist, and `v_skill_provenance` derives skill→contribution
-  links from `contribution_tags` automatically — but migration 008 backfilled
-  every skill at a uniform `proficient` / `NULL`, so the data carries no
-  differentiation. A one-off prototype and a decade of production use look
-  identical to generation. JD-relevance filtering is the current stopgap; the
-  fix is populating real per-skill depth, not more schema.
+- Skill depth signal — **the gap is in the code, not the data.** The schema
+  supports depth (`skills.proficiency`, `skills.years_experience`, and
+  `v_skill_provenance` deriving skill→contribution links from
+  `contribution_tags`), and the data now carries it: migration 008's uniform
+  `proficient` / `NULL` backfill was curated afterward in seed files 016/018/019,
+  so the table holds a real spread of novice/proficient/expert with
+  `years_experience` populated on most rows.
+
+  `internal/fitgate` never sees any of it. `ListActiveSkillTagNamesByUser`
+  (`internal/db/queries/skills.sql`) selects `t.name` only, and
+  `ScoreTechnicalFit` takes a flat `skillNames []string`, so scoring is pure
+  presence/absence — a matched required skill is worth 2 points and a matched
+  preferred skill 1, whether it represents twenty years or a weekend. A one-off
+  prototype and a decade of production use still look identical to scoring, but
+  because the columns are dropped at the query layer, not because they are
+  empty. `ListActiveSkillsByUser` already returns full rows; threading
+  proficiency and years through to the scorer is the fix.
 
 Resolved: the renderer service question (Go-native vs Python) — Python won,
 see Architecture above.
