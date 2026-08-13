@@ -70,8 +70,8 @@ Key points to include:
 - Process boundary is an open question: separate process alongside the chi
   API (needs its own pgx pool, decides whether to import the same sqlc code
   or duplicate it), or embedded as a second protocol surface in the same
-  binary (cleaner code sharing, changes deployment shape). Note this as a
-  decision to make during implementation, not now.
+  binary (cleaner code sharing, changes deployment shape). Decide during
+  implementation, not now.
 - Transport: Streamable HTTP (the current MCP spec standard as of
   2026-07-28; HTTP+SSE is deprecated).
 - Candidate tools (initial surface, not exhaustive):
@@ -88,6 +88,22 @@ Key points to include:
 - Relationship to Temporal: if the pipeline eventually gets orchestrated by
   Temporal workflows, MCP tools need to decide whether they trigger Temporal
   workflows or stay below that layer. Note as an open question.
+
+**Where open questions live.** State each open question inline in the MCP
+section where it has context, then add a one-line pointer entry to the
+`## Open Questions` list so the numbered index stays the single place to scan
+for unresolved decisions. The inline text carries the reasoning; the list entry
+carries the pointer. Do not restate the full reasoning in both. The list
+currently ends at #7; append:
+
+> 8. **MCP process boundary** — separate process alongside the chi API (own pgx
+>    pool, and a decision about importing vs. duplicating the sqlc code) or a
+>    second protocol surface in the same binary (cleaner sharing, different
+>    deployment shape)? Decide during implementation, not now. See the MCP Server
+>    section.
+> 9. **MCP tools vs. Temporal workflows** — if Phase 3 lands and the pipeline is
+>    orchestrated by Temporal, do MCP tools trigger workflows or stay below that
+>    layer? Blocked on Temporal actually being built. See the MCP Server section.
 
 ### 3. Add Onboarding Agent to Phase 1
 
@@ -171,8 +187,26 @@ multi-agent coordination patterns, and building the Temporal integration
 are skill-acquisition moves that support category 1. The exclude is scoped
 to who consumes the output, not to any particular technology.
 
-Update the "defense / aerospace" line to "defense-coded / clearance-required"
-if session 030 didn't already handle this.
+**Also update the divergence block** at the end of Hard-Pass Filters. It
+currently defers reconciliation "to the architectural pass" — this is that
+pass, for the doc half. The `preferences` table reconciliation remains a data
+change and stays deferred; what changes here is the honest description of *why*
+it can't be done by hand. Add the representability problem as a fourth bullet
+in the existing list:
+
+> - The three-category AI breakdown above is **not representable in the current
+>   `preferences` schema at all.** A conscious exception evaluated on its own
+>   track, an exclude held on values rather than skill grounds, and a
+>   Stage-1-to-Stage-2 downgrade gated on unshipped work are three different
+>   shapes; `fitgate` knows only flat `hard_exclude` at a weight. This is a
+>   scoring-model gap, not a missing row.
+
+Then amend the closing paragraph so it no longer claims the whole thing is
+deferred:
+
+> Reconciling the seeded rows is a data change and stays deferred. The
+> representability gap is a `fitgate` change and belongs in Phase 2 planning —
+> neither is silently edited here.
 
 ### 6. Update Known Skill Gaps table
 
@@ -190,9 +224,15 @@ background applied to a new domain.
 
 ## What NOT to change
 
-- Do not reorganize the phase structure (Phase 1/2/3/3.5/4). New items
-  slot into existing phases.
-- Do not change the Stack table.
+- Don't renumber, merge, or resequence the existing phases (Phase 1/2/3/3.5/4).
+  Adding a new top-level (`##`) section as a peer of the phase headings **is**
+  permitted — see §2, which places the MCP server section at that level
+  deliberately, because it is infrastructure serving multiple phases.
+- Do not change the Stack table. It records **shipped** stack only — every row
+  is something running today, and LangGraph and the MCP server are neither.
+  You may add a single clarifying line directly beneath the table, exactly:
+  *"This table covers shipped stack. Planned technology commitments live in
+  their phase sections."* Do not add rows, columns, or a Planned block.
 - Do not modify the Implementation Checkpoint section (that was session 030).
 - Do not add the company research brief or any other features not listed
   above — this session is scoped to the MCP/agent/eval/targeting decisions.
@@ -210,6 +250,10 @@ After making changes, read the full ROADMAP.md and confirm:
 - Eval harness is documented as a correctness tool, distinct from the
   Phase 4 prompt-version comparison
 - Hard-pass filters reflect the three-category AI breakdown
+- Stack table is unchanged except for the permitted clarifying line
+- Hard-Pass divergence block reflects the three-category breakdown and no
+  longer defers the doc half
+- Every open question raised inline also appears in the `## Open Questions` list
 - No section contradicts another
 
 ## Commit
