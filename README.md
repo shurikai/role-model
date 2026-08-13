@@ -107,11 +107,11 @@ This README will grow as the system does.
 ## Open Questions
 - Blob storage interface for rendered documents (local disk now, S3 later) — rendered files are currently returned to the caller, not persisted
 - Evaluation strategy for prompt quality across versions
-- Skills carry a proficiency column, but every row was backfilled at the same value, so a one-off prototype and a decade of production use look identical to generation. Relevance filtering is the current stopgap; real per-skill depth is the fix
+- Skills carry proficiency and years-of-experience, and both are populated with real values — but the fit scorer reads skills as a flat list of names and never sees either column, so a one-off prototype and a decade of production use score identically. The fix is plumbing the depth through to `internal/fitgate`, not more seeding
 
 ## TODO
 [ ] Restore `applied_on` date parsing on the application update endpoint
 [ ] Add sample migrations with dummy test data (for onboarding without real career data)
 [ ] Build out the career-data views (employer/position/contribution browsing and editing)
-[ ] Populate real per-skill proficiency and years (the schema is there; the data is uniform)
+[ ] Weight technical fit scoring by skill proficiency and years (the schema and the data are both there; `internal/fitgate` reads names only)
 [ ] Human review gate for extracted JD signals before generation runs
