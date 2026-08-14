@@ -253,14 +253,26 @@ differences before working on this:
   automatic and never needs writing to. The proposed junction table below was
   not built and is not needed.
 
-**Remaining gap — depth signal, not provenance.** Migration 008 backfilled
-every used tag at a uniform `'proficient'` with `years_experience = NULL`, on
-the explicit reasoning that the migration had no basis to distinguish depth.
-So the columns are populated but carry no differentiating information:
-a single Daugherty GCP cohort prototype and a decade of AWS are both
-`proficient / NULL`. JD-relevance filtering in `resume_body.tmpl` is the
-current stopgap (shipped, issue #34 closed); the permanent fix is reweighting
-proficiency and years per skill, which nothing does yet.
+**Remaining gap — depth signal, and the gap is in the code, not the data.**
+Migration 008 did backfill every used tag at a uniform `'proficient'` with
+`years_experience = NULL`, on the explicit reasoning that the migration had no
+basis to distinguish depth. That backfill has since been curated: seed files
+`016`, `018`, and `019` gave the table a real spread — a Daugherty GCP cohort
+prototype and a decade of AWS no longer look alike, and `years_experience` is
+populated on most rows.
+
+`internal/fitgate` never sees any of it. `ListActiveSkillTagNamesByUser`
+(`internal/db/queries/skills.sql`) selects `t.name` only, and `ScoreTechnicalFit`
+takes a flat `skillNames []string`, so scoring is pure presence/absence — a
+matched required skill is worth 2 points and a matched preferred skill 1,
+whether it represents twenty years or a weekend. `ListActiveSkillsByUser`
+already returns the full rows; threading proficiency and years through to the
+scorer is the fix. Tracked as #43/#44, and held by
+`known-gap-depth-blind-scoring` in the fit-gate eval harness, where full
+coverage at novice depth currently scores an unqualified 100.
+
+JD-relevance filtering in `resume_body.tmpl` remains the stopgap on the
+generation side (shipped, issue #34 closed).
 
 Migration 008 also flagged a review task: it treated every used tag as
 skill-worthy regardless of `tag_categories`, so domain/outcome-type tags became
@@ -375,9 +387,11 @@ without touching the terminal.*
 - ~~Skills + preferences schema and seed~~ — BUILT (migrations 005, 008, 009;
   seeded in `013`/`014`, curated in `016`/`018`/`019`/`020`)
 - ~~Pending seed tasks (MySQL tag, Groovy verification)~~ — DONE (`012`, `015`)
-- Skill *depth* population — provenance itself needs no work (`v_skill_provenance`
-  derives it from `contribution_tags`), but `proficiency` and `years_experience`
-  are still uniform, so generation can't tell a prototype from a decade
+- ~~Skill *depth* population~~ — DONE. Provenance needed no work
+  (`v_skill_provenance` derives it from `contribution_tags`), and `proficiency` /
+  `years_experience` were curated to a real spread in `016`/`018`/`019`.
+  The remaining work is *plumbing* that depth into `internal/fitgate`, which
+  reads skill names only — see Schema Gaps above, and #43/#44
 
 **Stage 0 — LLM-assisted data entry pipeline** — BUILT (migration 006,
 `internal/stage0`, endpoints under `/api/v1/import`). Design retained below.  
@@ -914,10 +928,12 @@ neither is silently edited here.
 5. **Lever adapter** — verify `api.lever.co/v0/postings/{company}?mode=json`
    against a real target slug before writing the adapter.
 6. ~~**Skills + preferences schema design session**~~ — RESOLVED, both tables
-   built and queryable (migrations 005/008/009). Successor question: how do
+   built and queryable (migrations 005/008/009). ~~Successor question: how do
    `skills.proficiency` / `years_experience` / `skill_provenance` actually get
-   populated? Nothing writes to them today, which is why generation still can't
-   tell a prototype from production depth.
+   populated?~~ Also resolved — provenance derives automatically from the view,
+   and depth was curated into a real spread in seed `016`/`018`/`019`. The live
+   successor is not a population question at all: `internal/fitgate` reads skill
+   *names* only and drops both depth columns at the query layer (#43/#44).
 7. ~~**`contribution_drafts` writethrough flow**~~ — RESOLVED as recommended.
    `stage0.ApproveDraft` holds rows in `contribution_drafts` until an explicit
    `POST /api/v1/import/drafts/{draftID}/approve`, which verifies parent-position
