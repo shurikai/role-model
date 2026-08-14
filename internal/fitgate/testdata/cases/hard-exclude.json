@@ -1,0 +1,52 @@
+{
+  "name": "hard-exclude",
+  "jd_fixture": "tests/fixtures/sample-hard-exclude-jd.md",
+  "description": "Senior Backend Engineer, real-time bidding at an adtech DSP. Deliberately a near-perfect technical match -- Go, Kafka, PostgreSQL, Redis, AWS, Kubernetes, remote, IC track, blameless postmortems -- so that the gate is the only thing standing between the persona and a role they will not take. A gate that only fires on obviously bad roles proves nothing.",
+
+  "signals": {
+    "required_skills": [
+      "Go",
+      "Kafka",
+      "PostgreSQL",
+      "Redis",
+      "AWS",
+      "Kubernetes",
+      "Distributed Systems"
+    ],
+    "preferred_skills": [
+      "OpenRTB | VAST",
+      "Terraform"
+    ],
+    "seniority": "senior",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": [
+      "remote-first",
+      "annual company gathering",
+      "strong individual contributor track through Principal",
+      "blameless postmortems",
+      "mature incident practice"
+    ],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "remote-first with an annual company gathering",
+      "travel": "annual company gathering",
+      "industry": "programmatic advertising technology, demand-side platform",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "real-time bidding on roughly 4 million ad impressions per second",
+        "revenue-critical latency budget; a 30-second outage is a measurable revenue event"
+      ]
+    }
+  },
+
+  "expect": {
+    "technical_score": {
+      "comment": "The point of this fixture: technically excellent, and it must still not be recommended.",
+      "min": 85
+    },
+    "technical_gaps": {
+      "must_exclude": ["Go", "Kafka", "PostgreSQL", "Redis", "AWS", "Kubernetes"]
+    }
+  }
+}

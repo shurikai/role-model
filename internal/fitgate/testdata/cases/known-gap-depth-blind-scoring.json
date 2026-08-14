@@ -1,0 +1,41 @@
+{
+  "name": "known-gap-depth-blind-scoring",
+  "status": "known_gap",
+  "issue": "#44",
+  "reason": "Every required skill here is matched by a NOVICE skill with 1-2 years: React (1.5), TypeScript (2.0), DynamoDB (1.0), WebSockets (1.5). ScoreTechnicalFit returns a perfect 100 -- identical to the score it gives a JD requiring Go, PostgreSQL, and Kafka, where the persona is expert with 9-11 years. The scorer cannot tell the difference because it never sees the difference: ListActiveSkillTagNamesByUser (internal/db/queries/skills.sql) selects t.name only, so proficiency and years_experience are dropped at the query layer before scoring begins. ListActiveSkillsByUser already returns the full rows. This is the mechanism behind #44's 'your profile covers Python, Kubernetes, and cloud-native work' narrative. The band below is what a depth-aware scorer should produce for an all-novice match; it is not a claim about the exact weighting, which is a design decision.",
+  "jd_fixture": "synthetic",
+  "description": "Synthetic signals, not drawn from a JD fixture. Isolates depth from every other variable: four required skills, all matched, all shallow.",
+
+  "signals": {
+    "required_skills": [
+      "React",
+      "TypeScript",
+      "DynamoDB",
+      "WebSockets"
+    ],
+    "preferred_skills": [],
+    "seniority": "senior",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": [],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "fully remote",
+      "travel": "not mentioned",
+      "industry": "synthetic fixture, not a real posting",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": []
+    }
+  },
+
+  "expect": {
+    "technical_score": {
+      "comment": "Full coverage at novice depth must not score like full coverage at expert depth.",
+      "max": 70
+    },
+    "technical_gaps": {
+      "comment": "Coverage is genuinely complete -- the defect is the weighting, not the matching.",
+      "empty": true
+    }
+  }
+}
