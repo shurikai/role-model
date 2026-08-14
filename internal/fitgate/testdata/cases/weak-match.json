@@ -1,0 +1,63 @@
+{
+  "name": "weak-match",
+  "jd_fixture": "tests/fixtures/sample-weak-match-jd.md",
+  "description": "Senior Frontend Engineer, consumer fintech, hybrid 4 days onsite, on-call heavy, extended hours at close. Exercises both preference failure modes at once and must keep them distinct: unmatched positives are gaps, matched negatives are conflicts. Technical coverage is partial, not zero -- React and TypeScript match at novice.",
+
+  "signals": {
+    "required_skills": [
+      "React",
+      "TypeScript",
+      "CSS",
+      "GraphQL"
+    ],
+    "preferred_skills": [
+      "Next.js",
+      "Node.js"
+    ],
+    "seniority": "senior",
+    "domain": "fintech",
+    "work_type": "hybrid",
+    "culture_signals": [
+      "hybrid, 4 days per week onsite",
+      "24/7 on-call rotation",
+      "extended hours through month-end and quarter-end close",
+      "fast-moving",
+      "high ownership",
+      "strong bias toward shipping",
+      "informal mentorship of junior engineers"
+    ],
+    "screening_summary": {
+      "location": "Chicago, IL",
+      "work_arrangement": "hybrid, 4 days per week onsite, non-negotiable",
+      "travel": "not mentioned",
+      "industry": "consumer fintech, small business banking",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "frontend-majority role, roughly 80% of time in the client codebase",
+        "extended hours expected through month-end and quarter-end close",
+        "24/7 on-call rotation with heavy pager load during close"
+      ]
+    }
+  },
+
+  "expect": {
+    "technical_score": {
+      "comment": "Partial, not zero: React and TypeScript match; CSS and GraphQL do not.",
+      "min": 30,
+      "max": 55
+    },
+    "technical_gaps": {
+      "must_include": ["CSS", "GraphQL"],
+      "must_exclude": ["React", "TypeScript"]
+    },
+    "preference_gaps": {
+      "comment": "The JD says nothing about these. Unmentioned is a gap, never a conflict.",
+      "must_include": ["logistics", "backend", "remote"],
+      "must_exclude": ["frontend", "on-call heavy", "mandatory overtime"]
+    },
+    "preference_conflicts": {
+      "comment": "The JD actively signals these. A conflict is never merely unmentioned.",
+      "must_exclude": ["logistics", "backend", "remote"]
+    }
+  }
+}

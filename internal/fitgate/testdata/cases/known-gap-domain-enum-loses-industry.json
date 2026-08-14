@@ -1,0 +1,54 @@
+{
+  "name": "known-gap-domain-enum-loses-industry",
+  "status": "known_gap",
+  "issue": "#45",
+  "reason": "The persona's top two positive preferences are 'logistics' (weight 9) and 'supply chain' (weight 8), and this JD is a freight visibility platform -- the single best domain match in the whole fixture set. Both are reported as preference GAPS anyway. jd_extraction.tmpl constrains `domain` to a closed enum with no logistics or freight value, so the closest honest extraction is 'saas'. The real industry survives only in screening_summary.industry ('freight logistics'), which signalFields does not read. The result inverts the strongest signal in the dataset: the JD the persona most wants is scored as though it failed to mention the thing they care most about.",
+  "jd_fixture": "tests/fixtures/sample-strong-match-jd.md",
+  "description": "Asserted separately from strong-match.json so the enforced case can hold a real preference floor while this stays visible.",
+
+  "signals": {
+    "required_skills": [
+      "Go",
+      "PostgreSQL",
+      "Kafka",
+      "Distributed Systems",
+      "AWS",
+      "Kubernetes"
+    ],
+    "preferred_skills": [
+      "Terraform",
+      "gRPC",
+      "Protobuf",
+      "TimescaleDB | ClickHouse",
+      "OpenTelemetry",
+      "Prometheus"
+    ],
+    "seniority": "staff",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": [
+      "remote-first",
+      "small team",
+      "high ownership",
+      "written-first culture",
+      "blameless postmortems",
+      "light on-call rotation",
+      "mentorship is an explicit part of the role",
+      "individual contributor track to Principal"
+    ],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "remote-first with quarterly on-sites",
+      "travel": "quarterly on-sites",
+      "industry": "freight logistics visibility platform",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": []
+    }
+  },
+
+  "expect": {
+    "preference_gaps": {
+      "must_exclude": ["logistics", "supply chain"]
+    }
+  }
+}

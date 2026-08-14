@@ -1,0 +1,49 @@
+{
+  "name": "known-gap-role-shape-conflicts",
+  "status": "known_gap",
+  "issue": "#45",
+  "reason": "ScorePreferenceFit matches through signalFields, which reads only domain, work_type, seniority, and culture_signals. Two consequences on this JD. (1) The 'frontend' negative preference is stored as preference_type work_type, but work_type is a closed enum of remote/hybrid/onsite/unknown -- it can never hold 'frontend'. The role shape lives in required_skills (React, TypeScript, CSS) and in screening_summary, neither of which signalFields reads. This is exactly Group C of notes/hard-exclude-preference-audit.md, which called 'pure frontend' miscategorized for the same reason. (2) 'on-call heavy' and 'mandatory overtime' are the persona's words; the JD's words are '24/7 on-call rotation' and 'extended hours'. containsPhrase requires a contiguous whole-word run, so neither matches -- the same morphological miss already documented for REST vs RESTful APIs in matchesAny. Because an unmatched negative preference EARNS its weight, all three of these do not merely fail to appear as conflicts: they are scored as if the JD successfully avoided something the JD in fact advertises.",
+  "jd_fixture": "tests/fixtures/sample-weak-match-jd.md",
+  "description": "The three conflicts database/sample/README.md says this fixture surfaces. Asserted separately from weak-match.json so that the gaps-vs-conflicts separation stays enforced while the matching defect stays visible.",
+
+  "signals": {
+    "required_skills": [
+      "React",
+      "TypeScript",
+      "CSS",
+      "GraphQL"
+    ],
+    "preferred_skills": [
+      "Next.js",
+      "Node.js"
+    ],
+    "seniority": "senior",
+    "domain": "fintech",
+    "work_type": "hybrid",
+    "culture_signals": [
+      "hybrid, 4 days per week onsite",
+      "24/7 on-call rotation",
+      "extended hours through month-end and quarter-end close",
+      "fast-moving",
+      "high ownership",
+      "strong bias toward shipping",
+      "informal mentorship of junior engineers"
+    ],
+    "screening_summary": {
+      "location": "Chicago, IL",
+      "work_arrangement": "hybrid, 4 days per week onsite, non-negotiable",
+      "travel": "not mentioned",
+      "industry": "consumer fintech, small business banking",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "frontend-majority role, roughly 80% of time in the client codebase"
+      ]
+    }
+  },
+
+  "expect": {
+    "preference_conflicts": {
+      "must_include": ["frontend", "on-call heavy", "mandatory overtime"]
+    }
+  }
+}
