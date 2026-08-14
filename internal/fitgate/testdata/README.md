@@ -93,7 +93,7 @@ the code:
 
 | Case | Issue | What it holds |
 |---|---|---|
-| `known-gap-adtech-exclude-cannot-fire` | #47 | The `adtech` hard exclude does not fire on the adtech JD. `domain` is a closed enum with no adtech value, and the industry survives only in `screening_summary.industry`, which the gate never reads. |
+| `known-gap-adtech-exclude-cannot-fire` | #48 | The `adtech` hard exclude does not fire on the adtech JD. `domain` is a closed enum with no adtech value, and the industry survives only in `screening_summary.industry`, which the gate never reads. |
 | `known-gap-domain-enum-loses-industry` | #45 | `logistics` (weight 9) and `supply chain` (weight 8) are reported as preference gaps on a freight logistics JD, for the same enum reason. |
 | `known-gap-role-shape-conflicts` | #45 | `frontend`, `on-call heavy`, and `mandatory overtime` do not surface as conflicts on a frontend-majority, on-call-heavy JD. Worse than silence: an unmatched negative preference *earns* its weight, so the JD is scored as having avoided what it advertises. |
 | `known-gap-depth-blind-scoring` | #44 | Full coverage at novice depth scores 100.0, identical to full coverage at expert depth. |
