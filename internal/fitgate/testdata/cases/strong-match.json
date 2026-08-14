@@ -1,0 +1,60 @@
+{
+  "name": "strong-match",
+  "jd_fixture": "tests/fixtures/sample-strong-match-jd.md",
+  "description": "Staff Backend Engineer, freight visibility platform. High technical coverage against the persona's expert skills, remote-first, explicit mentorship, IC track. Should score well on both halves and pass the gate.",
+
+  "signals": {
+    "required_skills": [
+      "Go",
+      "PostgreSQL",
+      "Kafka",
+      "Distributed Systems",
+      "AWS",
+      "Kubernetes"
+    ],
+    "preferred_skills": [
+      "Terraform",
+      "gRPC",
+      "Protobuf",
+      "TimescaleDB | ClickHouse",
+      "OpenTelemetry",
+      "Prometheus"
+    ],
+    "seniority": "staff",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": [
+      "remote-first",
+      "small team",
+      "high ownership",
+      "written-first culture",
+      "blameless postmortems",
+      "light on-call rotation",
+      "mentorship is an explicit part of the role",
+      "individual contributor track to Principal"
+    ],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "remote-first with quarterly on-sites",
+      "travel": "quarterly on-sites",
+      "industry": "freight logistics visibility platform",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "individual contributor track goes to Principal with no requirement to manage people",
+        "on-call rotation is a named responsibility, described as light"
+      ]
+    }
+  },
+
+  "expect": {
+    "technical_score": { "min": 80 },
+    "technical_gaps": {
+      "must_exclude": ["Go", "PostgreSQL", "Kafka", "Distributed Systems", "AWS", "Kubernetes"]
+    },
+    "preference_conflicts": {
+      "comment": "A light on-call rotation must not read as the 'on-call heavy' anti-preference.",
+      "must_exclude": ["on-call heavy", "frontend", "people management"]
+    },
+    "gate_passed": true
+  }
+}
