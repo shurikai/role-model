@@ -69,15 +69,22 @@ only place several code paths get exercised at all.
 ## Skill depth
 
 Proficiency in `007_skills_preferences.sql` is deliberately **varied**, and
-that is the point. Migration 008 backfilled the real dataset at a uniform
-`proficient` / `NULL` years, so a weekend prototype and a decade of production
-work are indistinguishable to generation.
+that is the point. Migration 008 originally backfilled at a uniform
+`proficient` / `NULL` years; the real dataset has since been curated to a real
+spread, so both datasets now carry genuine depth. Neither one is *scored* on
+it — `internal/fitgate` reads skill names only (#43/#44) — which is exactly why
+a dataset with a known, deliberate depth distribution is worth having.
 
-This sample is the one dataset where depth actually differs, including the
-case that matters most: skills with many years but only moderate depth (SQL
-and REST, 13 years each, `proficient`) versus fewer years and real depth (Go,
-9 years, `expert`). Two skills are marked `is_active = FALSE` — Spring Boot
-and Jenkins — so the active-skill filter has something to filter.
+The spread here includes the case that matters most: skills with many years but
+only moderate depth (SQL and REST, 13 years each, `proficient`) versus fewer
+years and real depth (Go, 9 years, `expert`). Two skills are marked
+`is_active = FALSE` — Spring Boot and Jenkins — so the active-skill filter has
+something to filter.
+
+`internal/fitgate/testdata/profile-sample.json` mirrors this file for the
+fit-gate eval harness, which runs offline against the mirror rather than a
+loaded database. Change skills or preferences here and the mirror needs the
+same edit.
 
 ## Paired JD fixtures
 
@@ -87,10 +94,41 @@ broken rather than correctly reporting a bad fit.
 
 | Fixture | Exercises |
 |---|---|
-| `sample-strong-match-jd.md` | High technical coverage and high preference fit. Staff backend role in freight visibility: Go, Kafka, PostgreSQL, Kubernetes, remote-first, explicit mentorship, IC track to Principal. |
-| `sample-weak-match-jd.md` | Both preference failure modes at once, kept distinct. Frontend-majority fintech role, hybrid onsite, on-call heavy: unmatched positive preferences (logistics, backend, remote) surface as **gaps**, while matched negative preferences (frontend, on-call heavy, mandatory overtime) surface as **conflicts**. Technical coverage is partial rather than zero — React and TypeScript do match, at `novice`. |
-| `sample-hard-exclude-jd.md` | The anti-pattern gate. An adtech RTB role that is a near-perfect *technical* match (Go, Kafka, PostgreSQL, Redis, AWS, Kubernetes, remote) and still fails the gate outright on the `adtech` hard exclude. Deliberately attractive on every other axis, because a gate that only ever fires on obviously bad roles proves nothing. |
+| `sample-strong-match-jd.md` | High technical coverage, and the *intended* high preference fit. Staff backend role in freight visibility: Go, Kafka, PostgreSQL, Kubernetes, remote-first, explicit mentorship, IC track to Principal. Technical coverage scores as designed; preference fit does not — see below. |
+| `sample-weak-match-jd.md` | Both preference failure modes at once, kept distinct. Frontend-majority fintech role, hybrid onsite, on-call heavy. Unmatched positive preferences (logistics, backend, remote) surface as **gaps** — this half works. The matched negatives (frontend, on-call heavy, mandatory overtime) are *intended* to surface as **conflicts** and currently do not — see below. Technical coverage is partial rather than zero: React and TypeScript do match, at `novice`. |
+| `sample-hard-exclude-jd.md` | The anti-pattern gate. An adtech RTB role that is a near-perfect *technical* match (Go, Kafka, PostgreSQL, Redis, AWS, Kubernetes, remote) and is *intended* to fail the gate outright on the `adtech` hard exclude. Deliberately attractive on every other axis, because a gate that only ever fires on obviously bad roles proves nothing. **It does not currently fail the gate** — see below. |
 
 Keeping gaps and conflicts separate is a standing constraint — collapsing them
 produces false conflict language. The weak-match fixture is what catches a
 regression there.
+
+### What these fixtures actually score today
+
+The rows above describe what each fixture is *designed* to exercise. The
+fit-gate eval harness (`internal/fitgate/testdata/`) measured what they
+currently produce, and the preference half does not match the design:
+
+```
+CASE            TECH   PREF  GATE
+strong-match    94.4   40.4  pass
+hard-exclude    93.8   40.4  pass
+weak-match      40.0   26.6  pass
+```
+
+Technical scoring behaves as designed. Two things do not:
+
+- **The gate cannot see a JD's industry**, so the adtech role is
+  indistinguishable from the freight role — 93.8 against 94.4, both passing.
+  `domain` is a closed enum with no adtech value, and the industry survives only
+  in `screening_summary.industry`, which no scoring path reads (#48).
+- **Preference matching is capped by the same enums.** Seven of the nine
+  positive preferences describe things `domain` / `work_type` / `seniority` /
+  `culture_signals` cannot express, so even the ideal JD scores 40.4. Worse, an
+  unmatched *negative* preference earns its weight — so the weak-match JD is
+  credited for avoiding the frontend focus, heavy on-call, and extended hours it
+  openly advertises (#45).
+
+These are code defects, not fixture defects. The fixtures are doing their job by
+exposing them, and each is held by a `known_gap` case in the eval harness that
+will fail the build once it starts passing. Do not "fix" the fixtures to make
+the numbers look right.

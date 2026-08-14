@@ -1,7 +1,7 @@
 {
   "name": "known-gap-adtech-exclude-cannot-fire",
   "status": "known_gap",
-  "issue": "#47",
+  "issue": "#48",
   "reason": "The 'adtech' hard exclude cannot fire on an adtech JD. gateFieldsFor routes an anti_pattern preference at domain, work_type, culture_signals, and required_skills -- and 'adtech' appears in none of them, because `domain` is a closed enum with no adtech value and the industry is only ever named in screening_summary.industry, which the gate does not read. database/sample/README.md claims this fixture 'fails the gate outright on the adtech hard exclude'; it does not. This is the hard-exclude fixture's entire reason for existing, so it is the highest-value gap in the set.",
   "jd_fixture": "tests/fixtures/sample-hard-exclude-jd.md",
   "description": "Same signals as hard-exclude.json, asserting the gate behavior that fixture was written to demonstrate.",
