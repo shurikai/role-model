@@ -200,3 +200,50 @@ Extraction also changed alongside this. Interchangeable alternatives now
 arrive as one entry joined with `" | "` ("Spring Boot | Quarkus | Micronaut |
 Vert.x") instead of one entry each, so `gateFieldsFor` splits them back apart
 before matching — an exclude still reaches a single option buried in a group.
+
+---
+
+## Resolution, 2026-08-17 — migration 011 and the unified matcher
+
+Group A is closed, and the audit's framing of it turned out to be half the
+story.
+
+The audit called `signalFields` not reading the skills arrays a problem for
+the four skills-shaped **hard excludes**. It is also a problem for the
+weighted **negatives**, and there it behaves worse. An unreachable hard
+exclude merely fails to fire. An unreachable negative earns its weight
+(`earned += weight` on the unmatched branch), so it pays out a bonus on every
+evaluation instead. Scoring the seeded Jenkins (−8) and Oracle (−6) rows
+against a JD whose `required_skills` were literally `["Jenkins", "Oracle"]`
+returned **100.0** — the same score as a clean Go/Kafka JD. Neither row had
+ever fired, and both had been silently inflating every preference score.
+
+The fix was the option the audit named and deferred: extend the matcher to the
+skills arrays. It was done by deleting `signalFields` outright and routing
+everything through the survivor, now `prefFieldsFor`. Two matchers over one set
+of rows is what let the gap hide for as long as it did.
+
+That change was not free. Adopting the gate's routing wholesale regressed
+`culture` preferences: routed at `culture_signals` alone, `remote-first` scored
+as an unmet gap against a genuinely remote JD, because remoteness is recorded
+in `work_type` and nowhere else. `work_type` is now included in the `culture`
+branch — the enum is remote|hybrid|onsite|unknown, work *arrangement* rather
+than work type, and arrangement is a culture question. The gate never hit this
+because its one `culture` row ("Big Four consulting culture") really does live
+in `culture_signals`. Worth noting as a general hazard: this audit reasoned
+about the gate's eight rows, and the gate's routing was correct *for those
+eight rows*. Generalizing it to all 24 needed a second look.
+
+Separately, migration 011 split severity from gate behavior. `hard_exclude` is
+no longer a sentiment; every row is a weighted positive or negative and
+`is_hard_gate` marks the ones that disqualify. This closes a hole the audit did
+not cover: `ScorePreferenceFit` skipped hard excludes entirely, which was
+correct while the gate blocked (an excluded JD was never scored) and became
+wrong the moment the gate went advisory in a6c700f. Between then and now, the
+strongest signal in the preference model contributed nothing to the only number
+that survived.
+
+**Group B and Group C are unchanged.** Both depend on `screening_summary`
+being matchable, which it still is not (#48). Row 8 ("pure frontend",
+miscategorized as `work_type`) is still miscategorized. Rows 5–7 are still
+candidates for retirement on evidence, not on this table.

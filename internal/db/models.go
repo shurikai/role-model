@@ -168,11 +168,12 @@ type Preference struct {
 	PreferenceType string    `json:"preference_type"`
 	Label          string    `json:"label"`
 	Sentiment      string    `json:"sentiment"`
-	Weight         *int16    `json:"weight"`
+	Weight         int16     `json:"weight"`
 	ContextType    *string   `json:"context_type"`
 	Notes          *string   `json:"notes"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	IsHardGate     bool      `json:"is_hard_gate"`
 }
 
 type Project struct {

@@ -80,7 +80,7 @@ type Querier interface {
 	ListContributionsBySkill(ctx context.Context, skillID uuid.UUID) ([]uuid.UUID, error)
 	ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitReport, error)
 	ListFitReportsByApplication(ctx context.Context, arg ListFitReportsByApplicationParams) ([]FitReport, error)
-	ListHardExcludesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
+	ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
 	ListImportBatches(ctx context.Context, userID uuid.UUID) ([]ImportBatch, error)
 	ListPreferencesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
 	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)

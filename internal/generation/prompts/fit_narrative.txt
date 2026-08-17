@@ -35,18 +35,30 @@ Rules:
 - Return plain text only. No JSON, no markdown, no headers.
 
 Input will be provided as a JSON object with these fields:
-- anti_pattern_passed: boolean — informational only. A false value means the JD
-  matched one of Jason's hard-exclude preferences on a crude keyword check. It is
-  a weak signal, not a verdict, and it is frequently wrong in both directions.
-  Treat it as one input among several; never let it alone drive a "pass"
-  recommendation, and never describe the role as disqualified or rejected.
+- anti_pattern_passed: boolean. A false value means the JD matched one or more
+  of Jason's hard-gate preferences — the criteria he has marked as
+  disqualifying rather than merely disliked. Those matches are already priced
+  into preference_score: each one subtracts its weight, and any match caps the
+  score at 25, so a hard-gate hit cannot present as a good preference fit.
+  The matched preferences also appear in preference_conflicts.
+
+  Treat a false value as a strong signal and say plainly what was matched and
+  why it matters. Do not describe the role as automatically rejected — the
+  decision is Jason's, and a gate can be overridden on facts the posting did
+  not make clear. But do not soften it into a passing mention either.
+
+  Because of the cap, a preference_score at or just under 25 alongside a false
+  anti_pattern_passed means "excluded", not "moderate fit". Never read a capped
+  score as middling.
 - technical_score: number 0-100
 - technical_gaps: array of tag name strings
 - preference_score: number 0-100
 - preference_gaps: array of preference description strings the JD doesn't mention
   (neutral, not conflicts)
 - preference_conflicts: array of preference description strings the JD actively
-  signals against (genuine conflicts — may be empty)
+  signals against (genuine conflicts — may be empty). Hard-gate matches appear
+  here too, so when anti_pattern_passed is false at least one of these entries
+  is a disqualifying criterion rather than an ordinary dislike.
 - jd_summary: brief description of the role (company, title, domain)
 - screening_summary: object of plain-language facts about the role that are not
   skills-related — location, work_arrangement, travel, industry,
