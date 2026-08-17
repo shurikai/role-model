@@ -66,11 +66,16 @@ type evalSkill struct {
 	IsActive    bool     `json:"is_active"`
 }
 
+// evalPreference mirrors the preferences table. Weight is a value, not a
+// pointer, because the column is NOT NULL — a fixture row that forgot its
+// weight would otherwise score as zero and quietly contribute nothing, which
+// is the class of silence this harness exists to break.
 type evalPreference struct {
 	PreferenceType string `json:"preference_type"`
 	Label          string `json:"label"`
 	Sentiment      string `json:"sentiment"`
-	Weight         *int16 `json:"weight"`
+	Weight         int16  `json:"weight"`
+	IsHardGate     bool   `json:"is_hard_gate"`
 }
 
 type evalCase struct {
@@ -119,6 +124,7 @@ func (p evalProfile) toPreferences() []db.Preference {
 			Label:          pref.Label,
 			Sentiment:      pref.Sentiment,
 			Weight:         pref.Weight,
+			IsHardGate:     pref.IsHardGate,
 		})
 	}
 	return out
@@ -169,10 +175,13 @@ func TestFitEval(t *testing.T) {
 		t.Run(c.Name, func(t *testing.T) {
 			var res result
 			res.technicalScore, res.technicalGaps = ScoreTechnicalFit(skills, c.Signals)
-			res.preferenceScore, res.preferenceGaps, res.prefConflicts = ScorePreferenceFit(prefs, c.Signals)
-
 			var hits []db.Preference
-			res.gatePassed, hits = RunAntiPatternGate(prefs, c.Signals)
+			res.preferenceScore, res.preferenceGaps, res.prefConflicts, hits =
+				ScorePreferenceFit(prefs, c.Signals)
+
+			// Mirrors RunFitEvaluation: the gate boolean is derived from the
+			// hard-gate rows scoring matched, not computed by a second pass.
+			res.gatePassed = len(hits) == 0
 			for _, h := range hits {
 				res.gateHits = append(res.gateHits, h.Label)
 			}

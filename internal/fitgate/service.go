@@ -37,9 +37,9 @@ func NewService(q *db.Queries, client *generation.Client) *Service {
 // and preferences, scores technical and preference fit, and persists the
 // result as a new fit_reports row.
 //
-// Every evaluation produces a complete report. The anti-pattern gate runs and
-// its result is recorded, but it does not block: a JD that trips it is still
-// scored and still gets a narrative.
+// Every evaluation produces a complete report. Hard-gate preferences are
+// recorded and priced into preference_score, but they do not block: a JD that
+// trips one is still scored and still gets a narrative.
 func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uuid.UUID) (*db.FitReport, error) {
 	app, err := s.q.GetApplication(ctx, db.GetApplicationParams{ID: applicationID, UserID: userID})
 	if err != nil {
@@ -66,18 +66,6 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 
 	appIDParam := pgtype.UUID{Bytes: [16]byte(applicationID), Valid: true}
 
-	// The gate is informational. It still records which hard_exclude
-	// preferences a JD's extracted fields happened to match, but it no longer
-	// decides anything: substring matching over lossy enum fields was making
-	// an irreversible call — no score, no narrative, no way to override —
-	// from evidence too thin to carry it. screening_summary surfaces the
-	// facts instead and leaves the judgment to the human reading them.
-	gatePassed, gateHits := RunAntiPatternGate(prefs, signals)
-	gateHitsJSON, err := marshalRawNonEmpty(gateHits)
-	if err != nil {
-		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
-	}
-
 	screeningJSON, err := marshalScreeningSummary(signals.ScreeningSummary)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal screening summary: %w", err)
@@ -87,6 +75,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		wg                                 sync.WaitGroup
 		technicalScore, prefScore          float64
 		technicalGaps, prefGaps, prefConfl []string
+		gateHits                           []db.Preference
 	)
 	wg.Add(2)
 	go func() {
@@ -95,9 +84,24 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}()
 	go func() {
 		defer wg.Done()
-		prefScore, prefGaps, prefConfl = ScorePreferenceFit(prefs, signals)
+		prefScore, prefGaps, prefConfl, gateHits = ScorePreferenceFit(prefs, signals)
 	}()
 	wg.Wait()
+
+	// The gate no longer runs as a separate pass. It used to, against its own
+	// field-routing function, which is how preference scoring came to be blind
+	// to the skills arrays the gate could see. Scoring now reports every
+	// hard-gate row it matched and the boolean is derived from that, so the
+	// two can no longer disagree about what a JD says.
+	//
+	// It remains non-blocking: a JD that trips a gate is still scored, still
+	// gets a narrative, and still generates. What changed is that the trip is
+	// now priced into preference_score instead of living only in this boolean.
+	gatePassed := len(gateHits) == 0
+	gateHitsJSON, err := marshalRawNonEmpty(gateHits)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
+	}
 
 	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technicalScore, technicalGaps, prefScore, prefGaps, prefConfl)
 	if err != nil {
