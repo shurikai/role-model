@@ -115,3 +115,6 @@ This README will grow as the system does.
 [ ] Build out the career-data views (employer/position/contribution browsing and editing)
 [ ] Weight technical fit scoring by skill proficiency and years (the schema and the data are both there; `internal/fitgate` reads names only)
 [ ] Human review gate for extracted JD signals before generation runs
+
+## License
+Apache License 2.0 — see [LICENSE](./LICENSE).

@@ -30,6 +30,8 @@ go.work.sum
 
 database/seed
 scripts
+# Make sure that generated output isn't committed
+generated_resume*.json
 
 # Renderer scratch output. Deliberately not a blanket *.docx rule -- the
 # regression fixtures under tests/fixtures/ are tracked on purpose.
