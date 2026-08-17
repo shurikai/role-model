@@ -64,6 +64,44 @@ Unmet preferences (JD simply doesn't mention something) and genuine conflicts
 (JD involves something actively unwanted) are tracked as separate lists and
 must stay that way; collapsing them produces false conflict language.
 
+The two axes are orthogonal on purpose: technical score measures *capability*,
+preference score measures *desire*. A role you could do and would hate should
+read as high technical / low preference, not as one muddled number. Do not
+introduce a blended score.
+
+**Preferences carry severity and gate behavior separately.** `sentiment` is
+`positive|negative`, `weight` is NOT NULL, and `is_hard_gate` marks the rows
+that disqualify. A hard exclude is a heavy negative that also gates — there is
+no `hard_exclude` sentiment (migration 011 removed it).
+
+Hard-gate rows are deliberately **not** terms in the normalized average. A
+matched gate subtracts its weight as raw points and then caps the score at
+`hardGateCeiling`. Two rules that are easy to get wrong and are load-bearing:
+
+- Feeding gates into `earned`/`possible` would let a profile full of unmatched
+  excludes inflate every clean JD toward 100. Keep them out of the average.
+- The ceiling is `min()`, an upper bound. Setting the score *to* the ceiling
+  on a match would raise a JD that already scored below it.
+- The empty-average short-circuit governs only the average. Penalty and
+  ceiling still apply on top, or a gates-only profile scores 100 on a JD that
+  trips one — the original bug, relocated.
+
+Gating does **not** block. A tripped JD is still scored, still narrated, still
+generated; the trip is priced into the score rather than living in a boolean.
+
+**One matcher.** `prefFieldsFor` routes every preference by `preference_type`;
+there is no second matcher for the gate, and `anti_pattern` is the only branch
+that reads `required_skills`. The previous split (a broad `signalFields` for
+scoring, a routed `gateFieldsFor` for the gate) is what hid #49: scoring never
+saw the skills arrays, so a technology-shaped negative could not fire and,
+because an unmatched negative earns its weight, paid out a bonus instead.
+
+Conditional preferences are modelled by **decomposing the root cause into its
+own weighted row**, not by a dependency edge. "C# is only bad because of the
+Microsoft ecosystem" is two rows — a gate on the ecosystem, a moderate
+negative on the language — and additive weights produce the conditional
+behavior on their own. Do not add a parent/implies relation to `preferences`.
+
 ### Intermediate resume JSON
 Generation produces a structured JSON document (see /schema/resume.v1.json)
 that is the contract between the generation pipeline and the renderer.

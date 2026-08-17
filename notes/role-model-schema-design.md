@@ -213,3 +213,36 @@ This design is ready to drive a migration. Recommended approach: treat the desig
 - Stage 0 LLM-assisted data entry schema (`import_batches`, `contribution_drafts`) — already designed in a prior session, not part of this review.
 - Feedback loop `feedback_type` enum and prompt-steering accumulation table — noted in §4 as a known gap; §7.5 records and defers a proposed solution, but the gap itself remains open.
 - Frontend/API surface for managing skills and preferences — schema-first; UI follows once the migration is implemented.
+
+---
+
+## Superseded, 2026-08-17 — §7.3 and §8
+
+This document records a design session and is kept as written. Two of its
+conclusions have since been overturned by role-model migration 011; the
+reasoning below is what changed, not a correction of what was decided at the
+time.
+
+**§7.3, `check_exclude_has_no_weight` — dropped.** The constraint's rationale
+("a weight on one would imply a contradictory partial ban") was sound given the
+§8 pipeline it was designed against, where the hard gate ran first and
+short-circuited before scoring. An excluded JD was never scored, so a weight
+on a hard exclude genuinely had nothing to feed.
+
+That pipeline no longer exists. The blocking gate was replaced by an advisory
+one (commit a6c700f) so that every JD produces a complete report. Under those
+semantics a weightless exclusion means the strongest signal in the preference
+model contributes nothing to the only number that survives, and an excluded
+role scores as though the exclusion were never recorded. `sentiment` narrows to
+`positive | negative`, `weight` becomes NOT NULL, and a separate `is_hard_gate`
+boolean carries what the third sentiment value used to.
+
+**§9, "keep 3 buckets" — overturned for the same reason.** The resolution was
+right about the numeric question (scoring is still derived as
+`sentiment_sign × weight`, not stored) and wrong about the bucket count, but
+only because the third bucket was doing two jobs: naming a severity *and*
+selecting a code path. Splitting them is what the current model does.
+
+**§8 remains accurate in outline** — deterministic technical and preference
+scoring in parallel, LLM confined to narrative — with one correction: stage 1
+is no longer a gate that anything passes or fails. Nothing short-circuits.
