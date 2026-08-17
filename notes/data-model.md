@@ -214,13 +214,28 @@ What you want and don't want in a role. Read by `ScorePreferenceFit` and
 |---|---|---|
 | `preference_type` | TEXT | CHECK: `domain`, `work_type`, `culture`, `anti_pattern` |
 | `label` | TEXT | NOT NULL. `UNIQUE (user_id, preference_type, label)` |
-| `sentiment` | TEXT | CHECK: `positive`, `negative`, `hard_exclude` |
-| `weight` | SMALLINT | CHECK 1–10, nullable |
+| `sentiment` | TEXT | CHECK: `positive`, `negative` |
+| `weight` | SMALLINT | CHECK 1–10, NOT NULL |
+| `is_hard_gate` | BOOLEAN | NOT NULL DEFAULT FALSE |
 | `context_type` | TEXT | CHECK: `permanent`, `contract`, `fractional`, or NULL |
 | `notes` | TEXT | |
 
-A table-level CHECK enforces that `hard_exclude` rows carry **no** weight —
-a hard exclude is categorical, so a weight would be meaningless.
+Severity and gate behavior are separate columns (migration 011). `weight` says
+how much a preference matters; `is_hard_gate` says whether matching it
+disqualifies. A hard exclude is a heavy negative that also gates.
+
+This replaces a `hard_exclude` sentiment whose rows were required to carry a
+NULL weight, on the reasoning that a categorical exclusion has no meaningful
+weight. That held while the gate blocked generation — an excluded JD was never
+scored, so there was nothing for a weight to feed. Once the gate became
+advisory and every JD got scored regardless, a weightless exclusion meant the
+strongest preference signal contributed nothing to the score, and an excluded
+role read as a good fit. Weight is what the scorer needs to say otherwise.
+
+Note that `weight` alone does not make an exclusion decisive: `internal/fitgate`
+keeps gate rows out of the normalized average and caps the score on a match.
+Under a normalized average the denominator grows with the penalty, so no single
+row can dominate on weight alone.
 
 `preference_type` is doing double duty: it names both the *subject* of the
 preference and (via `anti_pattern`) a kind of sentiment. That overlap is what the

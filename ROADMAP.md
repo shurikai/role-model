@@ -336,38 +336,55 @@ CREATE TABLE preference_contexts (
 );
 ```
 
-Known preference profile — 24 rows, transcribed from `014_preferences.sql`,
-which is the source of truth. Note that several are typed differently than an
-earlier revision of this doc claimed: Big Four is `culture`, not `anti_pattern`,
-and `defense / aerospace` and `pure frontend` are `domain` and `work_type`
-respectively. `hard_exclude` rows carry no weight.
+Known preference profile — 29 rows, from `014_preferences.sql` plus
+`021_preference_reconciliation.sql`, which together are the source of truth.
+Note that several are typed differently than an earlier revision of this doc
+claimed: Big Four is `culture`, not `anti_pattern`, and `defense / aerospace`
+and `pure frontend` are `domain` and `work_type` respectively.
 
-| Type | Sentiment | Weight | Label |
-|---|---|---|---|
-| domain | positive | 9 | distributed systems |
-| domain | positive | 8 | IoT / telemetry / real-time data |
-| domain | positive | 7 | observability |
-| domain | positive | 7 | consumer-facing product |
-| domain | positive | 5 | fintech / blockchain |
-| domain | hard_exclude | — | defense / aerospace |
-| work_type | positive | 9 | small team, high ownership |
-| work_type | positive | 8 | product over platform / internal tooling |
-| work_type | positive | 6 | greenfield over pure maintenance |
-| work_type | negative | 7 | full-stack where frontend is co-equal |
-| work_type | negative | 5 | platform / internal tooling over product |
-| work_type | hard_exclude | — | pure frontend |
-| culture | positive | 8 | remote-first |
-| culture | positive | 7 | low-ego / async |
-| culture | negative | 6 | military-coded culture |
-| culture | hard_exclude | — | Big Four consulting culture |
-| anti_pattern | negative | 8 | Jenkins administration as primary responsibility |
-| anti_pattern | negative | 6 | Oracle DBA or heavy Oracle stack |
-| anti_pattern | negative | 5 | large enterprise / Big Co process-heavy |
-| anti_pattern | hard_exclude | — | TypeScript / Node.js as primary language |
-| anti_pattern | hard_exclude | — | expert Python as primary requirement |
-| anti_pattern | hard_exclude | — | production LLM / AI engineering as hard requirement |
-| anti_pattern | hard_exclude | — | Angular as co-equal frontend requirement |
-| anti_pattern | hard_exclude | — | IT consulting / staff augmentation model |
+Since migration 011 there is no `hard_exclude` sentiment. Every row is a
+weighted positive or negative; `is_hard_gate` (the GATE column below) marks the
+rows that additionally cap the preference score when matched. The eight former
+hard excludes were backfilled to weight 10.
+
+| Type | Sentiment | Weight | Gate | Label |
+|---|---|---|---|---|
+| domain | positive | 9 | | distributed systems |
+| domain | positive | 8 | | IoT / telemetry / real-time data |
+| domain | positive | 7 | | observability |
+| domain | positive | 7 | | consumer-facing product |
+| domain | positive | 5 | | fintech |
+| domain | negative | 10 | GATE | defense / aerospace |
+| work_type | positive | 9 | | small team, high ownership |
+| work_type | positive | 8 | | product over platform / internal tooling |
+| work_type | positive | 6 | | greenfield over pure maintenance |
+| work_type | negative | 7 | | full-stack where frontend is co-equal |
+| work_type | negative | 5 | | platform / internal tooling over product |
+| work_type | negative | 10 | GATE | pure frontend |
+| culture | positive | 8 | | remote-first |
+| culture | positive | 7 | | low-ego / async |
+| culture | negative | 6 | | military-coded culture |
+| culture | negative | 6 | | defense-coded culture |
+| culture | negative | 10 | GATE | Big Four consulting culture |
+| anti_pattern | negative | 8 | | Jenkins administration as primary responsibility |
+| anti_pattern | negative | 8 | | crypto / blockchain |
+| anti_pattern | negative | 6 | | Oracle DBA or heavy Oracle stack |
+| anti_pattern | negative | 5 | | large enterprise / Big Co process-heavy |
+| anti_pattern | negative | 4 | | C# / .NET |
+| anti_pattern | negative | 10 | GATE | TypeScript / Node.js as primary language |
+| anti_pattern | negative | 10 | GATE | expert Python as primary requirement |
+| anti_pattern | negative | 10 | GATE | production LLM / AI engineering as hard requirement |
+| anti_pattern | negative | 10 | GATE | Angular as co-equal frontend requirement |
+| anti_pattern | negative | 10 | GATE | IT consulting / staff augmentation model |
+| anti_pattern | negative | 10 | GATE | Ruby / Rails as primary language |
+| anti_pattern | negative | 8 | GATE | Windows / Microsoft ecosystem |
+
+The C#/.NET pair is the worked example of a *conditional* preference. The
+objection is the Microsoft ecosystem rather than the language, so the ecosystem
+is the gate and the language is a moderate negative. A C# role on Linux takes
+the small penalty uncapped (59.7 → 53.5 against this profile); a C# role on the
+Microsoft stack trips the gate and caps (→ 25.0). No dependency edge between
+the rows is involved — additive weights produce that on their own.
 
 Not every row can actually fire against extracted JD signals — the
 skills-shaped anti-patterns in particular depend on what `gateFieldsFor` reads.
@@ -888,25 +905,38 @@ category 1. Note that the exclude in category 2 is scoped to **who consumes the
 output**, not to any particular technology — the same LangGraph skill that
 serves category 1 does not make category 2 acceptable.
 
-**This list has diverged from the seeded `preferences` rows** and the two are
-not currently reconcilable by hand:
-- The seed stores `domain / defense / aerospace / hard_exclude`, which is the
-  broader industry framing this list has now narrowed
-- The seed stores `domain / fintech / blockchain` as a **positive** at weight 5
-  ("Manifold experience; not a primary target but not a negative either"),
-  which directly contradicts the crypto/blockchain hard-pass above
-- Ruby/Rails, C#/.NET, and the Orlando onsite constraint have no preference
-  rows at all, so nothing in `fitgate` can act on them
-- The three-category AI breakdown above is **not representable in the current
-  `preferences` schema at all.** A conscious exception evaluated on its own
-  track, an exclude held on values rather than skill grounds, and a
-  Stage-1-to-Stage-2 downgrade gated on unshipped work are three different
-  shapes; `fitgate` knows only flat `hard_exclude` at a weight. This is a
-  scoring-model gap, not a missing row.
+**Mostly reconciled** against the seeded `preferences` rows by
+`021_preference_reconciliation.sql`. Closed:
+- `domain / fintech / blockchain` positive-5 is retired and split into
+  `domain / fintech` positive-5 (the Manifold half, which is real) and
+  `anti_pattern / crypto / blockchain` negative-8
+- Ruby/Rails and C#/.NET now have rows — Ruby/Rails as a gate at 10 beside
+  TypeScript and Python, C#/.NET as a moderate negative at 4 paired with a
+  `Windows / Microsoft ecosystem` gate at 8 that carries the actual objection
+- `culture / defense-coded culture` negative-6 adds the culture half of the
+  narrowed defense filter
 
-Reconciling the seeded rows is a data change and stays deferred. The
-representability gap is a `fitgate` change and belongs in Phase 2 planning —
-neither is silently edited here.
+Still open, and both for the same reason — **`screening_summary` is not
+matchable** (#48), so a row keyed on it would fire on nothing:
+- **The Orlando onsite constraint has no row, deliberately.** `work_type` is a
+  closed enum of remote|hybrid|onsite|unknown and `matchesSignal` compares in
+  both directions, so a label like "onsite outside Orlando" would match the
+  bare token `onsite` and fire on every onsite role — including the
+  Orlando-local ones that are fine. A row that fires on exactly the roles it is
+  meant to allow is worse than no row.
+- **`domain / defense / aerospace` is left as an industry gate** rather than
+  retyped to the clearance-and-culture shape this list describes. It
+  over-excludes commercial aerospace, which is wrong — but it is also the one
+  original gate that reliably fires, because `defense` is a value in the
+  extraction prompt's domain enum. Retyping it to clearance-required would be
+  more honest and would make it unreachable.
+
+The three-category AI breakdown above remains **not representable**. A
+conscious exception evaluated on its own track, an exclude held on values
+rather than skill grounds, and a Stage-1-to-Stage-2 downgrade gated on
+unshipped work are three different shapes. Migration 011 split severity from
+gate behavior, which is the axis that had to exist first, but `fitgate` still
+has no notion of exclude *kind* — see #46.
 
 ---
 
