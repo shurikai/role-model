@@ -12,9 +12,9 @@ import (
 )
 
 const createPreference = `-- name: CreatePreference :one
-INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, context_type, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at
+INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate
 `
 
 type CreatePreferenceParams struct {
@@ -23,7 +23,8 @@ type CreatePreferenceParams struct {
 	PreferenceType string    `json:"preference_type"`
 	Label          string    `json:"label"`
 	Sentiment      string    `json:"sentiment"`
-	Weight         *int16    `json:"weight"`
+	Weight         int16     `json:"weight"`
+	IsHardGate     bool      `json:"is_hard_gate"`
 	ContextType    *string   `json:"context_type"`
 	Notes          *string   `json:"notes"`
 }
@@ -36,6 +37,7 @@ func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferencePara
 		arg.Label,
 		arg.Sentiment,
 		arg.Weight,
+		arg.IsHardGate,
 		arg.ContextType,
 		arg.Notes,
 	)
@@ -51,6 +53,7 @@ func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferencePara
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHardGate,
 	)
 	return i, err
 }
@@ -71,7 +74,7 @@ func (q *Queries) DeletePreference(ctx context.Context, arg DeletePreferencePara
 }
 
 const getPreference = `-- name: GetPreference :one
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
 WHERE id = $1 AND user_id = $2
 `
 
@@ -94,18 +97,19 @@ func (q *Queries) GetPreference(ctx context.Context, arg GetPreferenceParams) (P
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHardGate,
 	)
 	return i, err
 }
 
-const listHardExcludesByUser = `-- name: ListHardExcludesByUser :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at FROM preferences
-WHERE user_id = $1 AND sentiment = 'hard_exclude'
+const listHardGatesByUser = `-- name: ListHardGatesByUser :many
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
+WHERE user_id = $1 AND is_hard_gate
 ORDER BY preference_type, created_at
 `
 
-func (q *Queries) ListHardExcludesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error) {
-	rows, err := q.db.Query(ctx, listHardExcludesByUser, userID)
+func (q *Queries) ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error) {
+	rows, err := q.db.Query(ctx, listHardGatesByUser, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +128,7 @@ func (q *Queries) ListHardExcludesByUser(ctx context.Context, userID uuid.UUID) 
 			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsHardGate,
 		); err != nil {
 			return nil, err
 		}
@@ -136,7 +141,7 @@ func (q *Queries) ListHardExcludesByUser(ctx context.Context, userID uuid.UUID) 
 }
 
 const listPreferencesByUser = `-- name: ListPreferencesByUser :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
 WHERE user_id = $1
 ORDER BY preference_type, created_at
 `
@@ -161,6 +166,7 @@ func (q *Queries) ListPreferencesByUser(ctx context.Context, userID uuid.UUID) (
 			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsHardGate,
 		); err != nil {
 			return nil, err
 		}
@@ -173,7 +179,7 @@ func (q *Queries) ListPreferencesByUser(ctx context.Context, userID uuid.UUID) (
 }
 
 const listPreferencesByUserAndType = `-- name: ListPreferencesByUserAndType :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
 WHERE user_id = $1 AND preference_type = $2
 ORDER BY created_at
 `
@@ -203,6 +209,7 @@ func (q *Queries) ListPreferencesByUserAndType(ctx context.Context, arg ListPref
 			&i.Notes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IsHardGate,
 		); err != nil {
 			return nil, err
 		}
@@ -220,11 +227,12 @@ SET preference_type = $3,
     label           = $4,
     sentiment       = $5,
     weight          = $6,
-    context_type    = $7,
-    notes           = $8,
+    is_hard_gate    = $7,
+    context_type    = $8,
+    notes           = $9,
     updated_at      = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at
+RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate
 `
 
 type UpdatePreferenceParams struct {
@@ -233,7 +241,8 @@ type UpdatePreferenceParams struct {
 	PreferenceType string    `json:"preference_type"`
 	Label          string    `json:"label"`
 	Sentiment      string    `json:"sentiment"`
-	Weight         *int16    `json:"weight"`
+	Weight         int16     `json:"weight"`
+	IsHardGate     bool      `json:"is_hard_gate"`
 	ContextType    *string   `json:"context_type"`
 	Notes          *string   `json:"notes"`
 }
@@ -246,6 +255,7 @@ func (q *Queries) UpdatePreference(ctx context.Context, arg UpdatePreferencePara
 		arg.Label,
 		arg.Sentiment,
 		arg.Weight,
+		arg.IsHardGate,
 		arg.ContextType,
 		arg.Notes,
 	)
@@ -261,6 +271,7 @@ func (q *Queries) UpdatePreference(ctx context.Context, arg UpdatePreferencePara
 		&i.Notes,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IsHardGate,
 	)
 	return i, err
 }
