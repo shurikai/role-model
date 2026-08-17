@@ -21,7 +21,8 @@
 --
 -- preferences: internal/fitgate scores preference fit against this table.
 -- With no rows the fit gate only ever produces its technical half. The set
--- below covers all three sentiments and all four preference types, and is
+-- below covers both sentiments, gate and non-gate rows, and all four
+-- preference types, and is
 -- built to pair with the JD fixtures in tests/fixtures/ -- see
 -- database/sample/README.md for which fixture exercises which path.
 
@@ -94,76 +95,85 @@ ON CONFLICT (id) DO UPDATE SET
 -- culture_signals fields, so labels are kept short enough to match a
 -- canonical JD token.
 --
--- hard_exclude rows must have NULL weight (check_exclude_has_no_weight).
+-- Every row carries a weight. A hard exclude is a heavy negative that also
+-- sets is_hard_gate: it costs its weight like any negative and additionally
+-- caps the preference score. There is no separate hard_exclude sentiment.
 -- ============================================================
 INSERT INTO preferences (
-  id, user_id, preference_type, label, sentiment, weight, context_type, notes
+  id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes
 ) VALUES
   -- ---------- positive ----------
   ('56000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001',
-   'domain', 'logistics', 'positive', 9, 'permanent',
+   'domain', 'logistics', 'positive', 9, FALSE, 'permanent',
    'Thirteen years in freight. Domain knowledge compounds and the persona does not want to restart it elsewhere.'),
 
   ('56000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001',
-   'domain', 'supply chain', 'positive', 8, NULL,
+   'domain', 'supply chain', 'positive', 8, FALSE, NULL,
    'Adjacent to logistics and draws on the same domain knowledge.'),
 
   ('56000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001',
-   'domain', 'developer tooling', 'positive', 6, NULL,
+   'domain', 'developer tooling', 'positive', 6, FALSE, NULL,
    'Secondary interest, from the platform team years.'),
 
   ('56000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'backend', 'positive', 9, 'permanent',
+   'work_type', 'backend', 'positive', 9, FALSE, 'permanent',
    'Core of the career and where the persona is strongest.'),
 
   ('56000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'distributed systems', 'positive', 9, NULL,
+   'work_type', 'distributed systems', 'positive', 9, FALSE, NULL,
    'The problems the persona finds most interesting.'),
 
   ('56000000-0000-0000-0000-000000000006', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'platform engineering', 'positive', 8, NULL,
+   'work_type', 'platform engineering', 'positive', 8, FALSE, NULL,
    'Founded one platform team and would do it again.'),
 
   ('56000000-0000-0000-0000-000000000007', '5a000000-0000-0000-0000-000000000001',
-   'culture', 'remote', 'positive', 8, NULL,
+   'culture', 'remote', 'positive', 8, FALSE, NULL,
    'Remote since 2017 and not returning to an office full time.'),
 
   ('56000000-0000-0000-0000-000000000008', '5a000000-0000-0000-0000-000000000001',
-   'culture', 'mentoring', 'positive', 7, NULL,
+   'culture', 'mentoring', 'positive', 7, FALSE, NULL,
    'Wants a role where growing other engineers is part of the job, not a side activity.'),
 
   ('56000000-0000-0000-0000-000000000009', '5a000000-0000-0000-0000-000000000001',
-   'culture', 'blameless postmortems', 'positive', 5, NULL,
+   'culture', 'blameless postmortems', 'positive', 5, FALSE, NULL,
    'A reliable proxy for whether an engineering org is honest about failure.'),
 
   -- ---------- negative ----------
   ('56000000-0000-0000-0000-000000000020', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'frontend', 'negative', 6, NULL,
+   'work_type', 'frontend', 'negative', 6, FALSE, NULL,
    'Can do it, does not want it as the majority of the role. See the novice React and TypeScript entries in skills.'),
 
   ('56000000-0000-0000-0000-000000000021', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'people management', 'negative', 7, NULL,
+   'work_type', 'people management', 'negative', 7, FALSE, NULL,
    'Chose the IC track deliberately at the staff level and intends to stay on it.'),
 
   ('56000000-0000-0000-0000-000000000022', '5a000000-0000-0000-0000-000000000001',
-   'culture', 'on-call heavy', 'negative', 5, NULL,
+   'culture', 'on-call heavy', 'negative', 5, FALSE, NULL,
    'Has built two on-call practices and will carry a pager, but not one that dominates the role.'),
 
   ('56000000-0000-0000-0000-000000000023', '5a000000-0000-0000-0000-000000000001',
-   'culture', 'mandatory overtime', 'negative', 7, NULL,
+   'culture', 'mandatory overtime', 'negative', 7, FALSE, NULL,
    'Non-negotiable enough to be worth flagging, but not an automatic disqualification.'),
 
-  -- ---------- hard excludes (weight must be NULL) ----------
+  -- ---------- hard gates (heavy negatives that also cap the score) ----------
+  -- The one skills-shaped gate. The other three are industry-shaped, and an
+  -- industry is not currently matchable (see #48) -- so without this row no
+  -- fixture could exercise a gate firing end to end.
+  ('56000000-0000-0000-0000-000000000043', '5a000000-0000-0000-0000-000000000001',
+   'anti_pattern', '.NET', 'negative', 10, TRUE, NULL,
+   'Will not move to the Microsoft stack. Go/Java/Python is the career direction.'),
+
   ('56000000-0000-0000-0000-000000000040', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'adtech', 'hard_exclude', NULL, NULL,
+   'anti_pattern', 'adtech', 'negative', 10, TRUE, NULL,
    'Will not work on advertising technology.'),
 
   ('56000000-0000-0000-0000-000000000041', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'gambling', 'hard_exclude', NULL, NULL,
+   'anti_pattern', 'gambling', 'negative', 10, TRUE, NULL,
    'Will not work on gambling or sports betting.'),
 
   ('56000000-0000-0000-0000-000000000042', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'surveillance', 'hard_exclude', NULL, NULL,
+   'anti_pattern', 'surveillance', 'negative', 10, TRUE, NULL,
    'Will not work on consumer surveillance products.')
 
 ON CONFLICT (id) DO UPDATE SET
@@ -171,6 +181,7 @@ ON CONFLICT (id) DO UPDATE SET
   label           = EXCLUDED.label,
   sentiment       = EXCLUDED.sentiment,
   weight          = EXCLUDED.weight,
+  is_hard_gate    = EXCLUDED.is_hard_gate,
   context_type    = EXCLUDED.context_type,
   notes           = EXCLUDED.notes,
   updated_at      = now();

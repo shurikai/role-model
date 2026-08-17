@@ -5,6 +5,7 @@
 package fitgate
 
 import (
+	"math"
 	"slices"
 	"strings"
 	"unicode"
@@ -15,24 +16,6 @@ import (
 
 // JDSignals is the structured output of Stage 1 extraction.
 type JDSignals = generation.JDSignals
-
-// RunAntiPatternGate checks JD signals against the user's hard-exclude
-// preferences. Each preference is matched, on word boundaries, only against
-// the signal fields its preference_type names — see gateFieldsFor. The first
-// match fails the gate.
-//
-// The result is advisory: RunFitEvaluation records it but does not act on it.
-func RunAntiPatternGate(prefs []db.Preference, signals JDSignals) (passed bool, hits []db.Preference) {
-	for _, p := range prefs {
-		if p.Sentiment != "hard_exclude" {
-			continue
-		}
-		if matchesSignal(p.Label, gateFieldsFor(p.PreferenceType, signals)) {
-			return false, []db.Preference{p}
-		}
-	}
-	return true, nil
-}
 
 // alternativesDelimiter separates interchangeable alternatives inside a single
 // required_skills or preferred_skills entry. Extraction emits one entry per
@@ -102,10 +85,20 @@ func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, g
 	return clampScore(pointsEarned / pointsPossible * 100), gaps
 }
 
-// ScorePreferenceFit scores JD alignment against the user's non-hard-exclude
-// preferences (hard excludes are handled by RunAntiPatternGate). A matched
-// positive preference earns its weight; a matched negative preference costs
-// its weight.
+// hardGateCeiling is the highest preference score a JD can hold once it has
+// matched a hard-gate preference. It exists because weight subtraction alone
+// cannot express "hard" under a normalized average: the denominator grows with
+// the penalty, so no single row can ever dominate, and a tripped hard exclude
+// would read as a ten-point dip — a minor quibble rather than a disqualifier.
+//
+// It is deliberately not zero. A role that is excluded for one reason and
+// otherwise excellent should still be distinguishable from one that is
+// excluded and also a poor fit on every other axis.
+const hardGateCeiling = 25.0
+
+// ScorePreferenceFit scores JD alignment against the user's preferences.
+// A matched positive preference earns its weight; a matched negative
+// preference costs its weight.
 //
 // The two ways a preference can fail to earn points are semantically
 // different and are reported separately rather than lumped into one list:
@@ -117,24 +110,46 @@ func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, g
 // An unmatched negative preference earns its weight, since avoiding a
 // stated dislike is the ideal outcome, and isn't reported at all (there's
 // nothing notable to say about an absence of an absence).
-func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64, gaps []string, conflicts []string) {
-	fields := signalFields(signals)
-
-	var earned, possible float64
+//
+// # Hard gates
+//
+// Rows carrying is_hard_gate are scored differently, and deliberately so.
+// They are never terms in the normalized average — feeding them into both
+// earned and possible would let a profile full of unmatched excludes inflate
+// every clean JD toward 100, which is the same pathology that made unreachable
+// negatives a free bonus. Instead a matched hard gate subtracts its weight as
+// raw points and caps the result at hardGateCeiling.
+//
+// Every matched hard gate is returned in gateHits so the caller can record the
+// complete set, and is also reported as a conflict so the narrative can name
+// it. A hard gate that goes unmatched costs and earns nothing at all.
+//
+// The 100.0 short-circuit for a user with no scorable preferences governs only
+// the average. Penalty and ceiling still apply on top of it: a profile made up
+// entirely of hard gates has an empty average but must not therefore score a
+// perfect 100 on a JD that trips one.
+func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (
+	score float64, gaps []string, conflicts []string, gateHits []db.Preference,
+) {
+	var earned, possible, penalty float64
 	var counted bool
+
 	for _, p := range prefs {
-		if p.Sentiment == "hard_exclude" {
+		weight := float64(p.Weight)
+		matched := matchesSignal(p.Label, prefFieldsFor(p.PreferenceType, signals))
+
+		if p.IsHardGate {
+			if matched {
+				penalty += weight
+				gateHits = append(gateHits, p)
+				conflicts = append(conflicts, p.Label)
+			}
 			continue
 		}
-		counted = true
 
-		weight := 1.0
-		if p.Weight != nil {
-			weight = float64(*p.Weight)
-		}
+		counted = true
 		possible += weight
 
-		matched := matchesSignal(p.Label, fields)
 		switch p.Sentiment {
 		case "positive":
 			if matched {
@@ -152,20 +167,30 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (score float64
 		}
 	}
 
-	if !counted || possible == 0 {
-		return 100.0, nil, nil
+	base := 100.0
+	if counted && possible > 0 {
+		base = earned / possible * 100
 	}
-	return clampScore(earned / possible * 100), gaps, conflicts
+
+	score = base - penalty
+	if len(gateHits) > 0 {
+		// An upper bound, never an override. Setting the score *to* the
+		// ceiling would raise a JD that already scored below it.
+		score = math.Min(score, hardGateCeiling)
+	}
+	return clampScore(score), gaps, conflicts, gateHits
 }
 
-// signalFields collects the JD's free-text signal fields for matching
-// against preference labels.
-func signalFields(signals JDSignals) []string {
-	return append([]string{signals.Domain, signals.WorkType, signals.Seniority}, signals.CultureSignals...)
-}
-
-// gateFieldsFor returns the JD signal fields a hard-exclude preference of the
-// given type should be compared against.
+// prefFieldsFor returns the JD signal fields a preference of the given type
+// should be compared against.
+//
+// This is the single matcher for every preference, gate or not. There used to
+// be two: a broad signalFields for scoring and this routed one for the gate.
+// The split was invisible and consequential — scoring never saw the skills
+// arrays, so a weighted negative naming a technology could not fire no matter
+// what the JD required, and because an unmatched negative earns its weight it
+// silently paid out a bonus on every evaluation instead. Two matchers over one
+// set of rows is what let that hide; there is now one.
 //
 // Routing by type is what stops a label colliding with an unrelated field.
 // Matching every preference against every field meant "IT consulting / staff
@@ -179,28 +204,37 @@ func signalFields(signals JDSignals) []string {
 // describes a seniority level, so nothing should be matched against it. Add a
 // case if that ever changes.
 //
-// preferred_skills is deliberately absent too. A hard exclude is a statement
+// preferred_skills is deliberately absent too. A preference is a statement
 // about what the job actually demands, so it should fire on a genuine
 // requirement and not on an optional mention. The Angular exclude — "Angular
 // as co-equal frontend requirement" — tripped on a JD whose only Angular
 // reference was a nice-to-have bullet ("exposure to front-end technologies
 // such as React or Angular"), and the narrative then described Angular as a
 // co-equal requirement the JD never made it out to be. preferred_skills still
-// feeds ScoreTechnicalFit normally; it is only the gate that ignores it.
-func gateFieldsFor(prefType string, signals JDSignals) []string {
+// feeds ScoreTechnicalFit normally; it is only preference matching that
+// ignores it.
+func prefFieldsFor(prefType string, signals JDSignals) []string {
 	switch prefType {
 	case "domain":
 		return []string{signals.Domain}
 	case "work_type":
 		return []string{signals.WorkType}
 	case "culture":
-		return signals.CultureSignals
+		// work_type is included here, and only looks like a type confusion.
+		// The enum is remote | hybrid | onsite | unknown — work *arrangement*,
+		// not work type — and arrangement is a culture question. It is also
+		// the only field remoteness is ever recorded in, so a "remote-first"
+		// culture preference that could not read it would score zero against
+		// a genuinely remote JD. Adopting the gate's routing wholesale did
+		// exactly that; the gate never noticed because its one culture row
+		// ("Big Four consulting culture") really does live in culture_signals.
+		return append([]string{signals.WorkType}, signals.CultureSignals...)
 	default:
 		// anti_pattern is the catch-all type and has no single corresponding
-		// signal field. It is also where every skills-shaped exclude lives
+		// signal field. It is also where every skills-shaped preference lives
 		// ("expert Python as primary requirement" and friends), which is why
 		// this is the only branch that sees the skills arrays — a domain or
-		// culture exclude has no business matching against a tech stack.
+		// culture preference has no business matching against a tech stack.
 		fields := []string{signals.Domain, signals.WorkType}
 		fields = append(fields, signals.CultureSignals...)
 		// Alternatives are split back out so an exclude still matches a single

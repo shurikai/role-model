@@ -1,0 +1,54 @@
+{
+  "name": "hard-gate-fires",
+  "jd_fixture": "synthetic",
+  "description": "A freight-domain backend role built on the Microsoft stack. The persona's domain preferences all match -- logistics is their strongest positive -- and the role is remote, backend, and IC. The only thing wrong with it is the stack, which is a hard gate. This is the enforced counterpart to the unit tests: it proves a gate still fires, is priced into preference_score, and is reported as a conflict, through the same path RunFitEvaluation uses.",
+
+  "comment": "Before the hard-gate change a tripped gate contributed nothing to preference_score, so a JD like this one scored as though the exclusion had never been recorded. The max band below is what makes that regression impossible to reintroduce silently.",
+
+  "signals": {
+    "required_skills": [
+      "C#",
+      ".NET",
+      "SQL Server",
+      "Azure",
+      "Distributed Systems"
+    ],
+    "preferred_skills": [
+      "Kafka"
+    ],
+    "seniority": "senior",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": [
+      "remote-first",
+      "blameless postmortems",
+      "strong individual contributor track"
+    ],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "remote-first",
+      "travel": "none stated",
+      "industry": "freight and logistics software",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "greenfield rewrite of a legacy load-planning system onto .NET 8"
+      ]
+    }
+  },
+
+  "expect": {
+    "gate_passed": false,
+    "gate_hits": {
+      "comment": "The .NET hard gate is anti_pattern-typed, so it reads required_skills.",
+      "must_include": [".NET"]
+    },
+    "preference_score": {
+      "comment": "Capped by hardGateCeiling. A tripped gate must never present as a good preference fit, however well the rest of the role matches.",
+      "max": 25
+    },
+    "preference_conflicts": {
+      "comment": "A gate hit is a conflict, not a gap -- the narrative has to be able to name it.",
+      "must_include": [".NET"]
+    }
+  }
+}
