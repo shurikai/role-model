@@ -63,8 +63,9 @@
     { "preference_type": "culture",      "label": "on-call heavy",         "sentiment": "negative", "weight": 5 },
     { "preference_type": "culture",      "label": "mandatory overtime",    "sentiment": "negative", "weight": 7 },
 
-    { "preference_type": "anti_pattern", "label": "adtech",                "sentiment": "hard_exclude" },
-    { "preference_type": "anti_pattern", "label": "gambling",              "sentiment": "hard_exclude" },
-    { "preference_type": "anti_pattern", "label": "surveillance",          "sentiment": "hard_exclude" }
+    { "preference_type": "anti_pattern", "label": ".NET",                  "sentiment": "negative", "weight": 10, "is_hard_gate": true },
+    { "preference_type": "anti_pattern", "label": "adtech",                "sentiment": "negative", "weight": 10, "is_hard_gate": true },
+    { "preference_type": "anti_pattern", "label": "gambling",              "sentiment": "negative", "weight": 10, "is_hard_gate": true },
+    { "preference_type": "anti_pattern", "label": "surveillance",          "sentiment": "negative", "weight": 10, "is_hard_gate": true }
   ]
 }
