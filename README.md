@@ -40,14 +40,14 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 
 - **Go** with `chi` for routing. Chosen for simplicity and ubiquity
 - **PostgreSQL 16** via `pgx/v5` (native interface), with `sqlc` for type-safe generated queries and `golang-migrate` for schema migrations
-- **Anthropic Go SDK** for both pipeline stages, with prompts versioned as templates and included in the static executable via `go:embed`
+- **Anthropic Go SDK** for both pipeline stages, with prompts stored as `text/template` files and compiled into the static binary via `go:embed`. A prompt's identity is the git blob hash of its content, recorded per generation, so any past resume resolves back to the exact prompt text that produced it
 - **JSON Schema validation** (`santhosh-tekuri/jsonschema`) against a fixed resume schema, so generation output is structurally guaranteed before storage
 - **Python** (FastAPI + `python-docx`, managed with `uv`), scoped narrowly to the DOCX renderer — a separate process, not the service itself
 - **React + TypeScript** frontend (Vite, TanStack Query, React Router), covering the auth shell and the application generation flow
 
 ## Getting started
 
-Requires Go, Docker, `uv`, and `migrate`, `sqlc`, and `psql` on your `PATH`.
+Requires Go, Node, Docker, `uv`, and `migrate`, `sqlc`, and `psql` on your `PATH`.
 
 ```bash
 cp .env.example .env   # then fill in ANTHROPIC_API_KEY and adjust DATABASE_URL/SEED_DIR as needed
@@ -62,7 +62,7 @@ make dev                # start the API, the frontend, and the renderer together
 
 A full stack is three processes. `make dev` runs all of them and stops the whole set on Ctrl-C; `make run`, `make run-frontend`, and `make run-renderer` start them individually if you'd rather have separate terminals.
 
-Other useful targets: `make test` (unit tests), `make test-integration` (requires a running database), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
+Other useful targets: `make test` (unit tests), `make test-integration` (requires a running database), `make fmt` and `make fmt-check` (format or verify Go, TypeScript, and Python together), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
 
 There is no password reset flow in the UI yet. Until there is, `make reset-password EMAIL=you@example.com` prompts for a new password and writes the hash directly. It reads the password from stdin rather than an argument, so it needs a real terminal; set `NEWPASS` in the environment to run it non-interactively.
 
@@ -111,7 +111,6 @@ This README will grow as the system does.
 
 ## TODO
 [ ] Restore `applied_on` date parsing on the application update endpoint
-[ ] Add sample migrations with dummy test data (for onboarding without real career data)
 [ ] Build out the career-data views (employer/position/contribution browsing and editing)
 [ ] Weight technical fit scoring by skill proficiency and years (the schema and the data are both there; `internal/fitgate` reads names only)
 [ ] Human review gate for extracted JD signals before generation runs
