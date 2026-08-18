@@ -236,6 +236,9 @@ in the body), with parent ownership verified server-side. There is no
 
 ### Testing
 - Integration tests using `httptest` covering multi-tenant isolation
+- Renderer pytest suite (`make test-renderer`): schema contract, document
+  construction (nothing silently dropped, layout invariants hold), and the
+  `/render` HTTP contract the Go client depends on
 - `createAndGetID` helper (avoids double-close on response bodies)
 - CC session prompts stored in `prompts/cc_sessions/` for scaffolding
   pattern-replication work
