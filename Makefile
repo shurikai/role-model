@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -23,6 +23,11 @@ test:
 
 test-integration:
 	go test -tags integration ./...
+
+# The renderer is a separate process with its own toolchain, so its tests are
+# a separate target rather than part of `make test`.
+test-renderer:
+	cd docx-renderer && uv run pytest
 
 # Database
 db-up:

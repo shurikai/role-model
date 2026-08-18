@@ -88,12 +88,28 @@ schema browser.
 ## Development
 
 ```bash
+uv run pytest                 # run the tests
 uv run ruff format .          # format
 uv run ruff format --check .  # verify formatting
 ```
 
-`make fmt` at the repository root runs this along with `gofmt` and Prettier.
+`make test-renderer` at the repository root runs the tests; `make fmt` runs the
+formatter along with `gofmt` and Prettier.
 
-There are no tests for the renderer yet — `pytest` is wired into the dev
-dependency group, but nothing uses it. The regression fixtures under
-`tests/fixtures/` are compared by eye today.
+The suite covers three things, against the shared fixtures in
+`tests/fixtures/` rather than a private copy:
+
+- **The schema contract** (`test_models.py`) — `models.py` mirrors
+  `schema/resume.v1.json`, and nothing enforces that the two agree. These pin
+  the invariants the pipeline relies on, including that a bullet cannot
+  validate without at least one `contribution_ids` entry.
+- **Document construction** (`test_docx_builder.py`) — that no employer,
+  position, bullet, or skill is silently dropped, and that the layout
+  invariants hold: no Word heading styles, `keep_with_next` on the header
+  chains, bullets left free to break.
+- **The HTTP contract** (`test_render_endpoint.py`) — status, media type,
+  attachment filename, and a 422 rather than a 500 on a malformed document.
+  `internal/renderer.Client` depends on all four.
+
+Deliberately not asserted: the `.docx` bytes themselves. Binary comparison
+against the tracked fixtures would fail on every incidental spacing change.

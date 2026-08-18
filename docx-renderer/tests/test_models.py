@@ -1,0 +1,116 @@
+"""The schema contract.
+
+models.py mirrors schema/resume.v1.json. Nothing enforces that the two agree,
+so these tests pin the invariants the Go pipeline relies on. If the JSON schema
+changes and models.py does not, this is where it should surface -- a renderer
+that silently accepts a document the schema forbids is how a broken .docx gets
+produced instead of a 422.
+"""
+
+import pytest
+from pydantic import ValidationError
+
+from models import Bullet, PositionBlock, ProjectEntry, Resume
+
+
+def test_tracked_fixtures_validate(resume_data: dict) -> None:
+    Resume.model_validate(resume_data)
+
+
+def test_minimal_document_validates(minimal_resume_data: dict) -> None:
+    Resume.model_validate(minimal_resume_data)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["schema_version", "summary", "identity", "experience", "skills", "meta"],
+)
+def test_missing_required_field_is_rejected(
+    minimal_resume_data: dict, field: str
+) -> None:
+    del minimal_resume_data[field]
+    with pytest.raises(ValidationError):
+        Resume.model_validate(minimal_resume_data)
+
+
+def test_bullet_requires_at_least_one_contribution_id() -> None:
+    """Provenance is the point of the whole system.
+
+    Every bullet traces back to the contributions it was generated from. A
+    bullet with an empty contribution_ids array is an untraceable claim, and
+    the schema's min_length=1 is what keeps it out.
+    """
+    with pytest.raises(ValidationError):
+        Bullet(text="Unsourced claim.", contribution_ids=[])
+
+
+def test_bullet_accepts_a_contribution_id() -> None:
+    bullet = Bullet(text="Sourced claim.", contribution_ids=["abc"])
+    assert bullet.contribution_ids == ["abc"]
+    assert bullet.feedback_signal is None
+
+
+@pytest.mark.parametrize("bad_date", ["2020", "2020-1", "2020-01-15", "January 2020"])
+def test_position_dates_must_be_year_month(bad_date: str) -> None:
+    """Dates are YYYY-MM, not full dates.
+
+    The renderer formats tenure ranges from these directly, so a full date or a
+    free-text month would render literally.
+    """
+    with pytest.raises(ValidationError):
+        PositionBlock(
+            position_id="p1",
+            title="Engineer",
+            started_on=bad_date,
+            bullets=[Bullet(text="x", contribution_ids=["c1"])],
+        )
+
+
+def test_position_ended_on_may_be_omitted_for_current_role() -> None:
+    position = PositionBlock(
+        position_id="p1",
+        title="Engineer",
+        started_on="2020-01",
+        bullets=[Bullet(text="x", contribution_ids=["c1"])],
+    )
+    assert position.ended_on is None
+
+
+def test_unknown_industry_level_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        PositionBlock(
+            position_id="p1",
+            title="Engineer",
+            industry_level="wizard",
+            started_on="2020-01",
+            bullets=[Bullet(text="x", contribution_ids=["c1"])],
+        )
+
+
+def test_unknown_project_role_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        ProjectEntry(
+            project_id="proj1",
+            name="Thing",
+            role="owner",  # not one of author|maintainer|contributor|lead
+            status="active",
+            bullets=[Bullet(text="x", contribution_ids=["c1"])],
+        )
+
+
+def test_employer_must_have_at_least_one_position(minimal_resume_data: dict) -> None:
+    minimal_resume_data["experience"][0]["positions"] = []
+    with pytest.raises(ValidationError):
+        Resume.model_validate(minimal_resume_data)
+
+
+def test_optional_sections_may_be_empty(minimal_resume_data: dict) -> None:
+    """Empty is not the same as missing.
+
+    A resume with no projects or credentials is ordinary; the fixture with no
+    projects is a real generated document.
+    """
+    resume = Resume.model_validate(minimal_resume_data)
+    assert resume.projects == []
+    assert resume.credentials == []
+    assert resume.education == []

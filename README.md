@@ -62,7 +62,7 @@ make dev                # start the API, the frontend, and the renderer together
 
 A full stack is three processes. `make dev` runs all of them and stops the whole set on Ctrl-C; `make run`, `make run-frontend`, and `make run-renderer` start them individually if you'd rather have separate terminals.
 
-Other useful targets: `make test` (unit tests), `make test-integration` (requires a running database), `make fmt` and `make fmt-check` (format or verify Go, TypeScript, and Python together), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
+Other useful targets: `make test` (Go unit tests), `make test-renderer` (the Python renderer's pytest suite), `make test-integration` (requires a running database), `make fmt` and `make fmt-check` (format or verify Go, TypeScript, and Python together), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
 
 There is no password reset flow in the UI yet. Until there is, `make reset-password EMAIL=you@example.com` prompts for a new password and writes the hash directly. It reads the password from stdin rather than an argument, so it needs a real terminal; set `NEWPASS` in the environment to run it non-interactively.
 

@@ -14,6 +14,10 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.14",
+    # FastAPI's TestClient is a thin wrapper over httpx2; it is the supported
+    # way to exercise the /render endpoint without binding a port. Starlette
+    # deprecates plain httpx here, so pin httpx2 rather than inherit a warning.
+    "httpx2>=0.29",
 ]
 
 [tool.basedpyright]
@@ -22,3 +26,9 @@ reportUnusedCallResult = false
 [tool.ruff]
 line-length = 88
 target-version = "py314"
+
+[tool.pytest.ini_options]
+# main.py and models.py live at the project root, not in a package, so the
+# root has to be importable from tests/.
+pythonpath = ["."]
+testpaths = ["tests"]
