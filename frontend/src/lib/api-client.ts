@@ -2,6 +2,26 @@ import { getSession } from "./session";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+/**
+ * The API origin plus its path prefix, e.g. http://localhost:8080/api/v1.
+ *
+ * Endpoint paths are concatenated onto this verbatim, so an unset value would
+ * otherwise produce a request to `undefined/applications` — a 404 that reads
+ * as a broken backend rather than missing configuration. Checked here rather
+ * than at module load so importing the client never throws, which would take
+ * the whole app down instead of the request that needs it.
+ */
+function apiBaseUrl(): string {
+  if (!API_BASE_URL) {
+    throw new Error(
+      "VITE_API_BASE_URL is not set. Copy .env.example to .env in frontend/. " +
+        "The value must include the API path prefix, e.g. " +
+        "http://localhost:8080/api/v1.",
+    );
+  }
+  return API_BASE_URL;
+}
+
 interface ErrorBody {
   error: string;
   code: string;
@@ -49,7 +69,7 @@ async function rawFetch(path: string, init: RequestInit): Promise<Response> {
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...init,
     headers,
   });
