@@ -255,7 +255,7 @@ func prefFieldsFor(prefType string, signals JDSignals) []string {
 //
 // Bidirectional matching is only safe because callers control which fields a
 // given label is compared against. Comparing every label against every field
-// is what produced the staff-seniority collision — see gateFieldsFor.
+// is what produced the staff-seniority collision — see prefFieldsFor.
 func matchesSignal(label string, fields []string) bool {
 	for _, f := range fields {
 		if f == "" {
