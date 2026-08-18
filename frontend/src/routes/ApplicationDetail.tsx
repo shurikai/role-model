@@ -32,7 +32,9 @@ function ScreeningSummaryPanel({ summary }: { summary: ScreeningSummary }) {
 
   return (
     <div className="mb-3 rounded border border-gray-300 bg-gray-50 p-4">
-      <h3 className="mb-2 text-sm font-semibold text-gray-900">Screening summary</h3>
+      <h3 className="mb-2 text-sm font-semibold text-gray-900">
+        Screening summary
+      </h3>
       <dl className="space-y-1 text-sm">
         {fields.map(([label, value]) => (
           <div key={label} className="flex gap-2">
@@ -95,13 +97,19 @@ function ResumeVersionRow({
               </span>
             )}
           </p>
-          <p className="text-xs text-gray-500">{new Date(version.created_at).toLocaleString()}</p>
+          <p className="text-xs text-gray-500">
+            {new Date(version.created_at).toLocaleString()}
+          </p>
           {version.generation_notes && (
-            <p className="mt-1 text-xs text-gray-600">{version.generation_notes}</p>
+            <p className="mt-1 text-xs text-gray-600">
+              {version.generation_notes}
+            </p>
           )}
         </div>
         <div className="flex items-center gap-2">
-          {downloaded && <span className="text-xs text-green-700">Downloaded ✓</span>}
+          {downloaded && (
+            <span className="text-xs text-green-700">Downloaded ✓</span>
+          )}
           <button
             type="button"
             onClick={handleDownload}
@@ -113,7 +121,9 @@ function ResumeVersionRow({
         </div>
       </div>
       {renderVersion.isError && (
-        <p className="mt-2 text-sm text-red-600">{formatApiError(renderVersion.error)}</p>
+        <p className="mt-2 text-sm text-red-600">
+          {formatApiError(renderVersion.error)}
+        </p>
       )}
     </li>
   );
@@ -129,7 +139,11 @@ export function ApplicationDetail() {
   const generateResume = useGenerateResume();
 
   if (isLoading) {
-    return <p className="mx-auto mt-12 max-w-3xl px-4 text-sm text-gray-600">Loading...</p>;
+    return (
+      <p className="mx-auto mt-12 max-w-3xl px-4 text-sm text-gray-600">
+        Loading...
+      </p>
+    );
   }
   if (error || !application) {
     return (
@@ -160,10 +174,14 @@ export function ApplicationDetail() {
       <p className="mb-6 text-sm text-gray-500">Status: {application.status}</p>
 
       <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">Job Description Signals</h2>
+        <h2 className="mb-3 text-lg font-semibold text-gray-900">
+          Job Description Signals
+        </h2>
         {!application.jd_signals ? (
           <div className="rounded border border-gray-200 p-4">
-            <p className="mb-3 text-sm text-gray-600">Signals have not been extracted yet.</p>
+            <p className="mb-3 text-sm text-gray-600">
+              Signals have not been extracted yet.
+            </p>
             <button
               type="button"
               onClick={() => extractSignals.mutate(application.id)}
@@ -173,22 +191,29 @@ export function ApplicationDetail() {
               {extractSignals.isPending ? "Extracting..." : "Extract Signals"}
             </button>
             {extractSignals.isError && (
-              <p className="mt-2 text-sm text-red-600">{formatApiError(extractSignals.error)}</p>
+              <p className="mt-2 text-sm text-red-600">
+                {formatApiError(extractSignals.error)}
+              </p>
             )}
           </div>
         ) : (
           <div className="space-y-2 rounded border border-gray-200 p-4 text-sm">
             {application.jd_signals.screening_summary && (
-              <ScreeningSummaryPanel summary={application.jd_signals.screening_summary} />
+              <ScreeningSummaryPanel
+                summary={application.jd_signals.screening_summary}
+              />
             )}
             <p>
-              <span className="font-medium">Seniority:</span> {application.jd_signals.seniority}
+              <span className="font-medium">Seniority:</span>{" "}
+              {application.jd_signals.seniority}
             </p>
             <p>
-              <span className="font-medium">Domain:</span> {application.jd_signals.domain}
+              <span className="font-medium">Domain:</span>{" "}
+              {application.jd_signals.domain}
             </p>
             <p>
-              <span className="font-medium">Work type:</span> {application.jd_signals.work_type}
+              <span className="font-medium">Work type:</span>{" "}
+              {application.jd_signals.work_type}
             </p>
             <div>
               <span className="font-medium">Required skills:</span>{" "}
@@ -208,10 +233,14 @@ export function ApplicationDetail() {
               disabled={extractSignals.isPending}
               className="mt-2 text-xs text-gray-600 underline disabled:opacity-50"
             >
-              {extractSignals.isPending ? "Re-extracting..." : "Re-extract signals"}
+              {extractSignals.isPending
+                ? "Re-extracting..."
+                : "Re-extract signals"}
             </button>
             {extractSignals.isError && (
-              <p className="text-sm text-red-600">{formatApiError(extractSignals.error)}</p>
+              <p className="text-sm text-red-600">
+                {formatApiError(extractSignals.error)}
+              </p>
             )}
           </div>
         )}
@@ -233,7 +262,9 @@ export function ApplicationDetail() {
                 : "Run Fit Gate"}
           </button>
           {runFitEvaluation.isError && (
-            <p className="mt-2 text-sm text-red-600">{formatApiError(runFitEvaluation.error)}</p>
+            <p className="mt-2 text-sm text-red-600">
+              {formatApiError(runFitEvaluation.error)}
+            </p>
           )}
 
           {latestFitReport && (
@@ -246,10 +277,12 @@ export function ApplicationDetail() {
               {latestFitReport.anti_pattern_hits &&
                 latestFitReport.anti_pattern_hits.length > 0 && (
                   <div className="rounded border border-amber-300 bg-amber-50 p-3">
-                    <p className="font-medium text-amber-900">Anti-pattern flag</p>
+                    <p className="font-medium text-amber-900">
+                      Anti-pattern flag
+                    </p>
                     <p className="text-xs text-amber-800">
-                      Matched against your hard-exclude preferences. Informational — it
-                      does not block generation.
+                      Matched against your hard-exclude preferences.
+                      Informational — it does not block generation.
                     </p>
                     <ul className="mt-1 list-inside list-disc text-amber-900">
                       {latestFitReport.anti_pattern_hits.map((hit) => (
@@ -264,16 +297,17 @@ export function ApplicationDetail() {
                   ? "—"
                   : `${latestFitReport.technical_score}/100`}
               </p>
-              {latestFitReport.technical_gaps && latestFitReport.technical_gaps.length > 0 && (
-                <div>
-                  <span className="font-medium">Technical gaps:</span>
-                  <ul className="ml-4 list-disc text-gray-700">
-                    {latestFitReport.technical_gaps.map((gap) => (
-                      <li key={gap}>{gap}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {latestFitReport.technical_gaps &&
+                latestFitReport.technical_gaps.length > 0 && (
+                  <div>
+                    <span className="font-medium">Technical gaps:</span>
+                    <ul className="ml-4 list-disc text-gray-700">
+                      {latestFitReport.technical_gaps.map((gap) => (
+                        <li key={gap}>{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               <p>
                 <span className="font-medium">Preference score:</span>{" "}
                 {latestFitReport.preference_score === null
@@ -283,7 +317,9 @@ export function ApplicationDetail() {
               {latestFitReport.preference_conflicts &&
                 latestFitReport.preference_conflicts.length > 0 && (
                   <div>
-                    <span className="font-medium text-red-800">Preference conflicts:</span>
+                    <span className="font-medium text-red-800">
+                      Preference conflicts:
+                    </span>
                     <ul className="ml-4 list-disc text-red-700">
                       {latestFitReport.preference_conflicts.map((conflict) => (
                         <li key={conflict}>{conflict}</li>
@@ -294,7 +330,9 @@ export function ApplicationDetail() {
               {latestFitReport.preference_gaps &&
                 latestFitReport.preference_gaps.length > 0 && (
                   <div>
-                    <span className="font-medium">Preferences not mentioned:</span>
+                    <span className="font-medium">
+                      Preferences not mentioned:
+                    </span>
                     <ul className="ml-4 list-disc text-gray-700">
                       {latestFitReport.preference_gaps.map((gap) => (
                         <li key={gap}>{gap}</li>
@@ -303,7 +341,9 @@ export function ApplicationDetail() {
                   </div>
                 )}
               {latestFitReport.narrative && (
-                <p className="text-gray-700 italic">{latestFitReport.narrative}</p>
+                <p className="text-gray-700 italic">
+                  {latestFitReport.narrative}
+                </p>
               )}
             </div>
           )}
@@ -311,7 +351,9 @@ export function ApplicationDetail() {
       </section>
 
       <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">Resume Versions</h2>
+        <h2 className="mb-3 text-lg font-semibold text-gray-900">
+          Resume Versions
+        </h2>
         <div className="rounded border border-gray-200 p-4">
           <button
             type="button"
@@ -328,7 +370,9 @@ export function ApplicationDetail() {
             </p>
           )}
           {generateResume.isError && (
-            <p className="mt-2 text-sm text-red-600">{formatApiError(generateResume.error)}</p>
+            <p className="mt-2 text-sm text-red-600">
+              {formatApiError(generateResume.error)}
+            </p>
           )}
 
           {versions && versions.length > 0 && (

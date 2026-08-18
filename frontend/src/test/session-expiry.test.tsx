@@ -17,7 +17,9 @@ function LocationProbe() {
 }
 
 function renderProtectedApp() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={["/dashboard"]}>
@@ -54,7 +56,9 @@ describe("session expiry redirect", () => {
     fetchMock.mockResolvedValue({
       ok: false,
       status: 401,
-      json: vi.fn().mockResolvedValue({ error: "unauthorized", code: "unauthorized" }),
+      json: vi
+        .fn()
+        .mockResolvedValue({ error: "unauthorized", code: "unauthorized" }),
     } as unknown as Response);
 
     renderProtectedApp();
@@ -65,7 +69,9 @@ describe("session expiry redirect", () => {
       expect(screen.getByTestId("pathname")).toHaveTextContent("/login");
     });
 
-    const search = new URLSearchParams(screen.getByTestId("search").textContent ?? "");
+    const search = new URLSearchParams(
+      screen.getByTestId("search").textContent ?? "",
+    );
     expect(search.get("redirect")).toBe("/dashboard");
     expect(search.get("reason")).toBe("expired");
   });

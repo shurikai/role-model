@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password
+.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check
 
 # Build
 all: build
@@ -72,6 +72,23 @@ ifndef EMAIL
 	$(error EMAIL is required, e.g. make reset-password EMAIL=you@example.com)
 endif
 	@go run ./cmd/resetpw -email "$(EMAIL)"
+
+# Formatting. Each language keeps its own pinned formatter:
+#   Go      -- gofmt (toolchain)
+#   TS/TSX  -- prettier, pinned in frontend/package.json
+#   Python  -- ruff format, pinned in docx-renderer's dev group
+# SQL is deliberately not formatted: migrations are applied history, and the
+# sqlc query files carry load-bearing `-- name: ... :one` directives.
+fmt:
+	gofmt -w $(shell find . -name '*.go' -not -path './frontend/*')
+	cd frontend && npm run format
+	cd docx-renderer && uv run ruff format .
+
+fmt-check:
+	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './frontend/*'))"; \
+		if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
+	cd frontend && npm run format:check
+	cd docx-renderer && uv run ruff format --check .
 
 sqlc:
 	sqlc generate

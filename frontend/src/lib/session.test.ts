@@ -16,7 +16,10 @@ describe("session", () => {
   });
 
   it("removes the key on clearSession so subsequent getSession is null", () => {
-    setSession({ token: "abc123", user: { id: "user-1", email: "a@example.com" } });
+    setSession({
+      token: "abc123",
+      user: { id: "user-1", email: "a@example.com" },
+    });
     clearSession();
     expect(getSession()).toBeNull();
   });

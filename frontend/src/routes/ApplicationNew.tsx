@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCreateApplication, useExtractSignals } from "../hooks/useApplications";
+import {
+  useCreateApplication,
+  useExtractSignals,
+} from "../hooks/useApplications";
 import { formatApiError } from "../lib/api-client";
 
 export function ApplicationNew() {
@@ -41,11 +44,16 @@ export function ApplicationNew() {
 
   return (
     <div className="mx-auto mt-12 max-w-2xl px-4">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">New Application</h1>
+      <h1 className="mb-6 text-2xl font-semibold text-gray-900">
+        New Application
+      </h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="companyName" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="companyName"
+            className="block text-sm font-medium text-gray-700"
+          >
             Company
           </label>
           <input
@@ -58,7 +66,10 @@ export function ApplicationNew() {
           />
         </div>
         <div>
-          <label htmlFor="roleTitle" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="roleTitle"
+            className="block text-sm font-medium text-gray-700"
+          >
             Role title
           </label>
           <input
@@ -71,7 +82,10 @@ export function ApplicationNew() {
           />
         </div>
         <div>
-          <label htmlFor="jdUrl" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="jdUrl"
+            className="block text-sm font-medium text-gray-700"
+          >
             Job posting URL <span className="text-gray-400">(optional)</span>
           </label>
           <input
@@ -83,7 +97,10 @@ export function ApplicationNew() {
           />
         </div>
         <div>
-          <label htmlFor="jdText" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="jdText"
+            className="block text-sm font-medium text-gray-700"
+          >
             Job description text
           </label>
           <textarea

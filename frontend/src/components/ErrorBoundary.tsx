@@ -33,7 +33,9 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="mx-auto mt-12 max-w-3xl px-4">
         <div className="rounded border border-red-300 bg-red-50 p-4">
-          <h1 className="mb-1 text-lg font-semibold text-red-800">Something went wrong</h1>
+          <h1 className="mb-1 text-lg font-semibold text-red-800">
+            Something went wrong
+          </h1>
           <p className="text-sm text-red-700">{error.message}</p>
           <p className="mt-3 text-sm">
             <Link to="/applications" className="text-red-800 underline">

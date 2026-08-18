@@ -105,8 +105,8 @@ func TestHardGateMatching(t *testing.T) {
 			// The Citi case. Angular appeared once, in a "nice to have"
 			// bullet, and that was enough to disqualify the role with a
 			// narrative asserting a requirement the JD never stated.
-			name:       "angular as a preferred skill only does not trip the angular exclude",
-			pref:       hardGate(angularLabel, "anti_pattern"),
+			name: "angular as a preferred skill only does not trip the angular exclude",
+			pref: hardGate(angularLabel, "anti_pattern"),
 			signals: JDSignals{
 				Domain:          "fintech",
 				RequiredSkills:  []string{"Java", "Spring Boot"},
@@ -117,8 +117,8 @@ func TestHardGateMatching(t *testing.T) {
 		{
 			// The other half: narrowing the gate to required skills must not
 			// disable it. A real Angular requirement still trips it.
-			name:       "angular as a required skill still trips the angular exclude",
-			pref:       hardGate(angularLabel, "anti_pattern"),
+			name: "angular as a required skill still trips the angular exclude",
+			pref: hardGate(angularLabel, "anti_pattern"),
 			signals: JDSignals{
 				Domain:         "fintech",
 				RequiredSkills: []string{"Java", "Angular"},

@@ -1,5 +1,9 @@
 import { Link } from "react-router-dom";
-import { useApplications, useFitReports, useResumeVersions } from "../hooks/useApplications";
+import {
+  useApplications,
+  useFitReports,
+  useResumeVersions,
+} from "../hooks/useApplications";
 import { formatApiError } from "../lib/api-client";
 import type { Application } from "../lib/types";
 
