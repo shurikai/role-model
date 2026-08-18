@@ -179,6 +179,8 @@ Rules:
 /frontend                        — React + TypeScript + Vite UI
 /database/seed                   — real career seed SQL; a separate private git
                                    repo checked out in place, gitignored here
+/database/sample                 — fictional sample dataset, tracked here;
+                                   loaded by `make seed-sample`, never `make seed`
 /migrations                      — golang-migrate SQL migration files
 /schema                          — JSON schema documents
 /tests/fixtures                  — JD, resume JSON, and .docx regression fixtures
@@ -263,6 +265,25 @@ seems genuinely warranted.
 - JWT-based auth (24h token, no refresh — see internal/auth), single-tenant
   today but every table already carries user_id for a clean path to
   multi-tenant later
+
+## Formatting
+Each language has one pinned formatter, and `make fmt` runs all three
+(`make fmt-check` verifies without writing):
+
+- **Go** — `gofmt`, from the toolchain
+- **TypeScript** — Prettier, pinned in `frontend/package.json` with
+  `.prettierrc`; also `npm run format` / `format:check`
+- **Python** — `ruff format`, pinned in `docx-renderer`'s dev group with
+  `[tool.ruff]` in pyproject.toml
+
+Prettier is not always idempotent — a first `--write` pass can emit output that
+a second pass reformats (it happened on a `vi.fn().mockResolvedValue()` chain).
+Run it to convergence; do not assume one `--write` satisfies a later `--check`.
+
+**SQL is deliberately not formatted.** Migrations are applied history that must
+not churn, and the sqlc query files carry load-bearing `-- name: Foo :one`
+directives that comment-reflowing formatters can silently break. Do not add
+pg_format or sqlfluff.
 
 ## Conventions
 - No ORM — use sqlc generated code against pgx native interface
