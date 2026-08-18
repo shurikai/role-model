@@ -95,7 +95,7 @@ func TestHardGateMatching(t *testing.T) {
 		{
 			// Inverted deliberately. A nice-to-have mention is not a
 			// requirement, so it must not trip a hard exclude — see
-			// gateFieldsFor.
+			// prefFieldsFor.
 			name:       "python preferred skill does not trip the python exclude",
 			pref:       hardGate(pythonLabel, "anti_pattern"),
 			signals:    JDSignals{Domain: "saas", PreferredSkills: []string{"Python"}},
