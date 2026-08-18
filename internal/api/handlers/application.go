@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/httputil"
 )
 
 type ApplicationHandler struct {

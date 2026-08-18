@@ -29,7 +29,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const [user, setUser] = useState<AuthUser | null>(() => getSession()?.user ?? null);
+  const [user, setUser] = useState<AuthUser | null>(
+    () => getSession()?.user ?? null,
+  );
   const [sessionExpired, setSessionExpired] = useState(false);
   const isAuthenticated = user !== null;
 

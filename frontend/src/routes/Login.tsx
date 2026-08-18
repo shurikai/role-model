@@ -17,7 +17,8 @@ export function Login() {
   // target /login, so React Router updates this component's location in
   // place instead of remounting it — a mount-time useState initializer would
   // miss the ?reason=expired that arrives via the second navigation.
-  const showExpiredBanner = searchParams.get("reason") === "expired" && !bannerDismissed;
+  const showExpiredBanner =
+    searchParams.get("reason") === "expired" && !bannerDismissed;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,7 +55,10 @@ export function Login() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700"
+          >
             Email
           </label>
           <input
@@ -67,7 +71,10 @@ export function Login() {
           />
         </div>
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-gray-700"
+          >
             Password
           </label>
           <input

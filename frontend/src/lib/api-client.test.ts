@@ -28,17 +28,34 @@ describe("apiFetch", () => {
   });
 
   it("sends an Authorization header when a session exists", async () => {
-    setSession({ token: "tok-123", user: { id: "u1", email: "a@example.com" } });
-    fetchMock.mockResolvedValueOnce(mockResponse({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}) }));
+    setSession({
+      token: "tok-123",
+      user: { id: "u1", email: "a@example.com" },
+    });
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      }),
+    );
 
     await apiFetch("/whoami");
 
     const [, init] = fetchMock.mock.calls[0];
-    expect((init.headers as Headers).get("Authorization")).toBe("Bearer tok-123");
+    expect((init.headers as Headers).get("Authorization")).toBe(
+      "Bearer tok-123",
+    );
   });
 
   it("sends no Authorization header when no session exists", async () => {
-    fetchMock.mockResolvedValueOnce(mockResponse({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}) }));
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      }),
+    );
 
     await apiFetch("/whoami");
 
@@ -47,14 +64,25 @@ describe("apiFetch", () => {
   });
 
   it("sets Content-Type only when a body is present", async () => {
-    fetchMock.mockResolvedValue(mockResponse({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}) }));
+    fetchMock.mockResolvedValue(
+      mockResponse({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({}),
+      }),
+    );
 
-    await apiFetch("/with-body", { method: "POST", body: JSON.stringify({ a: 1 }) });
+    await apiFetch("/with-body", {
+      method: "POST",
+      body: JSON.stringify({ a: 1 }),
+    });
     await apiFetch("/no-body");
 
     const [, withBodyInit] = fetchMock.mock.calls[0];
     const [, noBodyInit] = fetchMock.mock.calls[1];
-    expect((withBodyInit.headers as Headers).get("Content-Type")).toBe("application/json");
+    expect((withBodyInit.headers as Headers).get("Content-Type")).toBe(
+      "application/json",
+    );
     expect((noBodyInit.headers as Headers).get("Content-Type")).toBeNull();
   });
 
@@ -63,7 +91,10 @@ describe("apiFetch", () => {
       mockResponse({
         ok: false,
         status: 422,
-        json: vi.fn().mockResolvedValue({ error: "email is required", code: "validation_error" }),
+        json: vi.fn().mockResolvedValue({
+          error: "email is required",
+          code: "validation_error",
+        }),
       }),
     );
 
@@ -104,7 +135,9 @@ describe("apiFetch", () => {
       mockResponse({
         ok: false,
         status: 401,
-        json: vi.fn().mockResolvedValue({ error: "unauthorized", code: "unauthorized" }),
+        json: vi
+          .fn()
+          .mockResolvedValue({ error: "unauthorized", code: "unauthorized" }),
       }),
     );
 
@@ -117,7 +150,9 @@ describe("apiFetch", () => {
 
   it("resolves undefined on a 204 and never calls .json()", async () => {
     const jsonSpy = vi.fn().mockResolvedValue({});
-    fetchMock.mockResolvedValueOnce(mockResponse({ ok: true, status: 204, json: jsonSpy }));
+    fetchMock.mockResolvedValueOnce(
+      mockResponse({ ok: true, status: 204, json: jsonSpy }),
+    );
 
     const result = await apiFetch("/deleted");
 

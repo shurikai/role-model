@@ -3,9 +3,9 @@ from pydantic import BaseModel, Field
 
 
 class Bullet(BaseModel):
-   text: str
-   contribution_ids: list[str] = Field(min_length=1)
-   feedback_signal: Literal["accepted", "rejected", "edited", None] = None
+    text: str
+    contribution_ids: list[str] = Field(min_length=1)
+    feedback_signal: Literal["accepted", "rejected", "edited", None] = None
 
 
 class PositionBlock(BaseModel):
@@ -64,6 +64,7 @@ class ProjectEntry(BaseModel):
     tags: list[str] = Field(default_factory=list)
     bullets: list[Bullet]
 
+
 class Identity(BaseModel):
     name: str
     email: str
@@ -74,10 +75,12 @@ class Identity(BaseModel):
     site_url: str | None = None
     headline: str | None = None
 
+
 class JDSignals(BaseModel):
     priority_skills: list[str] = Field(default_factory=list)
     seniority: str | None = None
     domain_vocabulary: list[str] = Field(default_factory=list)
+
 
 class MetaBlock(BaseModel):
     generation_model: str
@@ -88,6 +91,7 @@ class MetaBlock(BaseModel):
     target_role: str | None = None
     target_company: str | None = None
     jd_signals: JDSignals | None = None
+
 
 class Resume(BaseModel):
     schema_version: str

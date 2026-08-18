@@ -76,7 +76,10 @@ async function rawFetch(path: string, init: RequestInit): Promise<Response> {
   return response;
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   const response = await rawFetch(path, init);
 
   if (response.status === 204) {
@@ -88,7 +91,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 // apiFetchBlob is for binary responses (e.g. the rendered .docx download) that
 // apiFetch's response.json() parsing can't handle.
-export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+export async function apiFetchBlob(
+  path: string,
+  init: RequestInit = {},
+): Promise<Blob> {
   const response = await rawFetch(path, init);
   return response.blob();
 }

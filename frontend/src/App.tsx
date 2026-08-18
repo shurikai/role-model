@@ -27,10 +27,16 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route element={<RequireAuth />}>
-                <Route path="/" element={<Navigate to="/applications" replace />} />
+                <Route
+                  path="/"
+                  element={<Navigate to="/applications" replace />}
+                />
                 <Route path="/applications" element={<Applications />} />
                 <Route path="/applications/new" element={<ApplicationNew />} />
-                <Route path="/applications/:id" element={<ApplicationDetail />} />
+                <Route
+                  path="/applications/:id"
+                  element={<ApplicationDetail />}
+                />
               </Route>
             </Routes>
           </ErrorBoundary>

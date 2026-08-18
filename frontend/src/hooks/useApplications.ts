@@ -62,9 +62,13 @@ export function useRunFitEvaluation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (applicationId: string) =>
-      apiFetch<FitReport>(`/applications/${applicationId}/fit`, { method: "POST" }),
+      apiFetch<FitReport>(`/applications/${applicationId}/fit`, {
+        method: "POST",
+      }),
     onSuccess: (_data, applicationId) => {
-      queryClient.invalidateQueries({ queryKey: ["applications", applicationId, "fit"] });
+      queryClient.invalidateQueries({
+        queryKey: ["applications", applicationId, "fit"],
+      });
     },
   });
 }
@@ -72,7 +76,8 @@ export function useRunFitEvaluation() {
 export function useResumeVersions(applicationId: string | undefined) {
   return useQuery({
     queryKey: ["applications", applicationId, "versions"],
-    queryFn: () => apiFetch<ResumeVersion[]>(`/applications/${applicationId}/versions`),
+    queryFn: () =>
+      apiFetch<ResumeVersion[]>(`/applications/${applicationId}/versions`),
     enabled: !!applicationId,
   });
 }
@@ -81,9 +86,13 @@ export function useGenerateResume() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (applicationId: string) =>
-      apiFetch<ResumeVersion>(`/applications/${applicationId}/generate`, { method: "POST" }),
+      apiFetch<ResumeVersion>(`/applications/${applicationId}/generate`, {
+        method: "POST",
+      }),
     onSuccess: (_data, applicationId) => {
-      queryClient.invalidateQueries({ queryKey: ["applications", applicationId, "versions"] });
+      queryClient.invalidateQueries({
+        queryKey: ["applications", applicationId, "versions"],
+      });
     },
   });
 }
@@ -91,6 +100,8 @@ export function useGenerateResume() {
 export function useRenderResumeVersion() {
   return useMutation({
     mutationFn: (resumeVersionId: string) =>
-      apiFetchBlob(`/resume-versions/${resumeVersionId}/render`, { method: "POST" }),
+      apiFetchBlob(`/resume-versions/${resumeVersionId}/render`, {
+        method: "POST",
+      }),
   });
 }

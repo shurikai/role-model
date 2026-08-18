@@ -7,7 +7,9 @@ import { AuthProvider } from "../contexts/AuthContext";
 import { Login } from "./Login";
 
 function renderLogin(initialEntries: string[] = ["/login"]) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={initialEntries}>
@@ -49,7 +51,10 @@ describe("Login", () => {
     // that so only the /auth/login call itself needs asserting on below.
     fetchMock.mockResolvedValue(jsonResponse(true, 200, {}));
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(true, 200, { token: "tok", user: { id: "u1", email: "person@example.com" } }),
+      jsonResponse(true, 200, {
+        token: "tok",
+        user: { id: "u1", email: "person@example.com" },
+      }),
     );
     renderLogin();
 
@@ -58,7 +63,11 @@ describe("Login", () => {
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
     await waitFor(() => {
-      expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/auth/login"))).toBe(true);
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes("/auth/login"),
+        ),
+      ).toBe(true);
     });
 
     const [url, init] = fetchMock.mock.calls.find(([callUrl]) =>
@@ -74,7 +83,10 @@ describe("Login", () => {
   it("shows the verbatim backend message for code: invalid_credentials", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(false, 401, { error: "invalid email or password", code: "invalid_credentials" }),
+      jsonResponse(false, 401, {
+        error: "invalid email or password",
+        code: "invalid_credentials",
+      }),
     );
     renderLogin();
 
@@ -82,13 +94,18 @@ describe("Login", () => {
     await user.type(screen.getByLabelText("Password"), "wrong");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByText("invalid email or password")).toBeInTheDocument();
+    expect(
+      await screen.findByText("invalid email or password"),
+    ).toBeInTheDocument();
   });
 
   it("shows the generic fallback, not the raw message, for code: internal_error", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(false, 500, { error: "panic: nil pointer at auth.go:42", code: "internal_error" }),
+      jsonResponse(false, 500, {
+        error: "panic: nil pointer at auth.go:42",
+        code: "internal_error",
+      }),
     );
     renderLogin();
 
@@ -96,19 +113,27 @@ describe("Login", () => {
     await user.type(screen.getByLabelText("Password"), "hunter2");
     await user.click(screen.getByRole("button", { name: "Log in" }));
 
-    expect(await screen.findByText("Something went wrong. Please try again.")).toBeInTheDocument();
-    expect(screen.queryByText("panic: nil pointer at auth.go:42")).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Something went wrong. Please try again."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("panic: nil pointer at auth.go:42"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders the expiry banner on ?reason=expired and hides it on dismiss", async () => {
     const user = userEvent.setup();
     renderLogin(["/login?reason=expired"]);
 
-    const banner = screen.getByText("Your session expired. Please log in again.");
+    const banner = screen.getByText(
+      "Your session expired. Please log in again.",
+    );
     expect(banner).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Dismiss" }));
 
-    expect(screen.queryByText("Your session expired. Please log in again.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Your session expired. Please log in again."),
+    ).not.toBeInTheDocument();
   });
 });

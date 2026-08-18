@@ -86,7 +86,9 @@ function stubFetch(application: Application, fitReports: FitReport[]) {
 }
 
 function renderDetail() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[`/applications/${APP_ID}`]}>
@@ -125,7 +127,9 @@ describe("ApplicationDetail", () => {
       );
       renderDetail();
 
-      const button = await screen.findByRole("button", { name: "Generate Resume" });
+      const button = await screen.findByRole("button", {
+        name: "Generate Resume",
+      });
       expect(button).toBeEnabled();
       expect(
         screen.queryByText(/Run the fit evaluation first to see scores/),
@@ -136,7 +140,9 @@ describe("ApplicationDetail", () => {
       vi.stubGlobal("fetch", stubFetch(makeApplication(), []));
       renderDetail();
 
-      const button = await screen.findByRole("button", { name: "Generate Resume" });
+      const button = await screen.findByRole("button", {
+        name: "Generate Resume",
+      });
       expect(button).toBeDisabled();
       expect(
         await screen.findByText(/Run the fit evaluation first to see scores/),
@@ -165,7 +171,9 @@ describe("ApplicationDetail", () => {
       );
       renderDetail();
 
-      expect(await screen.findByText("This is the narrative.")).toBeInTheDocument();
+      expect(
+        await screen.findByText("This is the narrative."),
+      ).toBeInTheDocument();
       expect(screen.getByText("Technical score:")).toBeInTheDocument();
       expect(screen.getByText("Preference score:")).toBeInTheDocument();
       expect(screen.getByText("remote-first")).toBeInTheDocument();
@@ -200,7 +208,9 @@ describe("ApplicationDetail", () => {
       vi.stubGlobal("fetch", stubFetch(makeApplication(), [makeFitReport()]));
       renderDetail();
 
-      expect(await screen.findByText("This is the narrative.")).toBeInTheDocument();
+      expect(
+        await screen.findByText("This is the narrative."),
+      ).toBeInTheDocument();
       expect(screen.queryByText("Anti-pattern flag")).not.toBeInTheDocument();
       // The old always-on "passed" badge is gone too.
       expect(screen.queryByText(/Hard gate/)).not.toBeInTheDocument();
@@ -234,12 +244,12 @@ describe("ApplicationDetail", () => {
 
       expect(await screen.findByText("Anti-pattern flag")).toBeInTheDocument();
       expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
-      expect(screen.getByText("Technical score:").closest("p")).toHaveTextContent(
-        "Technical score: —",
-      );
-      expect(screen.getByText("Preference score:").closest("p")).toHaveTextContent(
-        "Preference score: —",
-      );
+      expect(
+        screen.getByText("Technical score:").closest("p"),
+      ).toHaveTextContent("Technical score: —");
+      expect(
+        screen.getByText("Preference score:").closest("p"),
+      ).toHaveTextContent("Preference score: —");
     });
   });
 
@@ -251,7 +261,9 @@ describe("ApplicationDetail", () => {
       expect(await screen.findByText("Screening summary")).toBeInTheDocument();
       expect(screen.getByText("Huntsville, AL")).toBeInTheDocument();
       expect(screen.getByText("active TS/SCI required")).toBeInTheDocument();
-      expect(screen.getByText("military-coded language throughout")).toBeInTheDocument();
+      expect(
+        screen.getByText("military-coded language throughout"),
+      ).toBeInTheDocument();
     });
 
     it("is absent, not an empty box, when screening_summary is null", async () => {
