@@ -63,9 +63,11 @@ phase sections.
 
 ### Infrastructure
 - Docker Compose managing PostgreSQL 16 on host port 5433
-- golang-migrate: 10 migrations applied
-- Makefile with `db-up`, `db-down`, `migrate`, `seed`, `reset` targets, plus
-  `run`, `run-frontend`, `run-renderer`, and `dev` (all three processes at once)
+- golang-migrate: 11 migrations applied (`001`–`011`)
+- Makefile with `db-up`, `db-down`, `db-reset`, `migrate-up`, `migrate-down`,
+  `seed`, and `seed-sample` targets, plus `run`, `run-frontend`,
+  `run-renderer`, and `dev` (all three processes at once), and `fmt` /
+  `fmt-check` (gofmt + Prettier + ruff)
 - `make seed` reads `SEED_DIR` and applies SQL files in order
 - `internal/httputil` package (resolved the handlers↔middleware circular import)
 
@@ -93,11 +95,11 @@ Key design decisions baked in:
   nullable columns (`db_type` override alone does not work in sqlc 1.31.1)
 - Assembly skips positions/employers with no active contributions
 
-### Seed Data — 19 files, complete canonical career history
+### Seed Data — 20 files, complete canonical career history
 Lives in a separate private data repo (`shurikai/role-model-seed`), checked out
 in place at `database/seed` — gitignored here, so it is never tracked by this
 repo. `SEED_DIR` points at it (`./database/seed`). Numbering runs 001–016 and
-018–020; **there is no 017**.
+018–021; **there is no 017**.
 ```
 001_foundation.sql      — users, employers, positions, 54 tags across 9 categories
 002_disney.sql          — 7 contributions
@@ -118,6 +120,8 @@ repo. `SEED_DIR` points at it (`./database/seed`). Numbering runs 001–016 and
 018_skill_curation.sql  — closes four open items from the 2026-07-31 provenance audit
 019_spring_mvc_deactivate.sql — deactivates Spring MVC (real but unplaceable in time)
 020_deactivate_graphql_artifact.sql — deactivates GraphQL (not real usable depth)
+021_preference_reconciliation.sql — reconciles the preference profile against the
+                          hard-pass filters; source of truth with 014
 ```
 
 **Pending seed tasks:** none blocking. Both items previously listed here are
@@ -387,7 +391,9 @@ Microsoft stack trips the gate and caps (→ 25.0). No dependency edge between
 the rows is involved — additive weights produce that on their own.
 
 Not every row can actually fire against extracted JD signals — the
-skills-shaped anti-patterns in particular depend on what `gateFieldsFor` reads.
+skills-shaped anti-patterns in particular depend on what `prefFieldsFor` reads.
+(There is now one matcher, not two: the `signalFields`/`gateFieldsFor` split
+this section used to name is what hid #49, and it was removed with the fix.)
 See `notes/hard-exclude-preference-audit.md`, which is current as of its two
 appended resolutions.
 

@@ -44,9 +44,9 @@ the client, not the old renderer implementation.
 1. **JD signal extraction (Stage 1)** — takes raw job description text, returns
    structured jd_signals JSON (priority skills, seniority, domain vocabulary)
 2. **Resume generation (Stage 2)** — split into two calls:
-   - **2a body** (`resume_body.v4.tmpl`) — selects and writes bullets and
+   - **2a body** (`resume_body.tmpl`) — selects and writes bullets and
      skills against jd_signals, under a seniority-informed length budget
-   - **2b summary** (`resume_summary.*.tmpl`) — writes the summary scoped to
+   - **2b summary** (`resume_summary.tmpl`) — writes the summary scoped to
      the bullets 2a already selected, so it cannot assert unsupported claims
 
    Facts that both calls would otherwise decide independently (e.g. the header
