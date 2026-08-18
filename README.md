@@ -1,4 +1,5 @@
 # Role Model
+![CI](https://github.com/shurikai/role-model/actions/workflows/ci.yml/badge.svg)
 
 A career knowledge base that generates tailored, traceable resumes. Built in Go, backed by Postgres, reasoned over by Claude.
 
