@@ -89,6 +89,26 @@ the client, not the old renderer implementation.
    title) are threaded through as explicit inputs rather than re-derived. This
    is the established pattern for cross-call consistency — follow it.
 
+Between the two calls, `reconcileSkills` enforces the bullet/skills invariant
+2a states but does not reliably honour: a claimed skill that an emitted bullet
+names must appear in the Skills section. It runs before 2b so the summary is
+written against the final Skills list. Three rules hold it together:
+
+- **Re-add only, never drop.** A skill can be legitimately claimed without a
+  dedicated bullet; dropping on that basis would delete a JD-relevant skill for
+  want of room in the bullet budget.
+- **Only claimed skills are eligible.** A bullet naming WAGO or NGTS must not
+  manufacture a skill with no `skills` row behind it.
+- **Whole-word matching, never substring** — the same rule the fit-gate matcher
+  documents, for the same reason. Substring matching makes "Go" a hit inside
+  "Golang" and "Java" a hit inside "JavaScript". The boundary test is
+  "not alphanumeric" rather than a regexp `\b`, because real skill names carry
+  punctuation (`C++`, `C#`, `.NET`, `CI/CD`) that `\b` breaks on.
+
+Category order is preserved on rewrite. The renderer prints categories in
+document order, so decoding to a plain map would silently re-alphabetize the
+resume's Skills section as a side effect of adding one entry.
+
 Both calls are recorded separately in generation_params for per-call
 traceability.
 
