@@ -81,16 +81,16 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}
 
 	var (
-		wg                                 sync.WaitGroup
-		technicalScore, prefScore          float64
-		technicalGaps, prefGaps, prefConfl []string
-		technicalMatches                   []SkillMatch
-		gateHits                           []db.Preference
+		wg                  sync.WaitGroup
+		technical           TechnicalFit
+		prefScore           float64
+		prefGaps, prefConfl []string
+		gateHits            []db.Preference
 	)
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		technicalScore, technicalGaps, technicalMatches = ScoreTechnicalFit(skills, signals)
+		technical = ScoreTechnicalFit(skills, signals)
 	}()
 	go func() {
 		defer wg.Done()
@@ -113,16 +113,16 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
 	}
 
-	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technicalScore, technicalGaps, technicalMatches, prefScore, prefGaps, prefConfl)
+	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technical, prefScore, prefGaps, prefConfl)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
 
-	technicalGapsJSON, err := marshalRawNonEmpty(technicalGaps)
+	technicalGapsJSON, err := marshalRawNonEmpty(technical.Gaps)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal technical gaps: %w", err)
 	}
-	technicalMatchesJSON, err := marshalRawNonEmpty(technicalMatches)
+	technicalMatchesJSON, err := marshalRawNonEmpty(technical.Matches)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal technical matches: %w", err)
 	}
@@ -141,7 +141,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		ApplicationID:       appIDParam,
 		AntiPatternPassed:   gatePassed,
 		AntiPatternHits:     gateHitsJSON,
-		TechnicalScore:      numericFromScore(technicalScore),
+		TechnicalScore:      technicalScoreColumn(technical),
 		TechnicalGaps:       technicalGapsJSON,
 		TechnicalMatches:    technicalMatchesJSON,
 		PreferenceScore:     numericFromScore(prefScore),
@@ -157,8 +157,11 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 }
 
 type narrativeInput struct {
-	AntiPatternPassed   bool                        `json:"anti_pattern_passed"`
-	TechnicalScore      float64                     `json:"technical_score"`
+	AntiPatternPassed bool `json:"anti_pattern_passed"`
+	// Absent when the JD stated no technical requirements. The narrative
+	// prompt reads an absent score as "nothing was assessed" — emitting 0
+	// instead would read as "covers nothing", the opposite finding.
+	TechnicalScore      *float64                    `json:"technical_score,omitempty"`
 	TechnicalGaps       []string                    `json:"technical_gaps"`
 	TechnicalMatches    []SkillMatch                `json:"technical_matches"`
 	PreferenceScore     float64                     `json:"preference_score"`
@@ -173,9 +176,7 @@ func (s *Service) generateNarrative(
 	app db.Application,
 	signals JDSignals,
 	gatePassed bool,
-	technicalScore float64,
-	technicalGaps []string,
-	technicalMatches []SkillMatch,
+	technical TechnicalFit,
 	prefScore float64,
 	prefGaps []string,
 	prefConflicts []string,
@@ -187,9 +188,9 @@ func (s *Service) generateNarrative(
 
 	input := narrativeInput{
 		AntiPatternPassed:   gatePassed,
-		TechnicalScore:      technicalScore,
-		TechnicalGaps:       technicalGaps,
-		TechnicalMatches:    technicalMatches,
+		TechnicalScore:      narrativeScore(technical),
+		TechnicalGaps:       technical.Gaps,
+		TechnicalMatches:    technical.Matches,
 		PreferenceScore:     prefScore,
 		PreferenceGaps:      prefGaps,
 		PreferenceConflicts: prefConflicts,
@@ -233,6 +234,28 @@ func marshalRawNonEmpty[T any](v []T) (*json.RawMessage, error) {
 	}
 	raw := json.RawMessage(b)
 	return &raw, nil
+}
+
+// technicalScoreColumn stores NULL when nothing was scored. fit_reports
+// .technical_score is nullable and the UI already renders a null as "—", so
+// the honest value is representable end to end; the previous 100 was not
+// merely wrong but confidently wrong.
+func technicalScoreColumn(t TechnicalFit) pgtype.Numeric {
+	if !t.Scored {
+		return pgtype.Numeric{} // Valid: false — SQL NULL
+	}
+	return numericFromScore(t.Score)
+}
+
+// narrativeScore omits the score from the narrative input when nothing was
+// scored, rather than passing a number the prompt would feel obliged to
+// characterize.
+func narrativeScore(t TechnicalFit) *float64 {
+	if !t.Scored {
+		return nil
+	}
+	score := t.Score
+	return &score
 }
 
 func numericFromScore(v float64) pgtype.Numeric {
