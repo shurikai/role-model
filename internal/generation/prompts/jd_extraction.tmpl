@@ -21,6 +21,37 @@ required_skills: array of strings — technologies, tools, languages, frameworks
 preferred_skills: array of strings — technologies or skills the JD states are
   preferred, nice-to-have, a plus, or desired but not required. Empty array if none.
 
+core_competencies: array of strings — the capability-level requirements the JD
+  states in prose rather than as named technology. These are the things the
+  role needs someone to be able to DO. Write each as a short lowercase noun
+  phrase, e.g. "distributed systems design", "monolith decomposition",
+  "payment and ledger systems", "production on-call ownership", "technical
+  leadership of a new team", "mentoring senior engineers", "API design for
+  internal platform consumers". Empty array if none.
+
+  This field exists because senior and staff postings routinely describe the
+  job entirely in capability terms and name no concrete technology at all. For
+  such a JD, required_skills and preferred_skills are correctly empty, and
+  without this field the extraction carries nothing at all about what the role
+  actually asks for.
+
+  Rules for core_competencies:
+  - Do NOT restate a named technology as a competency. If the JD says
+    "Kubernetes", that is a skill and belongs in required_skills; it does not
+    also become "container orchestration" here. Only describe a capability
+    here when the JD describes it WITHOUT naming a tool for it.
+  - Do NOT put generic soft skills here ("communication", "teamwork",
+    "collaboration", "attention to detail"). A competency is an engineering
+    capability with a shape someone could show evidence of having done.
+    Leadership scope IS in scope when the JD makes it a job requirement —
+    "leads a newly formed team", "sets technical direction across teams" —
+    because that is a demonstrable responsibility, not a personality trait.
+  - Extract what the JD asks for, not the whole posting. Typically 3-8
+    entries. A list of 20 is a sign that boilerplate is being captured.
+  - Do not duplicate culture_signals. Culture describes how the team works
+    ("async-first", "high ownership"); a competency describes what the person
+    must be able to do ("owns services in production").
+
 seniority: string — one of: "junior", "mid", "senior", "staff", "principal",
   "lead", "unknown". Infer from title and requirements if not explicit.
 
@@ -133,6 +164,10 @@ Example output shape:
 {
   "required_skills": ["Go", "Kubernetes", "PostgreSQL"],
   "preferred_skills": ["Kafka", "Prometheus"],
+  "core_competencies": [
+    "high-cardinality time series storage",
+    "production on-call ownership"
+  ],
   "seniority": "senior",
   "domain": "observability",
   "work_type": "remote",
@@ -163,6 +198,20 @@ Input bullet: "Active proficiency with modern AI-assisted development tooling
 (e.g., Claude Code) to accelerate product velocity."
 -> required_skills includes "Claude Code" (not just the general phrase
 "AI-assisted development tooling").
+
+Example of a JD that names no technology at all — the case core_competencies
+exists for:
+Input: "You will help build the foundations of a newly formed team owning
+account credits, discounts, and payments settlement. You will set technical
+direction, decompose existing functionality out of a large legacy service,
+design APIs consumed by other engineering teams, and own these systems in
+production. You will mentor engineers and raise the bar for engineering
+quality across the org."
+-> required_skills: [] and preferred_skills: [] — correctly empty, since no
+technology is named.
+-> core_competencies: ["payments and settlement systems", "decomposing a
+legacy service", "API design for internal platform consumers", "production
+ownership of services", "setting technical direction", "mentoring engineers"]
 
 <job_description>
 {{.JobDescription}}

@@ -66,7 +66,9 @@ RULES:
   one-off exposure — that judgment is yours to make here. Include a skill
   only if at least one of these holds:
   - it is demonstrated by a bullet that actually appears in this output, or
-  - it is needed to satisfy the <jd_requirement_checklist>, or
+  - it is a technology named in the Required skills or Preferred skills
+    sections of the <jd_requirement_checklist> (never the Core competencies
+    section — see below), or
   - it reflects genuine, sustained working depth relevant to the target
     role, not a single cohort exercise, prototype, or tangential exposure.
   Exclude thin or tangential technologies even if technically true of the
@@ -78,8 +80,8 @@ RULES:
 - Each position's position_id in the output must be copied verbatim from the
   id field of the corresponding position in the experience data. Never invent,
   abbreviate, or generate a position_id.
-- Include projects only if their tags overlap meaningfully with priority_skills,
-  unless force_include is true
+- Include projects only if their tags or contributions overlap meaningfully
+  with the <jd_requirement_checklist>, unless force_include is true
 - Exclude projects where force_exclude is true regardless of relevance
 - Before finalizing your output, go through every entry in
   <jd_requirement_checklist> one at a time. For each entry, check whether the
@@ -89,6 +91,27 @@ RULES:
   bullet was already built around it. If an entry is NOT supported anywhere
   in the provided data, leave it out; the checklist is for surfacing real,
   present facts, not for satisfying the JD by fabricating coverage.
+- The checklist's three sections are satisfied differently, and the difference
+  matters:
+  - Required skills and Preferred skills name technologies. Either a Skills
+    entry or a bullet can carry one.
+  - Core competencies name capabilities the role needs someone to be able to
+    do — "decomposing a legacy service", "production ownership of services",
+    "setting technical direction". Only a bullet can evidence one. NEVER add
+    a competency to the Skills list to check it off: the Skills list is
+    technologies, and "setting technical direction" sitting in it reads as
+    padding and displaces a real skill.
+  - A competency is answered by a bullet that SHOWS the capability, not by a
+    bullet that names it. "Owned Trip Trading and Give Away functions
+    end-to-end as part of a crew scheduling monolith decomposition" answers
+    "decomposing a legacy service". "Experienced in monolith decomposition"
+    does not, and is the kind of claim this prompt exists to prevent.
+  - When a JD lists core competencies and no required skills at all, that is
+    the real shape of the posting, not missing data. Select and frame against
+    the competencies exactly as you would against a skills list — and apply
+    the same Skills-list restraint you would have applied if a skills list
+    had been present. An empty Required skills section is never a licence to
+    emit the whole background inventory.
 - Each project's project_id in the output must be copied verbatim from the
   id field of the corresponding project in the projects data. Never invent
   or generate a project_id.

@@ -42,7 +42,29 @@ the client, not the old renderer implementation.
 
 ### LLM pipeline
 1. **JD signal extraction (Stage 1)** — takes raw job description text, returns
-   structured jd_signals JSON (priority skills, seniority, domain vocabulary)
+   structured jd_signals JSON: required/preferred skills, core competencies,
+   seniority, domain, work type, culture signals, and a screening summary.
+
+   **A JD's requirements arrive in two shapes, and both are extracted.**
+   `required_skills`/`preferred_skills` hold named technology. `core_competencies`
+   holds the capability-level asks a posting states in prose — "decomposing a
+   legacy service", "production ownership of services", "setting technical
+   direction". Senior and staff postings routinely name no technology at all,
+   which left both skill lists correctly but uselessly empty and degraded every
+   consumer at once and silently: the 2a requirement checklist rendered
+   "(none listed)" twice, disabling the prompt's entire skill-relevance
+   apparatus so it fell back to emitting the whole tag inventory, while
+   `ScoreTechnicalFit` reported a vacuous 100 against nothing.
+
+   The two lists stay separate because they are **satisfied** differently. A
+   required skill can be answered by a Skills entry; a competency can only be
+   evidenced by a bullet. Never let a competency into the Skills list — a
+   resume listing "setting technical direction" among its technologies reads
+   as padding and displaces a real skill.
+
+   `core_competencies` is deliberately **not** in the document projection. Per
+   the intermediate-JSON rule below, adding a field to `JDSignals` must not
+   change what the document emits.
 2. **Resume generation (Stage 2)** — split into two calls:
    - **2a body** (`resume_body.tmpl`) — selects and writes bullets and
      skills against jd_signals, under a seniority-informed length budget
