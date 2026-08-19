@@ -68,6 +68,20 @@ the client, not the old renderer implementation.
 2. **Resume generation (Stage 2)** — split into two calls:
    - **2a body** (`resume_body.tmpl`) — selects and writes bullets and
      skills against jd_signals, under a seniority-informed length budget
+     and framing guidance
+
+     **Seniority drives two levers, and they are siblings on purpose.**
+     `buildLengthBudget` sets how much gets written; `buildFramingGuidance`
+     sets what altitude it is written at. Length was for a long time the only
+     one, so a staff posting got more bullets of the same altitude rather than
+     bullets pitched at the level it was hiring for — every other rule in the
+     prompt pushes toward implementation specificity. Add a third lever to
+     that pair, not somewhere else.
+
+     Staff framing adds ownership and scope **on top of** the evidence, never
+     in place of it. Trading the metric for the claim is the failure mode, not
+     the goal: the number is what makes the ownership claim believable, and a
+     broad claim with nothing behind it is what a skeptical reader discounts.
    - **2b summary** (`resume_summary.tmpl`) — writes the summary scoped to
      the bullets 2a already selected, so it cannot assert unsupported claims
 
