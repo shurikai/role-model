@@ -43,46 +43,154 @@ func splitAlternatives(entry string) []string {
 	return out
 }
 
-// satisfies reports whether skillNames covers the requirement in entry — that
-// is, whether it matches any one of the entry's alternatives.
-func satisfies(skillNames []string, entry string) bool {
-	for _, alt := range splitAlternatives(entry) {
-		if matchesAny(skillNames, alt) {
-			return true
-		}
-	}
-	return false
+// SkillTerm is one active skill as the matcher sees it: the canonical name,
+// the synonyms a JD might use instead, and the category it belongs to along
+// with that category's competency vocabulary.
+//
+// It exists because matching against the name alone loses two different
+// things. Aliases lose a spelling difference ("Golang" against a stored
+// "Go"). The category loses a whole level of abstraction: a JD that asks for
+// "CI/CD" is asking about Jenkins and GitHub Actions without naming either.
+type SkillTerm struct {
+	Name            string
+	Aliases         []string
+	Category        string
+	CategoryAliases []string
 }
 
-// ScoreTechnicalFit scores how well skillNames (the user's resolved skill
-// tag names) cover the JD's required and preferred skills. Required matches
-// are worth twice a preferred match. Gaps list required skills with no
-// matching entry in skillNames.
+// MatchKind records how a requirement came to be satisfied. It is carried
+// into the report so a reader can tell strong evidence from weak: a direct
+// name match is the skill itself, while a category match means the JD asked
+// for a capability and the user holds tools within it.
+type MatchKind string
+
+const (
+	MatchDirect   MatchKind = "direct"
+	MatchAlias    MatchKind = "alias"
+	MatchCategory MatchKind = "category"
+)
+
+// SkillMatch is one satisfied requirement and the evidence behind it.
+type SkillMatch struct {
+	Requirement string    `json:"requirement"`
+	Kind        MatchKind `json:"kind"`
+	Category    string    `json:"category,omitempty"`
+	Evidence    []string  `json:"evidence"`
+}
+
+// satisfies reports how skills cover the requirement in entry, and returns
+// the evidence for it. An entry may offer several interchangeable
+// alternatives; matching any one satisfies the whole entry.
+//
+// The three kinds are tried in order of strength across every alternative,
+// rather than settling for the first alternative that matches somehow. A JD
+// entry of "Kubernetes | container orchestration" should report the stored
+// Kubernetes skill, not a category match on the phrase beside it.
+func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category string, evidence []string, ok bool) {
+	alts := splitAlternatives(entry)
+
+	// Strongest: the skill's own name answers the requirement.
+	for _, alt := range alts {
+		for _, s := range skills {
+			if matchesAny([]string{s.Name}, alt) {
+				evidence = appendUnique(evidence, s.Name)
+			}
+		}
+	}
+	if len(evidence) > 0 {
+		return MatchDirect, "", evidence, true
+	}
+
+	// Next: a recorded synonym of the skill answers it.
+	for _, alt := range alts {
+		for _, s := range skills {
+			if matchesPhrase(s.Aliases, alt) {
+				evidence = appendUnique(evidence, s.Name)
+			}
+		}
+	}
+	if len(evidence) > 0 {
+		return MatchAlias, "", evidence, true
+	}
+
+	// Weakest, and the one that rescues competency-worded JDs: the
+	// requirement names a capability that one of the user's categories
+	// covers. Evidence is every active skill in that category — the category
+	// is only reachable here because at least one such skill exists, since
+	// the skill list is what these categories were built from.
+	for _, alt := range alts {
+		for _, s := range skills {
+			if s.Category == "" {
+				continue
+			}
+			if !matchesPhrase(append([]string{s.Category}, s.CategoryAliases...), alt) {
+				continue
+			}
+			category = s.Category
+			for _, peer := range skills {
+				if peer.Category == category {
+					evidence = appendUnique(evidence, peer.Name)
+				}
+			}
+			return MatchCategory, category, evidence, true
+		}
+	}
+
+	return "", "", nil, false
+}
+
+// appendUnique appends v to out if it isn't already there, keeping evidence
+// lists stable and free of repeats when several alternatives hit the same
+// skill.
+func appendUnique(out []string, v string) []string {
+	if slices.Contains(out, v) {
+		return out
+	}
+	return append(out, v)
+}
+
+// ScoreTechnicalFit scores how well the user's skills cover the JD's required
+// and preferred skills. Required matches are worth twice a preferred match.
+// Gaps list required skills nothing answered; matches record the satisfied
+// requirements and the evidence for each.
 //
 // Each entry counts once toward the total no matter how many alternatives it
 // offers, and an unmet entry is reported as a single gap holding the whole
 // original string — one requirement, one gap.
-func ScoreTechnicalFit(skillNames []string, signals JDSignals) (score float64, gaps []string) {
+//
+// A category match earns the same points as a direct one. Five CI/CD tools
+// really is evidence of CI/CD, and a fractional constant would need defending
+// against every future JD. The distinction is preserved in the match kind,
+// where a reader can weigh it, rather than baked into the number. Weighting
+// credit by actual depth is a separate problem — skills.proficiency and
+// years_experience are still dropped before scoring ever sees them.
+func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) (score float64, gaps []string, matches []SkillMatch) {
 	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
 	if pointsPossible == 0 {
-		return 100.0, nil
+		return 100.0, nil, nil
 	}
 
 	var pointsEarned float64
 	for _, req := range signals.RequiredSkills {
-		if satisfies(skillNames, req) {
+		if kind, category, evidence, ok := satisfies(skills, req); ok {
 			pointsEarned += 2
+			matches = append(matches, SkillMatch{
+				Requirement: req, Kind: kind, Category: category, Evidence: evidence,
+			})
 		} else {
 			gaps = append(gaps, req)
 		}
 	}
 	for _, pref := range signals.PreferredSkills {
-		if satisfies(skillNames, pref) {
+		if kind, category, evidence, ok := satisfies(skills, pref); ok {
 			pointsEarned += 1
+			matches = append(matches, SkillMatch{
+				Requirement: pref, Kind: kind, Category: category, Evidence: evidence,
+			})
 		}
 	}
 
-	return clampScore(pointsEarned / pointsPossible * 100), gaps
+	return clampScore(pointsEarned / pointsPossible * 100), gaps, matches
 }
 
 // hardGateCeiling is the highest preference score a JD can hold once it has
@@ -308,19 +416,53 @@ func containsPhrase(needle, haystack string) bool {
 // still bridges the case that matters — a short canonical skill name sitting
 // inside a longer JD phrase — without inventing matches from shared letters.
 //
-// Neither direction bridges a morphological difference: "REST" and "RESTful
-// APIs" share no whole word and neither contains the other, so an adjectival
-// JD phrase is not matchable here at all. It has to be canonicalized upstream
-// — see the canonicalization rule in jd_extraction.tmpl. A stored skill named
-// "REST" reporting a 10-year expertise as a gap against "RESTful APIs" is the
-// case that surfaced both halves of this.
-func matchesAny(skillNames []string, tag string) bool {
+// Neither direction bridges a morphological difference on its own: "REST" and
+// "RESTful APIs" share no whole word and neither contains the other. That
+// gap is now closed by data rather than by string logic — the caller passes
+// each skill's recorded aliases through here too, and the REST tag carries
+// 'restful'. Canonicalization upstream in jd_extraction.tmpl is still the
+// first line of defence; aliases are what keep a stored ten-year skill from
+// reading as a gap when the JD spells it differently anyway.
+//
+// The terms slice is whatever the caller wants weighed against tag: a single
+// skill name, one skill's aliases, or a category name plus its competency
+// vocabulary. Keeping the primitive dumb is deliberate — the ranking of those
+// three lives in satisfies, where it can be read in one place.
+func matchesAny(terms []string, tag string) bool {
 	needle := strings.ToLower(tag)
-	for _, name := range skillNames {
-		if strings.Contains(strings.ToLower(name), needle) {
+	for _, term := range terms {
+		if term == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(term), needle) {
 			return true
 		}
-		if containsPhrase(name, tag) {
+		if containsPhrase(term, tag) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesPhrase is matchesAny without the raw-substring direction: a term
+// counts only where it appears as a run of whole words inside the JD phrase.
+//
+// It exists because the substring direction does not survive contact with
+// multi-word terms. It is safe for a skill name — a JD asking for "SQL" is
+// genuinely answered by "PostgreSQL" — but a category alias is a sentence
+// fragment, and letting a JD term match any letters inside one produced
+// exactly the nonsense you would predict: a JD requiring "RAG" matched the
+// Testing category, because "rag" sits inside "test cove(rag)e", and reported
+// TDD and JUnit as evidence of retrieval-augmented generation.
+//
+// Aliases and category vocabulary go through here. Only the skill's own name
+// keeps both directions.
+func matchesPhrase(terms []string, tag string) bool {
+	for _, term := range terms {
+		if term == "" {
+			continue
+		}
+		if containsPhrase(term, tag) {
 			return true
 		}
 	}
