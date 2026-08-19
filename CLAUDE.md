@@ -397,6 +397,16 @@ pg_format or sqlfluff.
   so the table holds a real spread of novice/proficient/expert with
   `years_experience` populated on most rows.
 
+  **Generation now reads it; the fit gate still does not.** `assembleSkills`
+  (`internal/generation/assemble.go`) selects the claimed skills with
+  proficiency and years via `ListActiveSkillProfileByUser` and passes them to
+  2a as `<skills>`, which filters on relevance and depth together and may
+  annotate a few deep, central skills as "Java (25 yrs)". That block is also
+  now the **only** source for the resume's Skills section — it used to be
+  built from contribution tags, which are vocabulary rather than claims, and
+  that is how JavaScript reached a rendered resume without a `skills` row
+  behind it.
+
   `internal/fitgate` never sees any of it. `ListActiveSkillMatchTermsByUser`
   (`internal/db/queries/skills.sql`) selects name, aliases, and category —
   but not proficiency or years — and `ScoreTechnicalFit` takes `[]SkillTerm`
@@ -405,8 +415,8 @@ pg_format or sqlfluff.
   preferred skill 1, whether it represents twenty years or a weekend. A one-off
   prototype and a decade of production use still look identical to scoring, but
   because the columns are dropped at the query layer, not because they are
-  empty. `ListActiveSkillsByUser` already returns full rows; threading
-  proficiency and years through to the scorer is the fix.
+  empty. `ListActiveSkillProfileByUser` already selects exactly what is
+  needed; threading proficiency and years through to the scorer is the fix.
 
   This is also why a category match earns full credit today (see the matching
   section above). Weighting a match by the depth behind it is the same missing
