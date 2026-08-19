@@ -32,6 +32,62 @@ type JDSignals struct {
 	DomainVocabulary []string `json:"domain_vocabulary,omitempty"`
 }
 
+// documentJDSignals is the jd_signals projection embedded in the resume
+// document's meta block. It mirrors $defs.jd_signals in schema/resume.v1.json
+// exactly — those six fields, no others.
+//
+// It exists because the document schema is a strict contract
+// (additionalProperties: false) while JDSignals is owned by extraction and
+// evolves on its own schedule. Assigning the stored jd_signals blob straight
+// into meta coupled the two, and broke in both directions at once: 15 stored
+// applications carry the deprecated priority_skills/domain_vocabulary and 5
+// carry screening_summary, none of which the schema allows. 20 of 31
+// applications could not generate at all, each failing on a field the
+// document never needed.
+//
+// The invariant this type buys: adding a field to JDSignals cannot change
+// what the document emits. If the document should carry something new, the
+// schema declares it first and this struct follows — never the reverse.
+type documentJDSignals struct {
+	RequiredSkills  []string `json:"required_skills"`
+	PreferredSkills []string `json:"preferred_skills"`
+	Seniority       string   `json:"seniority"`
+	Domain          string   `json:"domain"`
+	WorkType        string   `json:"work_type"`
+	CultureSignals  []string `json:"culture_signals"`
+}
+
+// forDocument projects the signals down to what the document schema declares.
+func (s JDSignals) forDocument() documentJDSignals {
+	// The same fallback buildSkillsChecklist applies. Pre-migration rows carry
+	// the requirement list under priority_skills, so reading RequiredSkills
+	// alone would hand 15 stored applications an empty signal block — a
+	// silent downgrade, where the data is merely named differently.
+	required := s.RequiredSkills
+	if len(required) == 0 {
+		required = s.PrioritySkills
+	}
+
+	return documentJDSignals{
+		RequiredSkills:  nonNilStrings(required),
+		PreferredSkills: nonNilStrings(s.PreferredSkills),
+		Seniority:       s.Seniority,
+		Domain:          s.Domain,
+		WorkType:        s.WorkType,
+		CultureSignals:  nonNilStrings(s.CultureSignals),
+	}
+}
+
+// nonNilStrings keeps an absent list marshalling as [] rather than null. The
+// schema types these as arrays without listing them as required, so an
+// omitted key validates but an explicit null does not.
+func nonNilStrings(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
+}
+
 // ScreeningSummary holds plain-language facts a human would scan a JD for
 // before seriously considering it — criteria that don't relate to skills
 // match but often decide whether a role is worth pursuing at all. This is

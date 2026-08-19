@@ -141,6 +141,25 @@ Generation produces a structured JSON document (see /schema/resume.v1.json)
 that is the contract between the generation pipeline and the renderer.
 The renderer never touches the database. The JSON document is self-contained.
 
+**Nothing is copied into the document verbatim from an evolving upstream
+type.** `meta.jd_signals` is a deliberate projection — `documentJDSignals` in
+internal/generation, mirroring `$defs.jd_signals` field for field — not the
+stored `jd_signals` blob. The schema sets `additionalProperties: false`, so
+assigning the blob straight through coupled a strict contract to a type owned
+by extraction, and it broke in both directions at once: 15 stored applications
+carried the deprecated `priority_skills`/`domain_vocabulary` and 5 carried
+`screening_summary`, none of them declared. 20 of 31 applications could not
+generate at all, each failing validation on a field the document never needed.
+
+The rule that follows: **adding a field to `JDSignals` must not change what the
+document emits.** If the document should carry something new, the schema
+declares it first and the projection follows — never the reverse. The same
+reasoning applies to any future blob the document embeds.
+
+`screening_summary` is deliberately absent from the document. It is screening
+data (location, travel, clearance, comp), not resume content; the renderer has
+no use for it, and it is already persisted on `fit_reports.screening_summary`.
+
 ### Renderer
 Built. `docx-renderer/` is a small Python service (FastAPI + python-docx)
 exposing a single `POST /render` endpoint that takes the intermediate resume

@@ -118,6 +118,31 @@ type resumeSummaryPromptData struct {
 	Body        string
 }
 
+// buildMetaBlock assembles the document's meta block.
+//
+// It takes the full JDSignals and projects internally rather than accepting an
+// already-projected value, so there is no call site at which the raw stored
+// blob could be substituted. That was the original defect: meta was assembled
+// inline and `"jd_signals": app.JdSignals` looked entirely reasonable there,
+// while the schema forbids additional properties. Making the projection
+// unbypassable is worth more than a test asserting nobody bypassed it.
+func buildMetaBlock(applicationID uuid.UUID, companyName, roleTitle, generationModel string, signals JDSignals) map[string]any {
+	return map[string]any{
+		"schema_version":   "1.0",
+		"generated_at":     time.Now().UTC().Format(time.RFC3339),
+		"application_id":   applicationID.String(),
+		"target_company":   companyName,
+		"target_role":      roleTitle,
+		"jd_signals":       signals.forDocument(),
+		"generation_model": generationModel,
+		// schema/resume.v1.json requires this field and forbids additional
+		// ones, so the portable document carries the coarse pipeline version
+		// only. Per-prompt content hashes live in generation_params on the
+		// resume_versions row, which is unconstrained JSONB.
+		"prompt_version": pipelineVersion,
+	}
+}
+
 // Generate runs the full resume generation pipeline for an application.
 func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID) (*db.ResumeVersion, error) {
 	app, err := s.q.GetApplication(ctx, db.GetApplicationParams{
@@ -144,6 +169,12 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	signalsJSON, err := json.MarshalIndent(app.JdSignals, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal signals: %w", err)
+	}
+	// The prompts get the full stored signals; the document gets only what its
+	// schema declares. See documentJDSignals and buildMetaBlock.
+	var parsedSignals JDSignals
+	if err := json.Unmarshal(*app.JdSignals, &parsedSignals); err != nil {
+		return nil, fmt.Errorf("generate: parse jd_signals for document: %w", err)
 	}
 	skillsChecklist, err := buildSkillsChecklist(app.JdSignals)
 	if err != nil {
@@ -293,20 +324,8 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 	// Overwrite provenance fields the model must not own. The model generates
 	// resume *content*; the generator stamps the *facts* about generation.
-	meta := map[string]any{
-		"schema_version":   "1.0",
-		"generated_at":     time.Now().UTC().Format(time.RFC3339),
-		"application_id":   applicationID.String(),
-		"target_company":   app.CompanyName,
-		"target_role":      app.RoleTitle,
-		"jd_signals":       app.JdSignals,
-		"generation_model": s.client.ModelName(),
-		// schema/resume.v1.json requires this field and forbids additional
-		// ones, so the portable document carries the coarse pipeline version
-		// only. Per-prompt content hashes live in generation_params on the
-		// resume_versions row, which is unconstrained JSONB.
-		"prompt_version": pipelineVersion,
-	}
+	meta := buildMetaBlock(applicationID, app.CompanyName, app.RoleTitle,
+		s.client.ModelName(), parsedSignals)
 	metaJSON, err := json.Marshal(meta)
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal meta: %w", err)
