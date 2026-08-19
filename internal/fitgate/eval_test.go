@@ -64,6 +64,13 @@ type evalSkill struct {
 	Proficiency string   `json:"proficiency"`
 	Years       *float64 `json:"years_experience"`
 	IsActive    bool     `json:"is_active"`
+
+	// Aliases and category mirror what ListActiveSkillMatchTermsByUser now
+	// returns. Both are optional in the fixture: an entry that omits them
+	// behaves exactly as it did when the query selected t.name alone.
+	Aliases         []string `json:"aliases"`
+	Category        string   `json:"category"`
+	CategoryAliases []string `json:"category_aliases"`
 }
 
 // evalPreference mirrors the preferences table. Weight is a value, not a
@@ -130,15 +137,20 @@ func (p evalProfile) toPreferences() []db.Preference {
 	return out
 }
 
-// activeSkills returns what ListActiveSkillTagNamesByUser returns today: names
-// only, active rows only. Proficiency and years are dropped here, in the one
-// place that models the production query, so the loss is visible rather than
-// buried in the fixture.
-func (p evalProfile) activeSkills() []string {
-	var out []string
+// activeSkills returns what ListActiveSkillMatchTermsByUser returns today:
+// name, aliases, and category, for active rows only. Proficiency and years
+// are still dropped here, in the one place that models the production query,
+// so the loss stays visible rather than buried in the fixture.
+func (p evalProfile) activeSkills() []SkillTerm {
+	var out []SkillTerm
 	for _, s := range p.Skills {
 		if s.IsActive {
-			out = append(out, s.Name)
+			out = append(out, SkillTerm{
+				Name:            s.Name,
+				Aliases:         s.Aliases,
+				Category:        s.Category,
+				CategoryAliases: s.CategoryAliases,
+			})
 		}
 	}
 	return out
@@ -174,7 +186,7 @@ func TestFitEval(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			var res result
-			res.technicalScore, res.technicalGaps = ScoreTechnicalFit(skills, c.Signals)
+			res.technicalScore, res.technicalGaps, _ = ScoreTechnicalFit(skills, c.Signals)
 			var hits []db.Preference
 			res.preferenceScore, res.preferenceGaps, res.prefConflicts, hits =
 				ScorePreferenceFit(prefs, c.Signals)

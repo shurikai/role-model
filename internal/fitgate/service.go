@@ -54,9 +54,18 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		return nil, fmt.Errorf("fit evaluation: parse jd_signals: %w", err)
 	}
 
-	skillNames, err := s.q.ListActiveSkillTagNamesByUser(ctx, userID)
+	skillRows, err := s.q.ListActiveSkillMatchTermsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: list skills: %w", err)
+	}
+	skills := make([]SkillTerm, 0, len(skillRows))
+	for _, r := range skillRows {
+		skills = append(skills, SkillTerm{
+			Name:            r.Name,
+			Aliases:         r.Aliases,
+			Category:        r.Category,
+			CategoryAliases: r.CategoryAliases,
+		})
 	}
 
 	prefs, err := s.q.ListPreferencesByUser(ctx, userID)
@@ -75,12 +84,13 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		wg                                 sync.WaitGroup
 		technicalScore, prefScore          float64
 		technicalGaps, prefGaps, prefConfl []string
+		technicalMatches                   []SkillMatch
 		gateHits                           []db.Preference
 	)
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		technicalScore, technicalGaps = ScoreTechnicalFit(skillNames, signals)
+		technicalScore, technicalGaps, technicalMatches = ScoreTechnicalFit(skills, signals)
 	}()
 	go func() {
 		defer wg.Done()
@@ -103,7 +113,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
 	}
 
-	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technicalScore, technicalGaps, prefScore, prefGaps, prefConfl)
+	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technicalScore, technicalGaps, technicalMatches, prefScore, prefGaps, prefConfl)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
@@ -111,6 +121,10 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	technicalGapsJSON, err := marshalRawNonEmpty(technicalGaps)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal technical gaps: %w", err)
+	}
+	technicalMatchesJSON, err := marshalRawNonEmpty(technicalMatches)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal technical matches: %w", err)
 	}
 	prefGapsJSON, err := marshalRawNonEmpty(prefGaps)
 	if err != nil {
@@ -129,6 +143,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		AntiPatternHits:     gateHitsJSON,
 		TechnicalScore:      numericFromScore(technicalScore),
 		TechnicalGaps:       technicalGapsJSON,
+		TechnicalMatches:    technicalMatchesJSON,
 		PreferenceScore:     numericFromScore(prefScore),
 		PreferenceGaps:      prefGapsJSON,
 		PreferenceConflicts: prefConflictsJSON,
@@ -145,6 +160,7 @@ type narrativeInput struct {
 	AntiPatternPassed   bool                        `json:"anti_pattern_passed"`
 	TechnicalScore      float64                     `json:"technical_score"`
 	TechnicalGaps       []string                    `json:"technical_gaps"`
+	TechnicalMatches    []SkillMatch                `json:"technical_matches"`
 	PreferenceScore     float64                     `json:"preference_score"`
 	PreferenceGaps      []string                    `json:"preference_gaps"`
 	PreferenceConflicts []string                    `json:"preference_conflicts"`
@@ -159,6 +175,7 @@ func (s *Service) generateNarrative(
 	gatePassed bool,
 	technicalScore float64,
 	technicalGaps []string,
+	technicalMatches []SkillMatch,
 	prefScore float64,
 	prefGaps []string,
 	prefConflicts []string,
@@ -172,6 +189,7 @@ func (s *Service) generateNarrative(
 		AntiPatternPassed:   gatePassed,
 		TechnicalScore:      technicalScore,
 		TechnicalGaps:       technicalGaps,
+		TechnicalMatches:    technicalMatches,
 		PreferenceScore:     prefScore,
 		PreferenceGaps:      prefGaps,
 		PreferenceConflicts: prefConflicts,

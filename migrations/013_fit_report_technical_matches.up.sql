@@ -1,0 +1,11 @@
+-- Per-requirement match provenance for the technical score.
+--
+-- technical_gaps records only what was *not* matched, which made a gap list
+-- impossible to trust: a naming mismatch and a genuine absence of skill were
+-- indistinguishable, and the narrative asserted the latter for both. Recording
+-- how each requirement was satisfied — and by which skills — makes the gaps
+-- that remain meaningful, and lets the narrative cite evidence ("your CI/CD
+-- experience is Jenkins, GitHub Actions, Harness") instead of a bare score.
+--
+-- Nullable: reports written before this migration have none.
+ALTER TABLE fit_reports ADD COLUMN technical_matches JSONB;

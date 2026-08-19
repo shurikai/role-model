@@ -2,9 +2,9 @@
 INSERT INTO fit_reports (
     id, user_id, application_id, anti_pattern_passed, anti_pattern_hits,
     technical_score, technical_gaps, preference_score, preference_gaps, narrative,
-    preference_conflicts, screening_summary
+    preference_conflicts, screening_summary, technical_matches
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 )
 RETURNING *;
 
