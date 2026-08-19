@@ -39,3 +39,19 @@ SELECT t.name
 FROM skills s
 JOIN tags t ON t.id = s.tag_id
 WHERE s.user_id = $1 AND s.is_active = true;
+
+-- name: ListActiveSkillMatchTermsByUser :many
+-- Everything the fit-gate matcher needs to answer a JD requirement: the
+-- canonical name, the synonyms a JD might use instead, and the category that
+-- carries the competency vocabulary a JD phrases requirements in. Selecting
+-- t.name alone is what made "Golang" a gap against a stored "Go", and
+-- "CI/CD" a gap against Jenkins.
+--
+-- The join is constrained on user_id as well as tag_id. FK integrity on
+-- skills.tag_id already implies it; stating it keeps the row set correct if a
+-- tag is ever re-pointed.
+SELECT t.name, t.aliases, t.category, c.aliases AS category_aliases
+FROM skills s
+JOIN tags t ON t.id = s.tag_id AND t.user_id = s.user_id
+JOIN tag_categories c ON c.user_id = t.user_id AND c.name = t.category
+WHERE s.user_id = $1 AND s.is_active = true;

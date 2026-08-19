@@ -73,6 +73,16 @@ type Querier interface {
 	GetTagsByProject(ctx context.Context, arg GetTagsByProjectParams) ([]GetTagsByProjectRow, error)
 	GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
+	// Everything the fit-gate matcher needs to answer a JD requirement: the
+	// canonical name, the synonyms a JD might use instead, and the category that
+	// carries the competency vocabulary a JD phrases requirements in. Selecting
+	// t.name alone is what made "Golang" a gap against a stored "Go", and
+	// "CI/CD" a gap against Jenkins.
+	//
+	// The join is constrained on user_id as well as tag_id. FK integrity on
+	// skills.tag_id already implies it; stating it keeps the row set correct if a
+	// tag is ever re-pointed.
+	ListActiveSkillMatchTermsByUser(ctx context.Context, userID uuid.UUID) ([]ListActiveSkillMatchTermsByUserRow, error)
 	ListActiveSkillTagNamesByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListActiveSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
