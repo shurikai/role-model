@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shurikai/role-model/internal/db"
 )
 
@@ -103,6 +104,56 @@ func (s *Service) AssembleContext(ctx context.Context, userID uuid.UUID) (*Resum
 	}
 
 	return result, nil
+}
+
+// assembleSkills gathers the user's claimed skills with their depth signal.
+//
+// This is the source for the resume's Skills section. Contribution tags are
+// not: they are the vocabulary a bullet draws on, not a claim, and sourcing
+// skills from them both dropped the depth columns and admitted technologies
+// the user never claimed at all.
+func (s *Service) assembleSkills(ctx context.Context, userID uuid.UUID) ([]SkillView, error) {
+	rows, err := s.q.ListActiveSkillProfileByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("assemble skills: %w", err)
+	}
+
+	result := make([]SkillView, 0, len(rows))
+	for _, r := range rows {
+		sv := SkillView{
+			Name:        r.Name,
+			Category:    r.Category,
+			Proficiency: r.Proficiency,
+		}
+		years, err := skillYears(r.YearsExperience)
+		if err != nil {
+			return nil, fmt.Errorf("assemble skills: years for %q: %w", r.Name, err)
+		}
+		sv.YearsExperience = years
+
+		result = append(result, sv)
+	}
+
+	return result, nil
+}
+
+// skillYears converts a numeric(4,1) duration to a float the prompt can read,
+// returning nil where none was recorded. The prompt is instructed to print
+// these verbatim ("Java (25 yrs)"), so a scaling error here becomes a false
+// claim on a rendered resume rather than a visible crash.
+func skillYears(n pgtype.Numeric) (*float64, error) {
+	if !n.Valid {
+		return nil, nil
+	}
+	f, err := n.Float64Value()
+	if err != nil {
+		return nil, err
+	}
+	if !f.Valid {
+		return nil, nil
+	}
+	years := f.Float64
+	return &years, nil
 }
 
 func (s *Service) assembleProjects(ctx context.Context, userID uuid.UUID) ([]ProjectView, error) {

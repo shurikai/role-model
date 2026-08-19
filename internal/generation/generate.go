@@ -37,6 +37,7 @@ type resumeBodyPromptData struct {
 	LengthBudget    string
 	Identity        string
 	Experience      string
+	Skills          string
 	Projects        string
 	Education       string
 	Credentials     string
@@ -208,6 +209,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal experience: %w", err)
 	}
 
+	skills, err := s.assembleSkills(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
 	projects, err := s.assembleProjects(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
@@ -221,6 +226,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: %w", err)
 	}
 
+	skillsJSON, err := json.MarshalIndent(skills, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal skills: %w", err)
+	}
 	projectsJSON, err := json.MarshalIndent(projects, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal projects: %w", err)
@@ -244,6 +253,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		LengthBudget:    lengthBudget,
 		Identity:        string(identityJSON),
 		Experience:      string(experienceJSON),
+		Skills:          string(skillsJSON),
 		Projects:        string(projectsJSON),
 		Education:       string(educationJSON),
 		Credentials:     string(credentialsJSON),
