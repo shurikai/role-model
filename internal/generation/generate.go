@@ -201,11 +201,66 @@ func writeSection(b *strings.Builder, label string, entries []string) {
 }
 
 type resumeSummaryPromptData struct {
-	CompanyName string
-	RoleTitle   string
-	JDSignals   string
-	HeaderTitle string
-	Body        string
+	CompanyName     string
+	RoleTitle       string
+	JDSignals       string
+	HeaderTitle     string
+	YearsExperience string
+	Body            string
+}
+
+// buildYearsExperience derives total years of experience from the earliest
+// started_on in the 2a body, formatted for the 2b prompt to quote verbatim.
+// Returns "" when no usable date is present, which the prompt reads as
+// "do not mention years at all".
+//
+// This is threaded in for the same reason HeaderTitle is: it is a fact both
+// passes could derive independently, and when 2b was left to derive it the
+// same career produced "27 years" for one application and "over 26 years" for
+// another generated three hours earlier. The rule was deterministic; the
+// arithmetic was not.
+//
+// Only started_on is read. An ended_on gap is not subtracted — the figure is
+// career span, the ordinary meaning of "N years of experience" on a resume,
+// and inferring unemployment from a date gap is not something to do silently.
+func buildYearsExperience(experience json.RawMessage, now time.Time) (string, error) {
+	if len(experience) == 0 {
+		return "", nil
+	}
+
+	var employers []struct {
+		Positions []struct {
+			StartedOn string `json:"started_on"`
+		} `json:"positions"`
+	}
+	if err := json.Unmarshal(experience, &employers); err != nil {
+		return "", fmt.Errorf("parse experience for years: %w", err)
+	}
+
+	var earliest time.Time
+	for _, e := range employers {
+		for _, p := range e.Positions {
+			started, err := time.Parse("2006-01", p.StartedOn)
+			if err != nil {
+				// The schema constrains this field, but 2a's output has not
+				// been validated yet at this point. A single unparseable
+				// date should not cost the whole figure.
+				continue
+			}
+			if earliest.IsZero() || started.Before(earliest) {
+				earliest = started
+			}
+		}
+	}
+	if earliest.IsZero() {
+		return "", nil
+	}
+
+	years := int(now.Sub(earliest).Hours() / 24 / 365.25)
+	if years < 1 {
+		return "", nil
+	}
+	return fmt.Sprintf("%d years", years), nil
 }
 
 // buildMetaBlock assembles the document's meta block.
@@ -384,12 +439,19 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		headerTitle = *user.Headline
 	}
 
+	// Likewise computed here rather than left to 2b's arithmetic.
+	yearsExperience, err := buildYearsExperience(doc["experience"], time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
 	summaryPrompt, err := renderPrompt(resumeSummaryPrompt, resumeSummaryPromptData{
-		CompanyName: app.CompanyName,
-		RoleTitle:   app.RoleTitle,
-		JDSignals:   string(signalsJSON),
-		HeaderTitle: headerTitle,
-		Body:        string(bodyForSummary),
+		CompanyName:     app.CompanyName,
+		RoleTitle:       app.RoleTitle,
+		JDSignals:       string(signalsJSON),
+		HeaderTitle:     headerTitle,
+		YearsExperience: yearsExperience,
+		Body:            string(bodyForSummary),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: render summary prompt: %w", err)
