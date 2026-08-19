@@ -97,7 +97,7 @@ func (q *Queries) CreateTag(ctx context.Context, arg CreateTagParams) (Tag, erro
 const createTagCategory = `-- name: CreateTagCategory :one
 INSERT INTO tag_categories (id, user_id, name, sort_order)
 VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, name, sort_order, created_at
+RETURNING id, user_id, name, sort_order, created_at, aliases
 `
 
 type CreateTagCategoryParams struct {
@@ -121,6 +121,7 @@ func (q *Queries) CreateTagCategory(ctx context.Context, arg CreateTagCategoryPa
 		&i.Name,
 		&i.SortOrder,
 		&i.CreatedAt,
+		&i.Aliases,
 	)
 	return i, err
 }
@@ -232,7 +233,7 @@ func (q *Queries) GetTagsByContribution(ctx context.Context, arg GetTagsByContri
 }
 
 const listTagCategories = `-- name: ListTagCategories :many
-SELECT id, user_id, name, sort_order, created_at FROM tag_categories
+SELECT id, user_id, name, sort_order, created_at, aliases FROM tag_categories
 WHERE user_id = $1
 ORDER BY sort_order, name
 `
@@ -252,6 +253,7 @@ func (q *Queries) ListTagCategories(ctx context.Context, userID uuid.UUID) ([]Ta
 			&i.Name,
 			&i.SortOrder,
 			&i.CreatedAt,
+			&i.Aliases,
 		); err != nil {
 			return nil, err
 		}

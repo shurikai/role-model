@@ -133,6 +133,7 @@ type FitReport struct {
 	CreatedAt           time.Time        `json:"created_at"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
+	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
 }
 
 type ImportBatch struct {
@@ -243,6 +244,7 @@ type TagCategory struct {
 	Name      string    `json:"name"`
 	SortOrder int32     `json:"sort_order"`
 	CreatedAt time.Time `json:"created_at"`
+	Aliases   []string  `json:"aliases"`
 }
 
 type User struct {

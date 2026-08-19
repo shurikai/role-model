@@ -17,11 +17,11 @@ const createFitReport = `-- name: CreateFitReport :one
 INSERT INTO fit_reports (
     id, user_id, application_id, anti_pattern_passed, anti_pattern_hits,
     technical_score, technical_gaps, preference_score, preference_gaps, narrative,
-    preference_conflicts, screening_summary
+    preference_conflicts, screening_summary, technical_matches
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 )
-RETURNING id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary
+RETURNING id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches
 `
 
 type CreateFitReportParams struct {
@@ -37,6 +37,7 @@ type CreateFitReportParams struct {
 	Narrative           *string          `json:"narrative"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
+	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
 }
 
 func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams) (FitReport, error) {
@@ -53,6 +54,7 @@ func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams
 		arg.Narrative,
 		arg.PreferenceConflicts,
 		arg.ScreeningSummary,
+		arg.TechnicalMatches,
 	)
 	var i FitReport
 	err := row.Scan(
@@ -69,12 +71,13 @@ func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams
 		&i.CreatedAt,
 		&i.PreferenceConflicts,
 		&i.ScreeningSummary,
+		&i.TechnicalMatches,
 	)
 	return i, err
 }
 
 const getFitReport = `-- name: GetFitReport :one
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary FROM fit_reports
+SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches FROM fit_reports
 WHERE id = $1 AND user_id = $2
 `
 
@@ -100,12 +103,13 @@ func (q *Queries) GetFitReport(ctx context.Context, arg GetFitReportParams) (Fit
 		&i.CreatedAt,
 		&i.PreferenceConflicts,
 		&i.ScreeningSummary,
+		&i.TechnicalMatches,
 	)
 	return i, err
 }
 
 const listFitReports = `-- name: ListFitReports :many
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary FROM fit_reports
+SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches FROM fit_reports
 WHERE user_id = $1
 ORDER BY created_at DESC
 `
@@ -133,6 +137,7 @@ func (q *Queries) ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitRe
 			&i.CreatedAt,
 			&i.PreferenceConflicts,
 			&i.ScreeningSummary,
+			&i.TechnicalMatches,
 		); err != nil {
 			return nil, err
 		}
@@ -145,7 +150,7 @@ func (q *Queries) ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitRe
 }
 
 const listFitReportsByApplication = `-- name: ListFitReportsByApplication :many
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary FROM fit_reports
+SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_score, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches FROM fit_reports
 WHERE application_id = $1 AND user_id = $2
 ORDER BY created_at DESC
 `
@@ -178,6 +183,7 @@ func (q *Queries) ListFitReportsByApplication(ctx context.Context, arg ListFitRe
 			&i.CreatedAt,
 			&i.PreferenceConflicts,
 			&i.ScreeningSummary,
+			&i.TechnicalMatches,
 		); err != nil {
 			return nil, err
 		}

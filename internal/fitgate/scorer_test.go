@@ -426,7 +426,7 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, gaps := ScoreTechnicalFit(tt.skillNames, tt.signals)
+			score, gaps, _ := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals)
 			if score != tt.wantScore {
 				t.Errorf("score = %v, want %v", score, tt.wantScore)
 			}
@@ -435,6 +435,18 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 			}
 		})
 	}
+}
+
+// nameOnlySkills lifts bare tag names into SkillTerms carrying no aliases and
+// no category. It keeps the name-matching tables in this file testing exactly
+// what they always did — the matcher's string behavior, with neither of the
+// two data-driven layers able to interfere.
+func nameOnlySkills(names []string) []SkillTerm {
+	out := make([]SkillTerm, 0, len(names))
+	for _, n := range names {
+		out = append(out, SkillTerm{Name: n})
+	}
+	return out
 }
 
 // citiSkills is a subset of the real stored skill tag names, kept verbatim
@@ -508,7 +520,7 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gaps := ScoreTechnicalFit(tt.skillNames, JDSignals{RequiredSkills: tt.required})
+			_, gaps, _ := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required})
 			if !slices.Equal(gaps, tt.wantGaps) {
 				t.Errorf("gaps = %q, want %q", gaps, tt.wantGaps)
 			}
@@ -516,16 +528,176 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 	}
 }
 
-// Known limitation, asserted so it stays a decision rather than a surprise.
-// "REST" and "RESTful APIs" share no whole word and neither contains the
-// other, so no amount of matching in this file connects them. Canonicalizing
-// the adjectival form is jd_extraction.tmpl's job; if that regresses, this is
-// the shape the gap comes back in.
-func TestScoreTechnicalFitDoesNotBridgeAdjectivalForms(t *testing.T) {
-	_, gaps := ScoreTechnicalFit(citiSkills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+// Asserted so it stays a decision rather than a surprise: string matching
+// alone still does not bridge a morphological difference. "REST" and
+// "RESTful APIs" share no whole word and neither contains the other, so a
+// skill carrying no aliases cannot answer the adjectival phrase.
+//
+// This is no longer a dead end, only the floor — see
+// TestScoreTechnicalFitBridgesAdjectivalFormsViaAliases for the data that
+// closes it. Canonicalization in jd_extraction.tmpl remains the first line of
+// defence; aliases are the recovery path when it does not fire.
+func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) {
+	_, gaps, _ := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}})
 	if len(gaps) == 0 {
-		t.Error("matchesAny appears to bridge RESTful->REST now; update this test, " +
-			"the matchesAny doc comment, and the canonicalization rule in jd_extraction.tmpl")
+		t.Error("matchesAny appears to bridge RESTful->REST on the name alone now; " +
+			"update this test, the matchesAny doc comment, and the canonicalization " +
+			"rule in jd_extraction.tmpl")
+	}
+}
+
+// The recovery path the test above leaves open. The stored REST tag really
+// does carry 'restful' in tags.aliases (database/seed/013_skills.sql), and
+// reading that column is what turns a ten-year skill from a reported gap into
+// a match.
+func TestScoreTechnicalFitBridgesAdjectivalFormsViaAliases(t *testing.T) {
+	skills := []SkillTerm{{Name: "REST", Aliases: []string{"rest api", "restful"}}}
+
+	score, gaps, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %q, want none — the 'restful' alias should answer this", gaps)
+	}
+	if score != 100.0 {
+		t.Errorf("score = %v, want 100", score)
+	}
+	if len(matches) != 1 || matches[0].Kind != MatchAlias {
+		t.Fatalf("matches = %+v, want one alias match", matches)
+	}
+	if !slices.Equal(matches[0].Evidence, []string{"REST"}) {
+		t.Errorf("evidence = %q, want [REST]", matches[0].Evidence)
+	}
+}
+
+// competencySkills models the shape the production query now returns for the
+// real profile: technology-named tags, each carrying the competency
+// vocabulary of the category it sits in. Trimmed to the categories the
+// regression below exercises.
+var competencySkills = []SkillTerm{
+	{Name: "Jenkins", Category: "Tools & CI/CD", CategoryAliases: []string{"ci/cd", "continuous integration"}},
+	{Name: "GitHub Actions", Category: "Tools & CI/CD", CategoryAliases: []string{"ci/cd", "continuous integration"}},
+	{Name: "Splunk", Category: "Observability", CategoryAliases: []string{"observability", "monitoring"}},
+	{Name: "Dynatrace", Category: "Observability", CategoryAliases: []string{"observability", "monitoring"}},
+	{Name: "JUnit", Category: "Testing", CategoryAliases: []string{"automated testing", "test automation"}},
+	{Name: "Kafka", Category: "Protocols & Messaging", CategoryAliases: []string{"event-driven systems", "api design"}},
+	{Name: "REST", Aliases: []string{"rest api", "restful"}, Category: "Protocols & Messaging", CategoryAliases: []string{"event-driven systems", "api design"}},
+	{Name: "PostgreSQL", Aliases: []string{"postgres"}, Category: "Databases", CategoryAliases: []string{"data modeling", "database design"}},
+}
+
+// The defect this whole change exists for. A staff-level JD that names no
+// concrete technology at all scored 0/100 with every requirement reported as
+// a gap, and the narrative told the user they had no overlap with the role.
+//
+// The assertion that matters most is not that the score rose. It is that
+// "auth/authz frameworks" and "access control" are STILL gaps: the user holds
+// no auth tags, and a fix that painted those green would have replaced a
+// false negative with a false positive.
+func TestScoreTechnicalFitCompetencyWordedJD(t *testing.T) {
+	signals := JDSignals{
+		RequiredSkills: []string{
+			"auth/authz frameworks", "API design", "access control",
+			"automated testing", "system design", "observability",
+			"event-driven systems", "CI/CD", "data modeling",
+		},
+		PreferredSkills: []string{"IaC", "multi-agent", "RAG"},
+	}
+
+	score, gaps, matches := ScoreTechnicalFit(competencySkills, signals)
+
+	wantGaps := []string{"auth/authz frameworks", "access control", "system design"}
+	if !slices.Equal(gaps, wantGaps) {
+		t.Errorf("gaps = %q, want %q", gaps, wantGaps)
+	}
+	if score == 0 {
+		t.Fatal("score = 0; the competency-worded JD regression is back")
+	}
+	if score >= 100 {
+		t.Fatalf("score = %v; genuine gaps should keep this well under 100", score)
+	}
+
+	// Every match must carry evidence, or the narrative has nothing to cite.
+	byReq := map[string]SkillMatch{}
+	for _, m := range matches {
+		if len(m.Evidence) == 0 {
+			t.Errorf("match %q carries no evidence", m.Requirement)
+		}
+		byReq[m.Requirement] = m
+	}
+
+	ci, ok := byReq["CI/CD"]
+	if !ok {
+		t.Fatal(`"CI/CD" was not matched`)
+	}
+	if ci.Kind != MatchCategory || ci.Category != "Tools & CI/CD" {
+		t.Errorf("CI/CD matched as %v/%q, want category/Tools & CI/CD", ci.Kind, ci.Category)
+	}
+	if !slices.Equal(ci.Evidence, []string{"Jenkins", "GitHub Actions"}) {
+		t.Errorf("CI/CD evidence = %q, want [Jenkins GitHub Actions]", ci.Evidence)
+	}
+
+	// A preferred skill naming a specific practice must not be answered by the
+	// broad category it loosely relates to.
+	if m, ok := byReq["IaC"]; ok {
+		t.Errorf("IaC should be unmatched, got %+v", m)
+	}
+}
+
+// Category credit is only reachable through a skill the user actually holds.
+// A JD asking about a capability the user has no tags for must not find the
+// category by vocabulary alone.
+func TestScoreTechnicalFitCategoryRequiresAnActiveSkill(t *testing.T) {
+	skills := []SkillTerm{
+		{Name: "Jenkins", Category: "Tools & CI/CD", CategoryAliases: []string{"ci/cd"}},
+	}
+
+	_, gaps, matches := ScoreTechnicalFit(skills, JDSignals{
+		RequiredSkills: []string{"observability", "CI/CD"},
+	})
+
+	if !slices.Equal(gaps, []string{"observability"}) {
+		t.Errorf("gaps = %q, want [observability] — no skill sits in an observability category", gaps)
+	}
+	if len(matches) != 1 || matches[0].Requirement != "CI/CD" {
+		t.Fatalf("matches = %+v, want only CI/CD", matches)
+	}
+}
+
+// Provenance ranks strongest-first. A requirement answerable both by a stored
+// skill name and by the category around it should report the skill, since
+// that is the stronger claim and the more useful thing to show a reader.
+func TestScoreTechnicalFitPrefersDirectMatchOverCategory(t *testing.T) {
+	skills := []SkillTerm{
+		{Name: "Kafka", Category: "Protocols & Messaging", CategoryAliases: []string{"kafka", "messaging"}},
+		{Name: "REST", Category: "Protocols & Messaging", CategoryAliases: []string{"kafka", "messaging"}},
+	}
+
+	_, _, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}})
+	if len(matches) != 1 {
+		t.Fatalf("matches = %+v, want one", matches)
+	}
+	if matches[0].Kind != MatchDirect {
+		t.Errorf("kind = %v, want direct", matches[0].Kind)
+	}
+	if !slices.Equal(matches[0].Evidence, []string{"Kafka"}) {
+		t.Errorf("evidence = %q, want [Kafka] alone, not the whole category", matches[0].Evidence)
+	}
+}
+
+// Found against live data, not imagined. A JD requiring "RAG" matched the
+// Testing category and offered TDD, JUnit, and Mockito as evidence, because
+// the raw-substring direction of matchesAny found "rag" inside the alias
+// "test coverage". Category and alias vocabulary is whole-word matched for
+// this reason; only a skill's own name keeps the substring direction.
+func TestScoreTechnicalFitCategoryDoesNotMatchOnSubstrings(t *testing.T) {
+	skills := []SkillTerm{
+		{Name: "JUnit", Category: "Testing", CategoryAliases: []string{"automated testing", "test coverage"}},
+	}
+
+	_, gaps, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}})
+	if len(matches) != 0 {
+		t.Errorf("matches = %+v, want none — 'rag' inside 'test coverage' is not a match", matches)
+	}
+	if !slices.Equal(gaps, []string{"RAG"}) {
+		t.Errorf("gaps = %q, want [RAG]", gaps)
 	}
 }
 

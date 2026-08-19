@@ -89,6 +89,40 @@ matched gate subtracts its weight as raw points and then caps the score at
 Gating does **not** block. A tripped JD is still scored, still narrated, still
 generated; the trip is priced into the score rather than living in a boolean.
 
+**Technical matching runs in three layers, strongest first**, and the layer
+that won is recorded on every match as `kind` (`direct` | `alias` | `category`):
+
+1. **direct** — the JD term against the skill's own name. This is the only
+   layer that keeps the raw-substring direction, so a JD asking for "SQL" is
+   answered by "PostgreSQL".
+2. **alias** — against `tags.aliases`. That column had been populated since
+   migration 001 and read by nothing, so "Golang" scored a gap against a
+   stored "Go" and "RESTful APIs" against "REST".
+3. **category** — against the tag's category name and `tag_categories.aliases`
+   (migration 012). This is what lets a competency-worded JD reach a
+   technology-worded profile: "CI/CD" is answered by Jenkins and GitHub
+   Actions, "observability" by Splunk and Dynatrace. A JD that names no
+   concrete technology at all — common at staff level — otherwise scores 0
+   with every requirement reported as a gap.
+
+Two rules hold this together:
+
+- **Aliases and category vocabulary are whole-word matched, never substring.**
+  Only a skill's own name keeps the substring direction. A category alias is a
+  sentence fragment, and substring-matching one made a JD requiring "RAG" match
+  the Testing category — "rag" sits inside "test cove*rag*e" — offering JUnit
+  as evidence of retrieval-augmented generation.
+- **A category alias must name a capability, not a technology.** Putting
+  "kafka" on Protocols & Messaging would grant the whole category for one tool.
+  The converse also bites: bare "frameworks" is deliberately not an alias of
+  Frameworks & Libraries, because "auth/authz frameworks" and "evaluation
+  frameworks" would both claim credit for React.
+
+Every match carries `evidence` — the specific skills behind it — so the
+narrative cites what the person actually has instead of asserting a score, and
+so a remaining gap is trustworthy. Gaps previously conflated "named
+differently" with "does not have it".
+
 **One matcher.** `prefFieldsFor` routes every preference by `preference_type`;
 there is no second matcher for the gate, and `anti_pattern` is the only branch
 that reads `required_skills`. The previous split (a broad `signalFields` for
@@ -322,15 +356,21 @@ pg_format or sqlfluff.
   so the table holds a real spread of novice/proficient/expert with
   `years_experience` populated on most rows.
 
-  `internal/fitgate` never sees any of it. `ListActiveSkillTagNamesByUser`
-  (`internal/db/queries/skills.sql`) selects `t.name` only, and
-  `ScoreTechnicalFit` takes a flat `skillNames []string`, so scoring is pure
-  presence/absence — a matched required skill is worth 2 points and a matched
+  `internal/fitgate` never sees any of it. `ListActiveSkillMatchTermsByUser`
+  (`internal/db/queries/skills.sql`) selects name, aliases, and category —
+  but not proficiency or years — and `ScoreTechnicalFit` takes `[]SkillTerm`
+  built from exactly those columns. Scoring is therefore still pure
+  presence/absence: a matched required skill is worth 2 points and a matched
   preferred skill 1, whether it represents twenty years or a weekend. A one-off
   prototype and a decade of production use still look identical to scoring, but
   because the columns are dropped at the query layer, not because they are
   empty. `ListActiveSkillsByUser` already returns full rows; threading
   proficiency and years through to the scorer is the fix.
+
+  This is also why a category match earns full credit today (see the matching
+  section above). Weighting a match by the depth behind it is the same missing
+  signal, and belongs with this work rather than as a constant bolted onto the
+  matcher.
 
 Resolved: the renderer service question (Go-native vs Python) — Python won,
 see Architecture above.

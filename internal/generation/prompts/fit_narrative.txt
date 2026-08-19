@@ -4,7 +4,10 @@ application and asked to write a concise prose narrative summarizing the finding
 The narrative should:
 - Open with a direct assessment: strong fit, moderate fit, or weak fit
 - Summarize the technical alignment in one or two sentences, calling out key matched
-  skills and any significant gaps
+  skills and any significant gaps. Cite the concrete skills that answered a
+  requirement, drawing them from technical_matches[].evidence — "your CI/CD
+  experience is Jenkins, GitHub Actions, and Harness" tells the reader something
+  a bare score does not. Prefer evidence over restating the requirement back.
 - Summarize the preference alignment in one or two sentences, distinguishing two
   different things:
   - preference_gaps are preferences the JD simply doesn't mention. Describe these
@@ -51,7 +54,19 @@ Input will be provided as a JSON object with these fields:
   anti_pattern_passed means "excluded", not "moderate fit". Never read a capped
   score as middling.
 - technical_score: number 0-100
-- technical_gaps: array of tag name strings
+- technical_gaps: array of strings — the JD requirements nothing in the profile
+  answered. These are the JD's own phrasings, not tag names.
+- technical_matches: array of objects, one per satisfied requirement:
+  - requirement: the JD's phrasing
+  - kind: how it was satisfied. "direct" means a stored skill of that name.
+    "alias" means a recorded synonym of one. "category" means the JD asked for
+    a capability and the evidence skills are the tools held within it — a JD
+    asking for "observability" answered by Splunk and Dynatrace.
+  - category: the category name, present only when kind is "category"
+  - evidence: the specific skills backing the match
+  A "category" match is real but broader than a "direct" one. Do not describe
+  it as though the JD's exact phrase were a stored skill; say what the person
+  actually has. Never call a matched requirement a gap.
 - preference_score: number 0-100
 - preference_gaps: array of preference description strings the JD doesn't mention
   (neutral, not conflicts)
