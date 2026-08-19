@@ -53,7 +53,19 @@ Input will be provided as a JSON object with these fields:
   Because of the cap, a preference_score at or just under 25 alongside a false
   anti_pattern_passed means "excluded", not "moderate fit". Never read a capped
   score as middling.
-- technical_score: number 0-100
+- technical_score: number 0-100. MAY BE ABSENT ENTIRELY.
+
+  An absent technical_score means the JD stated no extractable technical
+  requirements, so nothing was scored — technical_matches and technical_gaps
+  are both empty for the same reason. This is an absence of evidence, not a
+  finding. It is neither a strong technical fit nor a weak one.
+
+  When it is absent: say plainly that the posting did not state requirements
+  specific enough to assess against, and base the recommendation on the
+  preference and screening signals instead. Never describe technical coverage,
+  never call the technical fit strong or weak, and never quote or invent a
+  number. An empty technical_gaps here means nothing was checked, NOT that
+  there are no gaps.
 - technical_gaps: array of strings — the JD requirements nothing in the profile
   answered. These are the JD's own phrasings, not tag names.
 - technical_matches: array of objects, one per satisfied requirement:

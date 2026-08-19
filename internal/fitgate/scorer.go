@@ -164,13 +164,35 @@ func appendUnique(out []string, v string) []string {
 // where a reader can weigh it, rather than baked into the number. Weighting
 // credit by actual depth is a separate problem — skills.proficiency and
 // years_experience are still dropped before scoring ever sees them.
-func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) (score float64, gaps []string, matches []SkillMatch) {
+//
+// # The unscored case
+//
+// A JD that states no technical requirements at all yields Scored: false, and
+// Score is then meaningless and must not be read. It used to return 100 — a
+// perfect score with no matches and no evidence, which the narrative wrote
+// confident coverage prose around ("complete coverage across backend
+// engineering, distributed systems, payment platforms" — none of it scored).
+//
+// "This profile answers none of the requirements" and "this JD stated no
+// requirements to answer" are opposite findings and cannot share a
+// representation. Scored is what separates them, and returning a struct is
+// what makes the confusion unrepresentable rather than merely discouraged.
+//
+// Note that Stage 1 now also extracts core_competencies for exactly the
+// postings that trip this, so the unscored case should be rare — but a JD can
+// always fail to yield anything extractable, and the guard is independent of
+// how good extraction is on any given day.
+func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
 	if pointsPossible == 0 {
-		return 100.0, nil, nil
+		return TechnicalFit{Scored: false}
 	}
 
-	var pointsEarned float64
+	var (
+		pointsEarned float64
+		gaps         []string
+		matches      []SkillMatch
+	)
 	for _, req := range signals.RequiredSkills {
 		if kind, category, evidence, ok := satisfies(skills, req); ok {
 			pointsEarned += 2
@@ -190,7 +212,25 @@ func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) (score float64, ga
 		}
 	}
 
-	return clampScore(pointsEarned / pointsPossible * 100), gaps, matches
+	return TechnicalFit{
+		Score:   clampScore(pointsEarned / pointsPossible * 100),
+		Scored:  true,
+		Gaps:    gaps,
+		Matches: matches,
+	}
+}
+
+// TechnicalFit is the outcome of technical scoring.
+//
+// Scored is false when the JD stated no technical requirements at all. Score
+// carries no meaning in that case and callers must not display, store, or
+// narrate it — see the ScoreTechnicalFit doc comment for why this is a field
+// rather than a magic value.
+type TechnicalFit struct {
+	Score   float64
+	Scored  bool
+	Gaps    []string
+	Matches []SkillMatch
 }
 
 // hardGateCeiling is the highest preference score a JD can hold once it has

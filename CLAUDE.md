@@ -105,6 +105,19 @@ preference score measures *desire*. A role you could do and would hate should
 read as high technical / low preference, not as one muddled number. Do not
 introduce a blended score.
 
+**A technical score can be absent, and absent is not zero and not 100.**
+`ScoreTechnicalFit` returns a `TechnicalFit` whose `Scored` field is false when
+the JD stated no technical requirements at all. It used to return a bare 100
+there — a perfect score with no matches and no evidence, which the narrative
+then wrote confident coverage prose around. "This profile answers none of the
+requirements" and "this JD stated no requirements to answer" are opposite
+findings and must not share a representation; that is why it is a struct field
+rather than a sentinel value. When `Scored` is false the report stores SQL NULL
+(the UI already renders that as "—") and the narrative input omits the score
+entirely, which the prompt reads as "nothing was assessed". An empty
+`technical_gaps` in that state means nothing was checked, not that there are no
+gaps.
+
 **Preferences carry severity and gate behavior separately.** `sentiment` is
 `positive|negative`, `weight` is NOT NULL, and `is_hard_gate` marks the rows
 that disqualify. A hard exclude is a heavy negative that also gates — there is
