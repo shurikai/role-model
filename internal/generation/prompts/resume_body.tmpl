@@ -12,7 +12,10 @@ Deliberate constraints, do not "fix" these without reading the reasoning:
   - Skills are filtered on two axes together, JD relevance and depth. Depth
     used to be unavailable here, so relevance was the only lever; it is
     available now and both apply.
-  - LengthBudget is seniority-informed and passed in, not decided here.
+  - LengthBudget and FramingGuidance are both seniority-informed and passed
+    in, not decided here. Length was for a long time the only thing seniority
+    drove, which gave a staff-level JD more bullets of the same altitude
+    rather than bullets pitched at the level it was hiring for.
 
 This file is unversioned by design. Its identity is the git blob hash recorded
 in generation_params; its history is `git log` on this path.
@@ -39,6 +42,9 @@ RULES:
 - Copy identity fields (name, email, phone, location, links, headline) verbatim
   from the provided identity data. Never alter, synthesize, or infer them.
 - Every bullet must begin with a strong past-tense action verb
+- Pitch bullets at the altitude described in <framing_guidance> below. That
+  block governs what a bullet leads WITH; it never licenses a claim the
+  source material does not support.
 - Quantify outcomes wherever the source material supports it
 - Mirror the domain vocabulary from jd_signals where it is genuine and accurate
 - Prefer specificity over generality: "reduced p99 latency from 800ms to 120ms"
@@ -157,6 +163,10 @@ Role: {{.RoleTitle}}
 <length_budget>
 {{.LengthBudget}}
 </length_budget>
+
+<framing_guidance>
+{{.FramingGuidance}}
+</framing_guidance>
 
 <identity>
 {{.Identity}}

@@ -35,6 +35,7 @@ type resumeBodyPromptData struct {
 	JDSignals       string
 	SkillsChecklist string
 	LengthBudget    string
+	FramingGuidance string
 	Identity        string
 	Experience      string
 	Skills          string
@@ -68,6 +69,79 @@ func buildLengthBudget(raw *json.RawMessage) (string, error) {
 		// senior, manager, director, vp, unknown, or anything unrecognized:
 		// senior IC length is the safest general default.
 		return "Target 1-2 pages (~12-15 bullets total across ALL positions and projects combined).", nil
+	}
+}
+
+// Framing guidance, the second thing seniority drives. Length was the first
+// and, for a long time, the only one — which meant a staff-level posting got
+// more bullets of the same altitude rather than bullets pitched at the level
+// it was hiring for. Every other rule in the 2a prompt pushes toward
+// implementation specificity ("prefer specificity over generality"), so the
+// output read as a competent senior-IC implementation report no matter who
+// the reader was.
+//
+// The rule these strings exist to enforce is the one that is easy to get
+// backwards: ownership framing is added ON TOP of the evidence, never in
+// place of it. Trading the metric for the claim is a downgrade — the metric
+// is what makes the claim believable, and a broad ownership statement with
+// nothing behind it is exactly the shape a skeptical reader discounts.
+const (
+	framingStaff = `This role is pitched at staff level or above. A reader at this level is
+scanning for scope and accountability, not implementation detail alone.
+
+On the 2-3 most JD-relevant positions, open each bullet with what was owned,
+decided, or changed at the system or team level, then land the supporting
+evidence — the metric, the scale, the team size — in the same sentence.
+
+  Weaker: "Reduced cruise data API response times from several seconds to
+    under 500ms by separating historical and future data endpoints."
+  Stronger: "Owned performance of the guest-facing cruise data APIs across an
+    8-ship fleet, cutting response times from seconds to under 500ms by
+    separating historical from future data."
+
+Both sentences carry the same fact. The second also says what the candidate
+was responsible for.
+
+Two hard limits on this:
+  - NEVER trade the evidence for the framing. A bullet that claims ownership
+    and drops the number is weaker than one that only reports the number.
+    Both together, or the number alone — never the claim alone.
+  - NEVER manufacture scope the source material does not support. "Owned",
+    "led", "set technical direction for" are factual claims and need backing
+    in the contribution data like any other. If the data shows the work but
+    not the ownership, write the work.`
+
+	framingDefault = `This role is pitched at senior level or below. Lead with the concrete work
+and the outcome it produced.
+
+Where the source material genuinely supports ownership or leadership scope,
+say so — but do not reach for it. A bullet claiming architectural ownership
+the contribution data does not support reads as padding, and costs more
+credibility than the framing gains.`
+)
+
+// buildFramingGuidance renders seniority-informed guidance on what altitude to
+// pitch bullets at. Sibling to buildLengthBudget, deliberately: the two levers
+// seniority drives sit next to each other and are tested the same way.
+func buildFramingGuidance(raw *json.RawMessage) (string, error) {
+	seniority := ""
+	if raw != nil {
+		var signals JDSignals
+		if err := json.Unmarshal(*raw, &signals); err != nil {
+			return "", fmt.Errorf("parse jd_signals for framing guidance: %w", err)
+		}
+		seniority = signals.Seniority
+	}
+
+	switch seniority {
+	case "staff", "principal", "lead":
+		return framingStaff, nil
+	default:
+		// junior, mid, senior, manager, director, vp, unknown, or anything
+		// unrecognized. Only staff+ gets the altitude instruction; applying
+		// it to a mid-level posting would invite exactly the inflation the
+		// staff guidance spends two rules guarding against.
+		return framingDefault, nil
 	}
 }
 
@@ -200,6 +274,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}
+	framingGuidance, err := buildFramingGuidance(app.JdSignals)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
 	identityJSON, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal identity: %w", err)
@@ -251,6 +329,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		JDSignals:       string(signalsJSON),
 		SkillsChecklist: skillsChecklist,
 		LengthBudget:    lengthBudget,
+		FramingGuidance: framingGuidance,
 		Identity:        string(identityJSON),
 		Experience:      string(experienceJSON),
 		Skills:          string(skillsJSON),
