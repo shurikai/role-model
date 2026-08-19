@@ -70,11 +70,22 @@ func buildLengthBudget(raw *json.RawMessage) (string, error) {
 	}
 }
 
-// buildSkillsChecklist renders the JD's required/preferred skills as an
-// explicit checklist for the 2a prompt, rather than leaving cross-referencing
-// to implicit recall from the <jd_signals> blob. Falls back to the
-// deprecated priority_skills field for older stored jd_signals rows that
-// predate required_skills/preferred_skills.
+// buildSkillsChecklist renders the JD's requirements as an explicit checklist
+// for the 2a prompt, rather than leaving cross-referencing to implicit recall
+// from the <jd_signals> blob. Falls back to the deprecated priority_skills
+// field for older stored jd_signals rows that predate
+// required_skills/preferred_skills.
+//
+// Core competencies are rendered as their own section rather than folded in
+// with the skills. They satisfy differently: a required skill can be answered
+// by a Skills entry, while a competency is a capability that only a bullet can
+// evidence — resume_body.tmpl relies on the sections staying distinct to keep
+// "setting technical direction" out of the Skills list.
+//
+// The competency section is also what keeps this checklist non-empty for a
+// staff-level JD that names no technology at all. Both skill lists are
+// correctly empty for such a posting, and a checklist reading "(none listed)"
+// twice silently disables every relevance rule in the 2a prompt.
 func buildSkillsChecklist(raw *json.RawMessage) (string, error) {
 	if raw == nil {
 		return "(no jd_signals available)", nil
@@ -92,22 +103,26 @@ func buildSkillsChecklist(raw *json.RawMessage) (string, error) {
 	preferred := signals.PreferredSkills
 
 	var b strings.Builder
-	b.WriteString("Required:\n")
-	if len(required) == 0 {
-		b.WriteString("(none listed)\n")
-	}
-	for _, skill := range required {
-		fmt.Fprintf(&b, "- %s\n", skill)
-	}
-	b.WriteString("Preferred:\n")
-	if len(preferred) == 0 {
-		b.WriteString("(none listed)\n")
-	}
-	for _, skill := range preferred {
-		fmt.Fprintf(&b, "- %s\n", skill)
-	}
+	writeSection(&b, "Required skills", required)
+	writeSection(&b, "Preferred skills", preferred)
+	writeSection(&b, "Core competencies", signals.CoreCompetencies)
 
 	return b.String(), nil
+}
+
+// writeSection renders one labelled checklist section. An empty section still
+// prints its heading, so the prompt sees the same three-section shape every
+// time and "(none listed)" reads as a fact about this JD rather than as a
+// missing block.
+func writeSection(b *strings.Builder, label string, entries []string) {
+	fmt.Fprintf(b, "%s:\n", label)
+	if len(entries) == 0 {
+		b.WriteString("(none listed)\n")
+		return
+	}
+	for _, e := range entries {
+		fmt.Fprintf(b, "- %s\n", e)
+	}
 }
 
 type resumeSummaryPromptData struct {
