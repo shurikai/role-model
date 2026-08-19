@@ -422,6 +422,13 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: parse resume body json: %w (raw: %s)", err, bodyCleaned)
 	}
 
+	// Enforce the bullet/skills invariant 2a states but does not reliably
+	// honour, before 2b sees the body — the summary should be written against
+	// the final Skills section, not a version still missing entries.
+	if err := reconcileSkills(doc, skills); err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
 	// Pass 2b: summary, grounded ONLY in 2a's output — never the raw
 	// background corpus. This makes claims unsupported by any generated
 	// bullet structurally unreachable rather than relying on a prompt
