@@ -76,12 +76,19 @@ class Identity(BaseModel):
     headline: str | None = None
 
 
-class JDSignals(BaseModel):
-    priority_skills: list[str] = Field(default_factory=list)
-    seniority: str | None = None
-    domain_vocabulary: list[str] = Field(default_factory=list)
-
-
+# jd_signals is deliberately absent from MetaBlock.
+#
+# There used to be a JDSignals model here describing priority_skills,
+# seniority, and domain_vocabulary — the pre-split shape, long superseded by
+# required_skills/preferred_skills/domain/work_type/culture_signals. Because
+# Pydantic ignores unknown fields by default, it silently parsed every current
+# document into an empty object and no one noticed for as long as it took the
+# Go-side schema to catch the same drift from the other direction.
+#
+# Nothing in the renderer read it. Rather than resync a model with no consumer
+# — which would simply rot again — the block is dropped. The document still
+# carries meta.jd_signals for provenance; the renderer just does not model it,
+# and Pydantic discards it as it discards any other unmodelled field.
 class MetaBlock(BaseModel):
     generation_model: str
     prompt_version: str
@@ -90,7 +97,6 @@ class MetaBlock(BaseModel):
     application_id: str | None = None
     target_role: str | None = None
     target_company: str | None = None
-    jd_signals: JDSignals | None = None
 
 
 class Resume(BaseModel):
