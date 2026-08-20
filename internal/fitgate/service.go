@@ -73,8 +73,6 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		return nil, fmt.Errorf("fit evaluation: list preferences: %w", err)
 	}
 
-	appIDParam := pgtype.UUID{Bytes: [16]byte(applicationID), Valid: true}
-
 	screeningJSON, err := marshalScreeningSummary(signals.ScreeningSummary)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal screening summary: %w", err)
@@ -138,7 +136,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	report, err := s.q.CreateFitReport(ctx, db.CreateFitReportParams{
 		ID:                  uuid.New(),
 		UserID:              userID,
-		ApplicationID:       appIDParam,
+		ApplicationID:       &applicationID,
 		AntiPatternPassed:   gatePassed,
 		AntiPatternHits:     gateHitsJSON,
 		TechnicalScore:      technicalScoreColumn(technical),

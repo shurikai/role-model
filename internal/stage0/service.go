@@ -196,7 +196,7 @@ func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID 
 	contribution, err := qtx.CreateContribution(ctx, db.CreateContributionParams{
 		ID:              uuid.New(),
 		UserID:          userID,
-		PositionID:      positionID,
+		PositionID:      &positionID,
 		Summary:         *draft.Summary,
 		FullDescription: *draft.FullDescription,
 		Outcomes:        draft.Outcomes,

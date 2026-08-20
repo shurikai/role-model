@@ -37,7 +37,7 @@ func (s *Service) AssembleContext(ctx context.Context, userID uuid.UUID) (*Resum
 
 		for _, pos := range positions {
 			contributions, err := s.q.GetContributionsByPosition(ctx, db.GetContributionsByPositionParams{
-				PositionID: pos.ID,
+				PositionID: &pos.ID,
 				UserID:     userID,
 			})
 			if err != nil {

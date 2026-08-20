@@ -18,8 +18,8 @@ WHERE position_id = $1 AND user_id = $2
 `
 
 type CountContributionsByPositionParams struct {
-	PositionID uuid.UUID `json:"position_id"`
-	UserID     uuid.UUID `json:"user_id"`
+	PositionID *uuid.UUID `json:"position_id"`
+	UserID     uuid.UUID  `json:"user_id"`
 }
 
 func (q *Queries) CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error) {

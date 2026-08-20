@@ -27,7 +27,7 @@ RETURNING id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, t
 type CreateFitReportParams struct {
 	ID                  uuid.UUID        `json:"id"`
 	UserID              uuid.UUID        `json:"user_id"`
-	ApplicationID       pgtype.UUID      `json:"application_id"`
+	ApplicationID       *uuid.UUID       `json:"application_id"`
 	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
 	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
 	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
@@ -156,8 +156,8 @@ ORDER BY created_at DESC
 `
 
 type ListFitReportsByApplicationParams struct {
-	ApplicationID pgtype.UUID `json:"application_id"`
-	UserID        uuid.UUID   `json:"user_id"`
+	ApplicationID *uuid.UUID `json:"application_id"`
+	UserID        uuid.UUID  `json:"user_id"`
 }
 
 func (q *Queries) ListFitReportsByApplication(ctx context.Context, arg ListFitReportsByApplicationParams) ([]FitReport, error) {
