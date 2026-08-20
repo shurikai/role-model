@@ -416,8 +416,13 @@ without touching the terminal.*
 - ~~Skill *depth* population~~ — DONE. Provenance needed no work
   (`v_skill_provenance` derives it from `contribution_tags`), and `proficiency` /
   `years_experience` were curated to a real spread in `016`/`018`/`019`.
-  The remaining work is *plumbing* that depth into `internal/fitgate`, which
-  reads skill names only — see Schema Gaps above, and #43/#44
+  ~~Plumbing that depth into `internal/fitgate`~~ — DONE for the case that
+  matters: a JD stating a depth requirement now scores a `partial` when
+  ground truth falls short (migration 017, PR #71). `years_experience`
+  stays dropped at the query layer by design — nothing compares against a
+  number. #44's other half — scoring depth on requirements the JD never
+  stated a bar for — closed as working-as-intended: the technical score
+  answers "does this cover what was asked," not general strength.
 
 **Stage 0 — LLM-assisted data entry pipeline** — BUILT (migration 006,
 `internal/stage0`, endpoints under `/api/v1/import`). Design retained below.  
@@ -579,7 +584,7 @@ Design principles:
      active conflicts; do not re-merge them.
    - Still open: calibrate against outcome data once enough `applications`
      rows carry real outcomes
-4. **Feedback loop:**
+4. **Feedback loop (resume generation):**
    - Two levels: whole-resume and per-contribution
    - `feedback_type` enum: `correction` | `selection` | `phrasing`
      - `correction`: wrong at source; propagate upstream to canonical contribution
@@ -587,6 +592,40 @@ Design principles:
      - `phrasing`: correct content, wrong wording; feeds prompt-steering table
    - Prompt-steering accumulation: separate table injected into future generation
      calls (schema TBD, defer until feedback UI is in scope)
+   - Scope: Stage 2 output only (`resume_versions`, `contribution_feedback`).
+     Not the fit report — see 4a.
+
+4a. **Fit report corrections** (Stage 1, distinct from 4 above — 4 corrects
+    what generation *wrote*, this corrects what the fit gate *found*):
+   - Trigger point is a specific line in an existing `fit_reports` row — a
+     gap, a partial, a conflict, or a gate hit — not a free-form report.
+     Flagging always starts from "this specific finding is wrong," never
+     from "redo the whole comparison."
+   - Every flag resolves to exactly one of two kinds, decided at flag time,
+     not inferred after the fact:
+     - **Data gap** — the evidence genuinely isn't in the ground truth yet
+       (a real contribution was never captured, or never tagged). Fix:
+       enrich `skills`/`contribution_tags`, tied to a real contribution —
+       same no-invention standard as generation itself. This is a targeted
+       fix to one entry, not a general improvement.
+     - **Vocabulary gap** — the evidence exists and is correctly tagged, but
+       the JD's wording and the ground truth's wording were never linked
+       (the "GitHub Actions" / "CI/CD" case). Fix: extend `tags.aliases` or
+       `tag_categories.aliases` — the alias mechanism `internal/fitgate`
+       already reads via `ListActiveSkillMatchTermsByUser`, not a new
+       schema. This is the one case that improves *future* JDs generally,
+       not just the one being corrected.
+   - Deliberately does **not** revive the "prompt-steering accumulation
+     table" idea from item 4 for this purpose — the alias tables already do
+     the job for vocabulary, and reusing them keeps this from becoming a
+     second, parallel matching mechanism.
+   - Still human-confirmed at flag time, same as everything else in this
+     pipeline — the system surfaces "was this a data gap or a vocabulary
+     gap?" as a choice, it does not infer intent from the correction text.
+   - No schema addition anticipated beyond what already exists
+     (`skills`, `tags`, `tag_categories`) — the gap is UI (a flag action on
+     a fit report line) and a small API endpoint to route the flag to the
+     right table, not new tables.
 5. ~~Renderer (docx output)~~ — BUILT. `docx-renderer/` (FastAPI +
    python-docx), one `POST /render` endpoint, called synchronously from Go via
    `internal/renderer.Client` and surfaced as
@@ -970,9 +1009,12 @@ has no notion of exclude *kind* — see #46.
    built and queryable (migrations 005/008/009). ~~Successor question: how do
    `skills.proficiency` / `years_experience` / `skill_provenance` actually get
    populated?~~ Also resolved — provenance derives automatically from the view,
-   and depth was curated into a real spread in seed `016`/`018`/`019`. The live
-   successor is not a population question at all: `internal/fitgate` reads skill
-   *names* only and drops both depth columns at the query layer (#43/#44).
+   and depth was curated into a real spread in seed `016`/`018`/`019`.
+   ~~Second successor: `internal/fitgate` reads skill names only and drops
+   both depth columns at the query layer (#43/#44).~~ RESOLVED — PR #71 plumbs
+   `proficiency` in for JD requirements that state a depth; `years_experience`
+   stays dropped by design (see Phase 1 note above). #44's remaining half
+   closed as working-as-intended, not deferred further.
 7. ~~**`contribution_drafts` writethrough flow**~~ — RESOLVED as recommended.
    `stage0.ApproveDraft` holds rows in `contribution_drafts` until an explicit
    `POST /api/v1/import/drafts/{draftID}/approve`, which verifies parent-position
@@ -986,4 +1028,3 @@ has no notion of exclude *kind* — see #46.
 9. **MCP tools vs. Temporal workflows** — if Phase 3 lands and the pipeline is
    orchestrated by Temporal, do MCP tools trigger workflows or stay below that
    layer? Blocked on Temporal actually being built. See the MCP Server section.
-
