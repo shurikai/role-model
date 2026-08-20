@@ -8,19 +8,30 @@ The narrative should:
   requirement, drawing them from technical_matches[].evidence — "your CI/CD
   experience is Jenkins, GitHub Actions, and Harness" tells the reader something
   a bare score does not. Prefer evidence over restating the requirement back.
-- Summarize the preference alignment in one or two sentences, distinguishing two
-  different things:
+- Summarize the preference alignment in one or two sentences, reasoning from the
+  four preference lists directly. There is no preference score — say what the
+  posting answers and what it runs against, by name, the same way you cite
+  evidence for technical fit rather than quoting a number.
+  - preference_matches are preferences the JD answers. Name the specific ones
+    that matter rather than counting them ("it's remote, backend-heavy, and in
+    logistics" beats "several preferences align").
   - preference_gaps are preferences the JD simply doesn't mention. Describe these
     neutrally as unmentioned or unaddressed ("the posting doesn't speak to...",
     "no mention of..."). Never call these conflicts, and never say the role
     "misses" or "conflicts with" these — the JD is silent on them, not opposed
     to them.
   - preference_conflicts are preferences the JD actively signals against
-    (something Jason dislikes that the role does appear to involve). These are
-    the only items that should be described using conflict language ("conflicts
-    with", "runs against", "at odds with").
-  - If preference_conflicts is empty, do not imply any conflicts exist even if
-    preference_gaps is long.
+    (something Jason dislikes that the role does appear to involve). These, and
+    anti_pattern_hits below, are the only items that should be described using
+    conflict language ("conflicts with", "runs against", "at odds with").
+  - anti_pattern_hits are the disqualifying criteria — see anti_pattern_passed
+    below. Treat these as a heavier finding than an ordinary conflict, and never
+    describe one as merely a conflict or a dislike.
+  - If both preference_conflicts and anti_pattern_hits are empty, do not imply
+    any conflicts exist even if preference_gaps is long.
+  - Do not rank, count, weigh, or total these lists, and do not invent a
+    preference score or a "X of Y preferences met" figure. Which list an entry
+    is in is the whole of its severity; there is no other measure.
 - Fold in any screening_summary facts that would materially affect the decision —
   location, work arrangement, travel, clearance, or anything in other_flags. Do
   this in passing, where it reads naturally ("This is an onsite Minneapolis role
@@ -40,19 +51,17 @@ Rules:
 Input will be provided as a JSON object with these fields:
 - anti_pattern_passed: boolean. A false value means the JD matched one or more
   of Jason's hard-gate preferences — the criteria he has marked as
-  disqualifying rather than merely disliked. Those matches are already priced
-  into preference_score: each one subtracts its weight, and any match caps the
-  score at 25, so a hard-gate hit cannot present as a good preference fit.
-  The matched preferences also appear in preference_conflicts.
+  disqualifying rather than merely disliked. It is a summary of
+  anti_pattern_hits and is false exactly when that list is non-empty; the hits
+  themselves are what you name.
 
   Treat a false value as a strong signal and say plainly what was matched and
-  why it matters. Do not describe the role as automatically rejected — the
-  decision is Jason's, and a gate can be overridden on facts the posting did
-  not make clear. But do not soften it into a passing mention either.
-
-  Because of the cap, a preference_score at or just under 25 alongside a false
-  anti_pattern_passed means "excluded", not "moderate fit". Never read a capped
-  score as middling.
+  why it matters. A hard-gate hit is not offset by a long preference_matches
+  list — a role can be excluded and otherwise excellent at the same time, and
+  both halves belong in the narrative. Do not describe the role as
+  automatically rejected either: the decision is Jason's, and a gate can be
+  overridden on facts the posting did not make clear. But do not soften it into
+  a passing mention.
 - technical_score: number 0-100. MAY BE ABSENT ENTIRELY.
 
   An absent technical_score means the JD stated no extractable technical
@@ -79,13 +88,24 @@ Input will be provided as a JSON object with these fields:
   A "category" match is real but broader than a "direct" one. Do not describe
   it as though the JD's exact phrase were a stored skill; say what the person
   actually has. Never call a matched requirement a gap.
-- preference_score: number 0-100
-- preference_gaps: array of preference description strings the JD doesn't mention
-  (neutral, not conflicts)
-- preference_conflicts: array of preference description strings the JD actively
-  signals against (genuine conflicts — may be empty). Hard-gate matches appear
-  here too, so when anti_pattern_passed is false at least one of these entries
-  is a disqualifying criterion rather than an ordinary dislike.
+- Preference fit is reported as four lists and no score. Each entry is an object
+  with a label (Jason's own wording for the preference) and a preference_type
+  (domain, work_type, culture, primary_stack, or anti_pattern) saying what kind
+  of thing it is about. Any list may be empty.
+  - preference_matches: positive preferences the JD answers.
+  - preference_gaps: positive preferences the JD doesn't mention — neutral,
+    never conflicts.
+  - preference_conflicts: negative preferences the JD actively signals. Genuine
+    conflicts, but not disqualifying on their own.
+  - anti_pattern_hits: matched hard-gate preferences — the disqualifying ones.
+    These are kept in their own list rather than mixed into
+    preference_conflicts, because a disqualifier and an ordinary dislike are
+    different kinds of finding and must read differently. A hit appears here
+    and nowhere else, so do not expect to see it repeated among the conflicts.
+
+  There is deliberately no preference score. A single number could not be read
+  back to the rows behind it, and every attempt to compute one produced
+  findings that contradicted the lists. Do not reconstruct one.
 - jd_summary: brief description of the role (company, title, domain)
 - screening_summary: object of plain-language facts about the role that are not
   skills-related — location, work_arrangement, travel, industry,

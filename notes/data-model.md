@@ -283,14 +283,32 @@ initial migration, each fixing a distinct narrative defect.
 | `anti_pattern_hits` | JSONB | 007 |
 | `technical_score` | NUMERIC(5,2) | 007 |
 | `technical_gaps` | JSONB | 007 |
-| `preference_score` | NUMERIC(5,2) | 007 |
 | `preference_gaps` | JSONB | 007 — positive preferences the JD didn't mention |
-| `narrative` | TEXT | 007 — LLM prose, written *from* the scores |
+| `narrative` | TEXT | 007 — LLM prose, written *from* the findings |
 | `preference_conflicts` | JSONB | **009** — negative preferences the JD actively matched |
 | `screening_summary` | JSONB | **010** — plain-language screening facts from Stage 1 |
+| `technical_matches` | JSONB | **013** — per-requirement match provenance and evidence |
+| `preference_matches` | JSONB | **016** — positive preferences the JD answered |
 
-`preference_gaps` and `preference_conflicts` must stay separate. Collapsing them
-made the narrative describe merely-unmentioned preferences as active conflicts.
+`preference_score` was **dropped in 016**. Preference fit is now four lists and
+no number: `preference_matches`, `preference_gaps`, `preference_conflicts`, and
+`anti_pattern_hits`. The score was a weighted average with a hard-gate penalty
+subtracted and a ceiling clamped over it, and nearly every preference defect
+this project has fixed lived in that arithmetic rather than in the matching.
+Existing rows lost the column and nothing backfills it — the scorer that
+produced those numbers no longer exists.
+
+Technical fit still scores. The two axes were never comparable and are not
+becoming so: `technical_score` measures capability against stated requirements,
+which is a coverage ratio; preference fit measures desire, which is a set of
+named findings.
+
+The four lists must stay separate. Collapsing gaps into conflicts made the
+narrative describe merely-unmentioned preferences as active conflicts;
+collapsing `anti_pattern_hits` into conflicts makes a disqualifier read as one
+more dislike. A hard-gate hit is recorded in `anti_pattern_hits` only — it is
+no longer duplicated into `preference_conflicts` as it was when both fed a
+single score.
 
 ### `contribution_feedback`
 Scoped to a `(contribution, resume_version)` pair — feedback is per-version, not

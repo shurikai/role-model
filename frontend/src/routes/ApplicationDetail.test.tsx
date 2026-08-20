@@ -51,8 +51,24 @@ function makeFitReport(overrides: Partial<FitReport> = {}): FitReport {
     anti_pattern_hits: null,
     technical_score: 100,
     technical_gaps: null,
-    preference_score: 33.33,
-    preference_gaps: ["remote-first"],
+    preference_matches: [
+      {
+        id: "pref-match-1",
+        label: "distributed systems",
+        preference_type: "domain",
+        sentiment: "positive",
+        notes: null,
+      },
+    ],
+    preference_gaps: [
+      {
+        id: "pref-gap-1",
+        label: "remote-first",
+        preference_type: "culture",
+        sentiment: "positive",
+        notes: null,
+      },
+    ],
     preference_conflicts: null,
     narrative: "This is the narrative.",
     screening_summary: screeningSummary,
@@ -151,7 +167,7 @@ describe("ApplicationDetail", () => {
   });
 
   describe("fit report rendering", () => {
-    it("renders scores and narrative even when anti_pattern_passed is false", async () => {
+    it("renders the preference lists and narrative even when anti_pattern_passed is false", async () => {
       vi.stubGlobal(
         "fetch",
         stubFetch(makeApplication(), [
@@ -175,7 +191,15 @@ describe("ApplicationDetail", () => {
         await screen.findByText("This is the narrative."),
       ).toBeInTheDocument();
       expect(screen.getByText("Technical score:")).toBeInTheDocument();
-      expect(screen.getByText("Preference score:")).toBeInTheDocument();
+      // Preference fit is four lists and no score. Gaps and matches render as
+      // their own labelled lists; the hard-gate hits are the anti-pattern
+      // callout above and are deliberately not repeated down here.
+      expect(screen.queryByText("Preference score:")).not.toBeInTheDocument();
+      expect(screen.getByText("Preferences matched:")).toBeInTheDocument();
+      expect(screen.getByText("distributed systems")).toBeInTheDocument();
+      expect(
+        screen.getByText("Preferences not mentioned:"),
+      ).toBeInTheDocument();
       expect(screen.getByText("remote-first")).toBeInTheDocument();
     });
 
@@ -218,14 +242,14 @@ describe("ApplicationDetail", () => {
 
     // Reports written before the gate stopped blocking returned early, so they
     // carry no scores and no narrative. Those rows are still in the database.
-    it("shows a dash rather than a bare /100 for a legacy report with null scores", async () => {
+    it("shows a dash rather than a bare /100 for a legacy report with a null technical score", async () => {
       vi.stubGlobal(
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
             anti_pattern_passed: false,
             technical_score: null,
-            preference_score: null,
+            preference_matches: null,
             preference_gaps: null,
             narrative: null,
             anti_pattern_hits: [
@@ -247,9 +271,34 @@ describe("ApplicationDetail", () => {
       expect(
         screen.getByText("Technical score:").closest("p"),
       ).toHaveTextContent("Technical score: —");
+      // An empty preference list renders as nothing at all rather than as a
+      // dash. There is no score to be absent — a heading with no entries under
+      // it would be the only thing pretending otherwise.
       expect(
-        screen.getByText("Preference score:").closest("p"),
-      ).toHaveTextContent("Preference score: —");
+        screen.queryByText("Preferences not mentioned:"),
+      ).not.toBeInTheDocument();
+    });
+
+    // Gaps and conflicts were bare label strings before preference fit became
+    // a hit list, and reports written then are still in the database. They must
+    // still render their labels rather than a row of empty bullets.
+    it("renders a legacy report whose preference lists hold bare strings", async () => {
+      vi.stubGlobal(
+        "fetch",
+        stubFetch(makeApplication(), [
+          makeFitReport({
+            preference_matches: null,
+            preference_gaps: ["remote-first", "logistics"],
+            preference_conflicts: ["on-call heavy"],
+          }),
+        ]),
+      );
+      renderDetail();
+
+      expect(await screen.findByText("remote-first")).toBeInTheDocument();
+      expect(screen.getByText("logistics")).toBeInTheDocument();
+      expect(screen.getByText("on-call heavy")).toBeInTheDocument();
+      expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
     });
   });
 

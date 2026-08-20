@@ -3,7 +3,7 @@
   "issue": "#68",
   "jd_fixture": "synthetic, modelled on the ZoomInfo Senior SWE posting in #68",
   "description": "A backend crawling-infrastructure role whose must-have qualifications read 'Proficiency in Go and/or TypeScript' and whose 'Core Technical Stack' section restates both bare. The persona holds a TypeScript-primary hard gate and is a Go expert, so the posting is one they could take on their strongest language -- and the gate must not fire on the alternative they would never use. This is the ZoomInfo posting from #68 with the language pair swapped to the pair this profile actually gates on, so the case exercises the defect rather than merely resembling it.",
-  "comment": "The enforced regression for #68. prefFieldsFor used to route prominence-claiming labels at required_skills and split OR-groups back apart, so any posting naming a gated technology tripped the gate: the live profile scored the original of this JD at 21.5 with the Python gate hit, and the narrative asserted the role 'gates on expert Python as a primary requirement' -- wording supplied by the preference label, never by the posting. Two mechanisms are under test here and both have to hold. (1) primary_stack is not alt-split, so 'Go | TypeScript' does not reach the TypeScript gate. (2) primary_stack ALSO restates 'TypeScript' and 'Go' bare alongside the group, mirroring the real posting's duplicate stack listing; collapseSubsumed is what makes that harmless. Re-add splitting, or drop the collapse, and this case fails.",
+  "comment": "The enforced regression for #68. prefFieldsFor used to route prominence-claiming labels at required_skills and split OR-groups back apart, so any posting naming a gated technology tripped the gate: the live profile scored the original of this JD at 21.5 with the Python gate hit -- back when preference fit was a score -- and the narrative asserted the role 'gates on expert Python as a primary requirement' -- wording supplied by the preference label, never by the posting. Two mechanisms are under test here and both have to hold. (1) primary_stack is not alt-split, so 'Go | TypeScript' does not reach the TypeScript gate. (2) primary_stack ALSO restates 'TypeScript' and 'Go' bare alongside the group, mirroring the real posting's duplicate stack listing; collapseSubsumed is what makes that harmless. Re-add splitting, or drop the collapse, and this case fails.",
   "signals": {
     "required_skills": [
       "Go | TypeScript",
@@ -63,9 +63,9 @@
       "comment": "The posting offers Go as a substitute for TypeScript, and the persona is a Go expert. Nothing here is a gate.",
       "empty": true
     },
-    "preference_score": {
-      "comment": "Floor set above hardGateCeiling on purpose. A spurious gate hit caps at 25, so any score above it proves no gate fired -- which is the regression, not the exact arithmetic.",
-      "min": 40
+    "preference_matches": {
+      "comment": "Replaces a score floor that was set above hardGateCeiling purely so that a spurious gate hit would break it. The list says the thing directly: this posting requires distributed systems design outright, so the preference is matched, and the assertion no longer depends on any arithmetic at all.",
+      "must_include": ["distributed systems"]
     },
     "preference_conflicts": {
       "comment": "distributed systems is a genuine match here, not a conflict; the point is that the prominence-claiming label does not appear.",

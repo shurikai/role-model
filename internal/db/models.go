@@ -127,13 +127,13 @@ type FitReport struct {
 	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
 	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
 	TechnicalGaps       *json.RawMessage `json:"technical_gaps"`
-	PreferenceScore     pgtype.Numeric   `json:"preference_score"`
 	PreferenceGaps      *json.RawMessage `json:"preference_gaps"`
 	Narrative           *string          `json:"narrative"`
 	CreatedAt           time.Time        `json:"created_at"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
 	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
+	PreferenceMatches   *json.RawMessage `json:"preference_matches"`
 }
 
 type ImportBatch struct {

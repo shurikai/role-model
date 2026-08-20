@@ -1,0 +1,22 @@
+-- Preference fit stops being a number and becomes a hit list.
+--
+-- preference_score was a normalized weighted average with a hard-gate penalty
+-- subtracted from it and a ceiling clamped over the top. Three interacting
+-- mechanisms produced one float that could not be read back to the rows behind
+-- it, and nearly every preference defect this project has fixed lived in that
+-- arithmetic rather than in the matching: unmatched negatives paid out a bonus,
+-- gate hits read as a minor dip, a gates-only profile scored 100. The remaining
+-- columns already say everything the score was standing in for, per row and by
+-- name.
+--
+-- preference_matches is the fourth and last of them: the positive preferences
+-- the JD actually answers. Without it the report could only say what was
+-- missing or opposed, which is why a score was doing the work of reporting what
+-- went right.
+--
+-- Existing rows lose preference_score outright. It is not backfilled and could
+-- not be — the scorer that produced those numbers no longer exists — and
+-- preference_matches stays NULL on them, the same way technical_matches did for
+-- reports predating migration 013.
+ALTER TABLE fit_reports DROP COLUMN preference_score;
+ALTER TABLE fit_reports ADD COLUMN preference_matches JSONB;
