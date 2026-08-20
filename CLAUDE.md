@@ -334,6 +334,20 @@ Rules:
   document for provenance; keep it there. `industry_role` is free text, not an
   enum, because real roles are compound ("Senior Software Engineer / Architect")
   — `industry_level` is the enum.
+- **A contribution belongs to a position, a project, or both** (migration 014).
+  `position_id` is nullable: it says *where* the work was done, and the
+  `project_contributions` link says *what it was part of*. Those are independent
+  facts, which is why a job contribution on public code carries both. Before
+  this, personal projects had nothing to hang a contribution on, so
+  `project_contributions` stayed empty and `assembleProjects` dropped every
+  project before the prompt saw it — no generated resume could mention a
+  project at all.
+
+  What a contribution may not be is homeless: a row with neither is invisible
+  to both assemblers and nothing would report it as unreachable. A deferred
+  constraint trigger enforces this (a CHECK cannot subquery, and the invariant
+  spans two tables), mirrored onto `project_contributions` DELETE — an
+  invariant that holds only on insert is not an invariant.
 - Contributions are richer than resume bullets: full_description, outcomes, and
   scale_context are separate fields to give the LLM distinct signals to draw from
 - Bullet traceability: each generated bullet in the JSON carries contribution_ids
