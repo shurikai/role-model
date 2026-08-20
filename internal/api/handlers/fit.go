@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
@@ -69,7 +68,7 @@ func (h *FitHandler) ListByApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reports, err := h.queries.ListFitReportsByApplication(r.Context(), db.ListFitReportsByApplicationParams{
-		ApplicationID: pgtype.UUID{Bytes: [16]byte(appID), Valid: true},
+		ApplicationID: &appID,
 		UserID:        userID,
 	})
 	if err != nil {

@@ -28,16 +28,16 @@ type Application struct {
 }
 
 type Contribution struct {
-	ID              uuid.UUID `json:"id"`
-	UserID          uuid.UUID `json:"user_id"`
-	PositionID      uuid.UUID `json:"position_id"`
-	Summary         string    `json:"summary"`
-	FullDescription string    `json:"full_description"`
-	Outcomes        *string   `json:"outcomes"`
-	ScaleContext    *string   `json:"scale_context"`
-	IsActive        bool      `json:"is_active"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID              uuid.UUID  `json:"id"`
+	UserID          uuid.UUID  `json:"user_id"`
+	PositionID      *uuid.UUID `json:"position_id"`
+	Summary         string     `json:"summary"`
+	FullDescription string     `json:"full_description"`
+	Outcomes        *string    `json:"outcomes"`
+	ScaleContext    *string    `json:"scale_context"`
+	IsActive        bool       `json:"is_active"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type ContributionDraft struct {
@@ -122,7 +122,7 @@ type Employer struct {
 type FitReport struct {
 	ID                  uuid.UUID        `json:"id"`
 	UserID              uuid.UUID        `json:"user_id"`
-	ApplicationID       pgtype.UUID      `json:"application_id"`
+	ApplicationID       *uuid.UUID       `json:"application_id"`
 	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
 	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
 	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
