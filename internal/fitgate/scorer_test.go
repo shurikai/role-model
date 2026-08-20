@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/generation"
 )
 
 // Real label text from the seeded preference rows. The exact wording is what
@@ -15,7 +16,7 @@ import (
 const (
 	consultingLabel = "IT consulting / staff augmentation model"
 	defenseLabel    = "defense / aerospace"
-	pythonLabel     = "expert Python as primary requirement"
+	pythonLabel     = "Python as a primary language"
 	typescriptLabel = "TypeScript / Node.js as primary language"
 	cultureLabel    = "Big Four consulting culture"
 	angularLabel    = "Angular as co-equal frontend requirement"
@@ -86,18 +87,31 @@ func TestHardGateMatching(t *testing.T) {
 		},
 		{
 			// Task 2: skills-shaped excludes could never fire before, because
-			// nothing in the gate read the skills arrays at all.
-			name:       "python required skill trips the python exclude",
-			pref:       hardGate(pythonLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"Python", "Django"}},
+			// nothing in the gate read the skills arrays at all. They fire
+			// now, but against primary_stack rather than required_skills — the
+			// label claims Python is what the role is BUILT ON, and only
+			// primary_stack answers that question.
+			name:       "a python-primary role trips the python exclude",
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Python", "Django"}},
 			wantPassed: false,
+		},
+		{
+			// #68. The whole defect in one case: Python is required, but the
+			// posting does not say the role is built on it. Under the old
+			// routing this required skill alone tripped a hard gate about
+			// EXPERT Python as a PRIMARY requirement.
+			name:       "python as a required skill only does not trip the python exclude",
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"Python", "Django"}},
+			wantPassed: true,
 		},
 		{
 			// Inverted deliberately. A nice-to-have mention is not a
 			// requirement, so it must not trip a hard exclude — see
 			// prefFieldsFor.
 			name:       "python preferred skill does not trip the python exclude",
-			pref:       hardGate(pythonLabel, "anti_pattern"),
+			pref:       hardGate(pythonLabel, "primary_stack"),
 			signals:    JDSignals{Domain: "saas", PreferredSkills: []string{"Python"}},
 			wantPassed: true,
 		},
@@ -106,7 +120,7 @@ func TestHardGateMatching(t *testing.T) {
 			// bullet, and that was enough to disqualify the role with a
 			// narrative asserting a requirement the JD never stated.
 			name: "angular as a preferred skill only does not trip the angular exclude",
-			pref: hardGate(angularLabel, "anti_pattern"),
+			pref: hardGate(angularLabel, "primary_stack"),
 			signals: JDSignals{
 				Domain:          "fintech",
 				RequiredSkills:  []string{"Java", "Spring Boot"},
@@ -115,34 +129,65 @@ func TestHardGateMatching(t *testing.T) {
 			wantPassed: true,
 		},
 		{
-			// The other half: narrowing the gate to required skills must not
-			// disable it. A real Angular requirement still trips it.
-			name: "angular as a required skill still trips the angular exclude",
-			pref: hardGate(angularLabel, "anti_pattern"),
+			// The other half: routing away from required_skills must not
+			// disable the row. A posting built co-equally on Angular still
+			// trips it.
+			name: "angular in the primary stack still trips the angular exclude",
+			pref: hardGate(angularLabel, "primary_stack"),
 			signals: JDSignals{
-				Domain:         "fintech",
-				RequiredSkills: []string{"Java", "Angular"},
+				Domain:       "fintech",
+				PrimaryStack: []string{"Java", "Angular"},
 			},
 			wantPassed: false,
 		},
 		{
-			// An exclude must still reach an alternative inside an OR-group.
-			name:       "an exclude matches an alternative inside an or-group",
-			pref:       hardGate(pythonLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"Java | Python | Go"}},
+			// #68, the OR-group half. This case previously asserted the
+			// OPPOSITE, on the reasoning that an exclude should reach a single
+			// option buried in a group. That reasoning is right for
+			// anti_pattern and wrong here: a group means the posting offers
+			// substitutes, and a language you can be excused from is not what
+			// the role is built on. "Proficiency in Java and/or Python" is the
+			// posting that made this concrete.
+			name:       "an or-group in the primary stack does not trip an exclude on one member",
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Java | Python | Go"}},
+			wantPassed: true,
+		},
+		{
+			// The converse, so the rule above is a distinction and not a
+			// blanket disarm: no substitute is offered, so the claim stands.
+			name:       "an ungrouped primary language still trips an exclude",
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Python"}},
 			wantPassed: false,
 		},
 		{
-			name:       "typescript required skill trips the typescript exclude",
-			pref:       hardGate(typescriptLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"TypeScript"}},
+			// Extraction restating a grouped choice as a bare entry must not
+			// reopen #68. collapseSubsumed drops the restatement.
+			name:       "a bare restatement of a grouped member does not trip an exclude",
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Java | Python", "Python", "Java"}},
+			wantPassed: true,
+		},
+		{
+			name:       "typescript in the primary stack trips the typescript exclude",
+			pref:       hardGate(typescriptLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"TypeScript"}},
 			wantPassed: false,
 		},
 		{
 			name:       "unrelated stack does not trip a skills exclude",
-			pref:       hardGate(pythonLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"Go", "Kubernetes"}},
+			pref:       hardGate(pythonLabel, "primary_stack"),
+			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Go", "Kubernetes"}},
 			wantPassed: true,
+		},
+		{
+			// A bare-label exclude keeps presence semantics and stays on
+			// anti_pattern. Splitting the types must not disarm these.
+			name:       "a bare technology exclude still fires on a required skill",
+			pref:       hardGate("C# / .NET", "anti_pattern"),
+			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"C#", "Azure"}},
+			wantPassed: false,
 		},
 		{
 			name:       "culture exclude matches a culture signal",
@@ -280,17 +325,19 @@ func TestHardGateScoring(t *testing.T) {
 		// #49: ScorePreferenceFit matched against domain/work_type/culture
 		// only, so this row could never fire — and because an unmatched
 		// negative earns its weight, it paid out a bonus on every JD instead.
+		// The field it fires against changed with #68 (primary_stack, not
+		// required_skills); the property under test did not.
 		jenkins := db.Preference{
 			ID: uuid.New(), Label: "Jenkins administration as primary responsibility",
-			PreferenceType: "anti_pattern", Sentiment: "negative", Weight: 8,
+			PreferenceType: "primary_stack", Sentiment: "negative", Weight: 8,
 		}
 		prefs := []db.Preference{jenkins}
 
 		hit, _, conflicts, _ := ScorePreferenceFit(prefs, JDSignals{
-			Domain: "platform", RequiredSkills: []string{"Jenkins", "Groovy"},
+			Domain: "platform", PrimaryStack: []string{"Jenkins", "Groovy"},
 		})
 		clean, _, _, _ := ScorePreferenceFit(prefs, JDSignals{
-			Domain: "observability", RequiredSkills: []string{"Go", "Kafka"},
+			Domain: "observability", PrimaryStack: []string{"Go", "Kafka"},
 		})
 
 		if hit >= clean {
@@ -303,13 +350,182 @@ func TestHardGateScoring(t *testing.T) {
 	})
 }
 
+// #68's Go-side safety net. jd_extraction.tmpl asks for the same
+// deduplication, but a prompt is a request; this makes extraction noise
+// harmless rather than merely unlikely.
+func TestCollapseSubsumed(t *testing.T) {
+	tests := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{
+			// The ZoomInfo shape: the must-haves offer "Java and/or Python",
+			// and a later "Core Technical Stack" section restates both bare.
+			name: "a group beats bare restatements of its members",
+			in:   []string{"Java | Python", "Python", "Java", "Apache Kafka"},
+			want: []string{"Java | Python", "Apache Kafka"},
+		},
+		{
+			name: "unrelated entries survive untouched",
+			in:   []string{"Go", "Kubernetes", "PostgreSQL"},
+			want: []string{"Go", "Kubernetes", "PostgreSQL"},
+		},
+		{
+			// Strict subset only. Equal groups subsume each other, and dropping
+			// both would lose the entry entirely.
+			name: "identical groups are both kept",
+			in:   []string{"Java | Python", "Python | Java"},
+			want: []string{"Java | Python", "Python | Java"},
+		},
+		{
+			name: "a smaller group inside a larger one is dropped",
+			in:   []string{"Java | Python | Go", "Java | Python"},
+			want: []string{"Java | Python | Go"},
+		},
+		{
+			// A blank entry yields no alternatives, and an empty set is a
+			// subset of everything — it must be dropped rather than allowed to
+			// match nothing loudly.
+			name: "blank entries are dropped",
+			in:   []string{"Go", "   "},
+			want: []string{"Go"},
+		},
+		{
+			name: "order is preserved",
+			in:   []string{"Kafka", "Java | Python", "Java"},
+			want: []string{"Kafka", "Java | Python"},
+		},
+		{name: "empty input", in: nil, want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := collapseSubsumed(tt.in); !slices.Equal(got, tt.want) {
+				t.Errorf("collapseSubsumed(%v) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// #53. work_type and domain preferences were routed at single-value enums that
+// their labels could not appear in, so roughly 50 of 139 possible weight was
+// not merely unlikely to be earned but unearnable on any JD, ever.
+func TestPreferenceRoutingReachesProseSignals(t *testing.T) {
+	positive := func(label, prefType string, w int16) db.Preference {
+		return db.Preference{
+			ID: uuid.New(), Label: label, PreferenceType: prefType,
+			Sentiment: "positive", Weight: w,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		pref    db.Preference
+		signals JDSignals
+		wantGap bool
+	}{
+		{
+			// signals.WorkType is remote|hybrid|onsite|unknown. No work_type
+			// label can ever appear in it; the role shape is in culture_signals.
+			name:    "a work_type preference reads culture signals",
+			pref:    positive("small team, high ownership", "work_type", 9),
+			signals: JDSignals{WorkType: "remote", CultureSignals: []string{"small team", "high ownership"}},
+		},
+		{
+			name: "a work_type preference reads core competencies",
+			pref: positive("greenfield development", "work_type", 6),
+			signals: JDSignals{
+				WorkType:         "remote",
+				CoreCompetencies: []string{"greenfield development of a new ingest service"},
+			},
+		},
+		{
+			// The enum has no logistics value, so extraction correctly says
+			// "saas" and the real industry survives only in screening_summary.
+			name: "a domain preference reads the screening summary industry",
+			pref: positive("logistics", "domain", 9),
+			signals: JDSignals{
+				Domain: "saas",
+				ScreeningSummary: generation.ScreeningSummary{
+					Industry: "freight logistics visibility platform",
+				},
+			},
+		},
+		{
+			// "observability" was reported as an unmet gap on a posting that
+			// required observability work outright.
+			name: "a domain preference reads core competencies",
+			pref: positive("observability", "domain", 7),
+			signals: JDSignals{
+				Domain:           "healthcare",
+				CoreCompetencies: []string{"observability and incident response for production services"},
+			},
+		},
+		{
+			name: "a culture preference reads core competencies",
+			pref: positive("mentoring", "culture", 7),
+			signals: JDSignals{
+				WorkType:         "remote",
+				CoreCompetencies: []string{"mentoring senior engineers"},
+			},
+		},
+		{
+			// The widening must not make everything match. A JD that genuinely
+			// says nothing about a preference still reports it as a gap.
+			name:    "a silent JD still reports the preference as a gap",
+			pref:    positive("logistics", "domain", 9),
+			signals: JDSignals{Domain: "healthcare", CoreCompetencies: []string{"claims adjudication"}},
+			wantGap: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, gaps, _, _ := ScorePreferenceFit([]db.Preference{tt.pref}, tt.signals)
+			gotGap := slices.Contains(gaps, tt.pref.Label)
+			if gotGap != tt.wantGap {
+				t.Errorf("reported as gap = %v, want %v (gaps: %v)", gotGap, tt.wantGap, gaps)
+			}
+		})
+	}
+}
+
+// The oppositional pair that widening the work_type routing exposed. The two
+// labels seeded before migration 015 tokenized to the same bag of words, so a
+// JD mentioning internal tooling earned the positive and scored the conflict in
+// the same pass. matchesSignal compares token runs and cannot tell "X over Y"
+// from "Y over X" — the fix is disjoint labels, not a smarter matcher.
+func TestOppositeWorkTypePreferencesDoNotBothMatch(t *testing.T) {
+	prefs := []db.Preference{
+		{ID: uuid.New(), Label: "product engineering", PreferenceType: "work_type",
+			Sentiment: "positive", Weight: 8},
+		{ID: uuid.New(), Label: "internal platform / developer tooling", PreferenceType: "work_type",
+			Sentiment: "negative", Weight: 5},
+	}
+	signals := JDSignals{
+		WorkType:       "remote",
+		CultureSignals: []string{"internal platform / developer tooling"},
+	}
+
+	_, gaps, conflicts, _ := ScorePreferenceFit(prefs, signals)
+
+	if !slices.Contains(conflicts, "internal platform / developer tooling") {
+		t.Errorf("conflicts = %v, want the internal-tooling negative", conflicts)
+	}
+	if !slices.Contains(gaps, "product engineering") {
+		t.Errorf("gaps = %v: an internal-tooling JD must not also earn the "+
+			"product-engineering positive", gaps)
+	}
+}
+
 func TestContainsPhrase(t *testing.T) {
 	tests := []struct {
 		needle, haystack string
 		want             bool
 	}{
 		{"defense", "defense / aerospace", true},
-		{"Python", "expert Python as primary requirement", true},
+		{"Python", "Python as a primary language", true},
 		{"TypeScript", "TypeScript / Node.js as primary language", true},
 		{"node.js", "TypeScript / Node.js as primary language", true},
 		{"remote", "remote-first", true},
@@ -322,7 +538,7 @@ func TestContainsPhrase(t *testing.T) {
 
 		// Needle longer than haystack, and non-contiguous word runs.
 		{"defense / aerospace", "defense", false},
-		{"primary python", "expert Python as primary requirement", false},
+		{"primary python", "Python as a primary language", false},
 
 		// Empty needle matches nothing rather than everything.
 		{"", "anything", false},

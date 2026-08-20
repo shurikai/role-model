@@ -52,6 +52,31 @@ core_competencies: array of strings — the capability-level requirements the JD
     ("async-first", "high ownership"); a competency describes what the person
     must be able to do ("owns services in production").
 
+primary_stack: array of strings — the technologies the posting frames the role
+  as being BUILT ON: the languages and platforms the person will actually work
+  in day to day. This is a strict subset of required_skills, and it answers a
+  different question. required_skills asks "does the JD ask for this at all";
+  primary_stack asks "is this what the role is made of".
+
+  Rules for primary_stack:
+  - Not everything required is primary. A tool named once in a nice-to-have
+    bullet, a data store touched at the edges, or a CI system the team happens
+    to use is required, not primary. Typically 2-6 entries.
+  - Preserve substitutability. When the JD offers a choice — "Java and/or
+    Python", "Go or Rust" — that is ONE entry joined with " | ", exactly as in
+    required_skills. A technology the posting offers a substitute for is not
+    something the role is built on, and collapsing the choice into separate
+    entries asserts a requirement the JD did not make.
+  - Deduplicate across the whole posting, and let the STRICTEST statement of
+    the requirement govern. Postings routinely state the same stack twice: once
+    in the must-have qualifications and again in a "Core Technical Stack" or
+    "Tech you'll use" list. If a technology appears in a choice in one place and
+    bare in another, emit the choice and nothing else. Never emit both
+    "Java | Python" and a separate "Python".
+  - Empty array if the JD does not make it clear what the role is built on.
+    An empty primary_stack is a correct answer for a posting that lists
+    technologies without saying which ones the job centres on.
+
 seniority: string — one of: "junior", "mid", "senior", "staff", "principal",
   "lead", "unknown". Infer from title and requirements if not explicit.
 
@@ -168,6 +193,7 @@ Example output shape:
     "high-cardinality time series storage",
     "production on-call ownership"
   ],
+  "primary_stack": ["Go", "Kubernetes"],
   "seniority": "senior",
   "domain": "observability",
   "work_type": "remote",
@@ -216,3 +242,16 @@ ownership of services", "setting technical direction", "mentoring engineers"]
 <job_description>
 {{.JobDescription}}
 </job_description>
+
+Example of primary_stack against a posting that states its stack twice:
+Input: must-have qualifications say "Proficiency in Java and/or Python"; a
+later "Core Technical Stack" section lists "Java and Python, Apache Kafka, GCP
+(BigQuery, GKE, Vertex AI), Snowflake and Starburst/Trino, Terraform, Scrapy,
+proxy management systems, Apache Airflow".
+-> primary_stack is ["Java | Python", "Apache Kafka", "GCP", "Kubernetes"]
+The language requirement stays ONE entry because the must-have section offers
+the two as substitutes, and the bare "Java and Python" in the stack listing does
+not override that — the stricter statement governs. Snowflake, Terraform,
+Scrapy, and Airflow remain in required_skills but are not what the role is built
+on. Note this is independent of required_skills, which still lists every one of
+them separately.

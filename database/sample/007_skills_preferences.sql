@@ -164,6 +164,17 @@ INSERT INTO preferences (
    'anti_pattern', '.NET', 'negative', 10, TRUE, NULL,
    'Will not move to the Microsoft stack. Go/Java/Python is the career direction.'),
 
+  -- The one prominence-shaped gate. Every other row here objects to a
+  -- technology or industry being present at all; this one objects only to
+  -- TypeScript being what the role is BUILT ON, which is a different question
+  -- and is why it is typed primary_stack. The persona is a novice at
+  -- TypeScript and React and would still take a backend role that touches
+  -- them. Without a row of this shape no fixture exercises the distinction
+  -- #68 turns on.
+  ('56000000-0000-0000-0000-000000000044', '5a000000-0000-0000-0000-000000000001',
+   'primary_stack', 'TypeScript / Node.js as a primary language', 'negative', 10, TRUE, NULL,
+   'Backend is the career direction. A TypeScript-primary role is a different job, not a stretch assignment.'),
+
   ('56000000-0000-0000-0000-000000000040', '5a000000-0000-0000-0000-000000000001',
    'anti_pattern', 'adtech', 'negative', 10, TRUE, NULL,
    'Will not work on advertising technology.'),
