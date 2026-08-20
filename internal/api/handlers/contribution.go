@@ -53,7 +53,7 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 	}
 
 	contributions, err := h.queries.GetContributionsByPosition(r.Context(), db.GetContributionsByPositionParams{
-		PositionID: positionID,
+		PositionID: &positionID,
 		UserID:     userID,
 	})
 	if err != nil {
@@ -138,7 +138,7 @@ func (h *ContributionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	contribution, err := h.queries.CreateContribution(r.Context(), db.CreateContributionParams{
 		ID:              uuid.New(),
 		UserID:          userID,
-		PositionID:      req.PositionID,
+		PositionID:      &req.PositionID,
 		Summary:         req.Summary,
 		FullDescription: req.FullDescription,
 		Outcomes:        req.Outcomes,

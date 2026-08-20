@@ -20,14 +20,14 @@ RETURNING id, user_id, position_id, summary, full_description, outcomes, scale_c
 `
 
 type CreateContributionParams struct {
-	ID              uuid.UUID `json:"id"`
-	UserID          uuid.UUID `json:"user_id"`
-	PositionID      uuid.UUID `json:"position_id"`
-	Summary         string    `json:"summary"`
-	FullDescription string    `json:"full_description"`
-	Outcomes        *string   `json:"outcomes"`
-	ScaleContext    *string   `json:"scale_context"`
-	IsActive        bool      `json:"is_active"`
+	ID              uuid.UUID  `json:"id"`
+	UserID          uuid.UUID  `json:"user_id"`
+	PositionID      *uuid.UUID `json:"position_id"`
+	Summary         string     `json:"summary"`
+	FullDescription string     `json:"full_description"`
+	Outcomes        *string    `json:"outcomes"`
+	ScaleContext    *string    `json:"scale_context"`
+	IsActive        bool       `json:"is_active"`
 }
 
 func (q *Queries) CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error) {
@@ -127,8 +127,8 @@ ORDER BY created_at
 `
 
 type GetContributionsByPositionParams struct {
-	PositionID uuid.UUID `json:"position_id"`
-	UserID     uuid.UUID `json:"user_id"`
+	PositionID *uuid.UUID `json:"position_id"`
+	UserID     uuid.UUID  `json:"user_id"`
 }
 
 func (q *Queries) GetContributionsByPosition(ctx context.Context, arg GetContributionsByPositionParams) ([]Contribution, error) {

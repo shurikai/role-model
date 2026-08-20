@@ -45,3 +45,6 @@ generated_resume*.json
 # .vscode/
 .DS_Store
 
+
+# Database dumps (make db-dump). Real career data — never commit.
+backups/
