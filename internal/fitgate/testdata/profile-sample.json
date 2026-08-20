@@ -2,6 +2,7 @@
   "name": "sample",
   "source": "database/sample/007_skills_preferences.sql",
   "note": "Morgan Reyes, the fictional persona from database/sample. Mirrored here by hand so the eval harness runs offline. TestEvalProfileMatchesSampleSeed guards the mirror against drift.",
+  "note_primary_stack": "The primary_stack row exists so the fixture set exercises a label that makes a claim about PROMINENCE rather than presence. Every gate row here was a bare term (.NET, adtech, gambling, surveillance), which is exactly why the harness was blind to #68: a qualified label matched on any bare token inside it, and no fixture had one.",
 
   "skills": [
     { "name": "Go",                        "proficiency": "expert",     "years_experience": 9.0,  "is_active": true },
@@ -64,6 +65,9 @@
     { "preference_type": "culture",      "label": "mandatory overtime",    "sentiment": "negative", "weight": 7 },
 
     { "preference_type": "anti_pattern", "label": ".NET",                  "sentiment": "negative", "weight": 10, "is_hard_gate": true },
+
+    { "preference_type": "primary_stack", "label": "TypeScript / Node.js as a primary language", "sentiment": "negative", "weight": 10, "is_hard_gate": true },
+
     { "preference_type": "anti_pattern", "label": "adtech",                "sentiment": "negative", "weight": 10, "is_hard_gate": true },
     { "preference_type": "anti_pattern", "label": "gambling",              "sentiment": "negative", "weight": 10, "is_hard_gate": true },
     { "preference_type": "anti_pattern", "label": "surveillance",          "sentiment": "negative", "weight": 10, "is_hard_gate": true }

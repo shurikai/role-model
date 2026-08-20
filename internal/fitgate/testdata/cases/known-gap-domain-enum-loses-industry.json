@@ -1,11 +1,10 @@
 {
   "name": "known-gap-domain-enum-loses-industry",
   "status": "known_gap",
-  "issue": "#45",
-  "reason": "The persona's top two positive preferences are 'logistics' (weight 9) and 'supply chain' (weight 8), and this JD is a freight visibility platform -- the single best domain match in the whole fixture set. Both are reported as preference GAPS anyway. jd_extraction.tmpl constrains `domain` to a closed enum with no logistics or freight value, so the closest honest extraction is 'saas'. The real industry survives only in screening_summary.industry ('freight logistics'), which signalFields does not read. The result inverts the strongest signal in the dataset: the JD the persona most wants is scored as though it failed to mention the thing they care most about.",
+  "issue": "#53",
+  "reason": "HALF CLOSED by #53. 'logistics' now matches: prefFieldsFor's domain branch reads screening_summary.industry alongside signals.Domain, and the industry here is 'freight logistics visibility platform'. jd_extraction.tmpl still constrains `domain` to a closed enum with no logistics or freight value, so the enum alone still says 'saas' -- the fix was widening the fields, not the enum. What remains is 'supply chain' (weight 8, the persona's second-strongest positive), which appears in neither the industry string nor core_competencies on this fixture. containsPhrase requires a contiguous whole-word run, and nothing in these signals contains that phrase, so the row is still reported as an unmet gap on the JD it describes best. Closing it needs either a vocabulary layer for preference labels (the aliases mechanism tags already have) or richer extraction -- not more routing.",
   "jd_fixture": "tests/fixtures/sample-strong-match-jd.md",
-  "description": "Asserted separately from strong-match.json so the enforced case can hold a real preference floor while this stays visible.",
-
+  "description": "Asserted separately from strong-match.json so the enforced case can hold a real preference floor while the remaining half of this gap stays visible.",
   "signals": {
     "required_skills": [
       "Go",
@@ -45,10 +44,12 @@
       "other_flags": []
     }
   },
-
   "expect": {
     "preference_gaps": {
-      "must_exclude": ["logistics", "supply chain"]
+      "must_exclude": [
+        "logistics",
+        "supply chain"
+      ]
     }
   }
 }
