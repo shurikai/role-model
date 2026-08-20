@@ -15,6 +15,22 @@ type JDSignals struct {
 	RequiredSkills  []string `json:"required_skills"`
 	PreferredSkills []string `json:"preferred_skills"`
 
+	// CoreCompetencies holds the capability-level requirements a JD states in
+	// prose instead of as named technology — "decomposing a legacy service",
+	// "production ownership of services", "setting technical direction".
+	//
+	// It exists because senior and staff postings routinely name no concrete
+	// technology at all, leaving RequiredSkills and PreferredSkills correctly
+	// but uselessly empty. Every consumer then degrades at once and silently:
+	// the 2a requirement checklist renders "(none listed)" twice, so the
+	// prompt's whole skill-relevance apparatus has nothing to filter against
+	// and falls back to emitting the tag inventory; and ScoreTechnicalFit
+	// scores a vacuous 100 against an empty requirement list.
+	//
+	// Deliberately NOT part of the document projection. Adding a field here
+	// must not change what the document emits — see documentJDSignals.
+	CoreCompetencies []string `json:"core_competencies"`
+
 	// Role classification
 	Seniority string `json:"seniority"`
 	Domain    string `json:"domain"`

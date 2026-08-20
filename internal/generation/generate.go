@@ -35,8 +35,10 @@ type resumeBodyPromptData struct {
 	JDSignals       string
 	SkillsChecklist string
 	LengthBudget    string
+	FramingGuidance string
 	Identity        string
 	Experience      string
+	Skills          string
 	Projects        string
 	Education       string
 	Credentials     string
@@ -70,11 +72,95 @@ func buildLengthBudget(raw *json.RawMessage) (string, error) {
 	}
 }
 
-// buildSkillsChecklist renders the JD's required/preferred skills as an
-// explicit checklist for the 2a prompt, rather than leaving cross-referencing
-// to implicit recall from the <jd_signals> blob. Falls back to the
-// deprecated priority_skills field for older stored jd_signals rows that
-// predate required_skills/preferred_skills.
+// Framing guidance, the second thing seniority drives. Length was the first
+// and, for a long time, the only one — which meant a staff-level posting got
+// more bullets of the same altitude rather than bullets pitched at the level
+// it was hiring for. Every other rule in the 2a prompt pushes toward
+// implementation specificity ("prefer specificity over generality"), so the
+// output read as a competent senior-IC implementation report no matter who
+// the reader was.
+//
+// The rule these strings exist to enforce is the one that is easy to get
+// backwards: ownership framing is added ON TOP of the evidence, never in
+// place of it. Trading the metric for the claim is a downgrade — the metric
+// is what makes the claim believable, and a broad ownership statement with
+// nothing behind it is exactly the shape a skeptical reader discounts.
+const (
+	framingStaff = `This role is pitched at staff level or above. A reader at this level is
+scanning for scope and accountability, not implementation detail alone.
+
+On the 2-3 most JD-relevant positions, open each bullet with what was owned,
+decided, or changed at the system or team level, then land the supporting
+evidence — the metric, the scale, the team size — in the same sentence.
+
+  Weaker: "Reduced cruise data API response times from several seconds to
+    under 500ms by separating historical and future data endpoints."
+  Stronger: "Owned performance of the guest-facing cruise data APIs across an
+    8-ship fleet, cutting response times from seconds to under 500ms by
+    separating historical from future data."
+
+Both sentences carry the same fact. The second also says what the candidate
+was responsible for.
+
+Two hard limits on this:
+  - NEVER trade the evidence for the framing. A bullet that claims ownership
+    and drops the number is weaker than one that only reports the number.
+    Both together, or the number alone — never the claim alone.
+  - NEVER manufacture scope the source material does not support. "Owned",
+    "led", "set technical direction for" are factual claims and need backing
+    in the contribution data like any other. If the data shows the work but
+    not the ownership, write the work.`
+
+	framingDefault = `This role is pitched at senior level or below. Lead with the concrete work
+and the outcome it produced.
+
+Where the source material genuinely supports ownership or leadership scope,
+say so — but do not reach for it. A bullet claiming architectural ownership
+the contribution data does not support reads as padding, and costs more
+credibility than the framing gains.`
+)
+
+// buildFramingGuidance renders seniority-informed guidance on what altitude to
+// pitch bullets at. Sibling to buildLengthBudget, deliberately: the two levers
+// seniority drives sit next to each other and are tested the same way.
+func buildFramingGuidance(raw *json.RawMessage) (string, error) {
+	seniority := ""
+	if raw != nil {
+		var signals JDSignals
+		if err := json.Unmarshal(*raw, &signals); err != nil {
+			return "", fmt.Errorf("parse jd_signals for framing guidance: %w", err)
+		}
+		seniority = signals.Seniority
+	}
+
+	switch seniority {
+	case "staff", "principal", "lead":
+		return framingStaff, nil
+	default:
+		// junior, mid, senior, manager, director, vp, unknown, or anything
+		// unrecognized. Only staff+ gets the altitude instruction; applying
+		// it to a mid-level posting would invite exactly the inflation the
+		// staff guidance spends two rules guarding against.
+		return framingDefault, nil
+	}
+}
+
+// buildSkillsChecklist renders the JD's requirements as an explicit checklist
+// for the 2a prompt, rather than leaving cross-referencing to implicit recall
+// from the <jd_signals> blob. Falls back to the deprecated priority_skills
+// field for older stored jd_signals rows that predate
+// required_skills/preferred_skills.
+//
+// Core competencies are rendered as their own section rather than folded in
+// with the skills. They satisfy differently: a required skill can be answered
+// by a Skills entry, while a competency is a capability that only a bullet can
+// evidence — resume_body.tmpl relies on the sections staying distinct to keep
+// "setting technical direction" out of the Skills list.
+//
+// The competency section is also what keeps this checklist non-empty for a
+// staff-level JD that names no technology at all. Both skill lists are
+// correctly empty for such a posting, and a checklist reading "(none listed)"
+// twice silently disables every relevance rule in the 2a prompt.
 func buildSkillsChecklist(raw *json.RawMessage) (string, error) {
 	if raw == nil {
 		return "(no jd_signals available)", nil
@@ -92,30 +178,89 @@ func buildSkillsChecklist(raw *json.RawMessage) (string, error) {
 	preferred := signals.PreferredSkills
 
 	var b strings.Builder
-	b.WriteString("Required:\n")
-	if len(required) == 0 {
-		b.WriteString("(none listed)\n")
-	}
-	for _, skill := range required {
-		fmt.Fprintf(&b, "- %s\n", skill)
-	}
-	b.WriteString("Preferred:\n")
-	if len(preferred) == 0 {
-		b.WriteString("(none listed)\n")
-	}
-	for _, skill := range preferred {
-		fmt.Fprintf(&b, "- %s\n", skill)
-	}
+	writeSection(&b, "Required skills", required)
+	writeSection(&b, "Preferred skills", preferred)
+	writeSection(&b, "Core competencies", signals.CoreCompetencies)
 
 	return b.String(), nil
 }
 
+// writeSection renders one labelled checklist section. An empty section still
+// prints its heading, so the prompt sees the same three-section shape every
+// time and "(none listed)" reads as a fact about this JD rather than as a
+// missing block.
+func writeSection(b *strings.Builder, label string, entries []string) {
+	fmt.Fprintf(b, "%s:\n", label)
+	if len(entries) == 0 {
+		b.WriteString("(none listed)\n")
+		return
+	}
+	for _, e := range entries {
+		fmt.Fprintf(b, "- %s\n", e)
+	}
+}
+
 type resumeSummaryPromptData struct {
-	CompanyName string
-	RoleTitle   string
-	JDSignals   string
-	HeaderTitle string
-	Body        string
+	CompanyName     string
+	RoleTitle       string
+	JDSignals       string
+	HeaderTitle     string
+	YearsExperience string
+	Body            string
+}
+
+// buildYearsExperience derives total years of experience from the earliest
+// started_on in the 2a body, formatted for the 2b prompt to quote verbatim.
+// Returns "" when no usable date is present, which the prompt reads as
+// "do not mention years at all".
+//
+// This is threaded in for the same reason HeaderTitle is: it is a fact both
+// passes could derive independently, and when 2b was left to derive it the
+// same career produced "27 years" for one application and "over 26 years" for
+// another generated three hours earlier. The rule was deterministic; the
+// arithmetic was not.
+//
+// Only started_on is read. An ended_on gap is not subtracted — the figure is
+// career span, the ordinary meaning of "N years of experience" on a resume,
+// and inferring unemployment from a date gap is not something to do silently.
+func buildYearsExperience(experience json.RawMessage, now time.Time) (string, error) {
+	if len(experience) == 0 {
+		return "", nil
+	}
+
+	var employers []struct {
+		Positions []struct {
+			StartedOn string `json:"started_on"`
+		} `json:"positions"`
+	}
+	if err := json.Unmarshal(experience, &employers); err != nil {
+		return "", fmt.Errorf("parse experience for years: %w", err)
+	}
+
+	var earliest time.Time
+	for _, e := range employers {
+		for _, p := range e.Positions {
+			started, err := time.Parse("2006-01", p.StartedOn)
+			if err != nil {
+				// The schema constrains this field, but 2a's output has not
+				// been validated yet at this point. A single unparseable
+				// date should not cost the whole figure.
+				continue
+			}
+			if earliest.IsZero() || started.Before(earliest) {
+				earliest = started
+			}
+		}
+	}
+	if earliest.IsZero() {
+		return "", nil
+	}
+
+	years := int(now.Sub(earliest).Hours() / 24 / 365.25)
+	if years < 1 {
+		return "", nil
+	}
+	return fmt.Sprintf("%d years", years), nil
 }
 
 // buildMetaBlock assembles the document's meta block.
@@ -184,6 +329,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}
+	framingGuidance, err := buildFramingGuidance(app.JdSignals)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
 	identityJSON, err := json.MarshalIndent(user, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal identity: %w", err)
@@ -193,6 +342,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal experience: %w", err)
 	}
 
+	skills, err := s.assembleSkills(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
 	projects, err := s.assembleProjects(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
@@ -206,6 +359,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: %w", err)
 	}
 
+	skillsJSON, err := json.MarshalIndent(skills, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal skills: %w", err)
+	}
 	projectsJSON, err := json.MarshalIndent(projects, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("generate: marshal projects: %w", err)
@@ -227,8 +384,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		JDSignals:       string(signalsJSON),
 		SkillsChecklist: skillsChecklist,
 		LengthBudget:    lengthBudget,
+		FramingGuidance: framingGuidance,
 		Identity:        string(identityJSON),
 		Experience:      string(experienceJSON),
+		Skills:          string(skillsJSON),
 		Projects:        string(projectsJSON),
 		Education:       string(educationJSON),
 		Credentials:     string(credentialsJSON),
@@ -263,6 +422,13 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: parse resume body json: %w (raw: %s)", err, bodyCleaned)
 	}
 
+	// Enforce the bullet/skills invariant 2a states but does not reliably
+	// honour, before 2b sees the body — the summary should be written against
+	// the final Skills section, not a version still missing entries.
+	if err := reconcileSkills(doc, skills); err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
 	// Pass 2b: summary, grounded ONLY in 2a's output — never the raw
 	// background corpus. This makes claims unsupported by any generated
 	// bullet structurally unreachable rather than relying on a prompt
@@ -280,12 +446,19 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		headerTitle = *user.Headline
 	}
 
+	// Likewise computed here rather than left to 2b's arithmetic.
+	yearsExperience, err := buildYearsExperience(doc["experience"], time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+
 	summaryPrompt, err := renderPrompt(resumeSummaryPrompt, resumeSummaryPromptData{
-		CompanyName: app.CompanyName,
-		RoleTitle:   app.RoleTitle,
-		JDSignals:   string(signalsJSON),
-		HeaderTitle: headerTitle,
-		Body:        string(bodyForSummary),
+		CompanyName:     app.CompanyName,
+		RoleTitle:       app.RoleTitle,
+		JDSignals:       string(signalsJSON),
+		HeaderTitle:     headerTitle,
+		YearsExperience: yearsExperience,
+		Body:            string(bodyForSummary),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generate: render summary prompt: %w", err)

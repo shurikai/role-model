@@ -52,6 +52,24 @@ type TagView struct {
 	Category string `json:"category"`
 }
 
+// SkillView is one claimed skill with its depth signal, as the generation
+// prompt sees it.
+//
+// A TagView and a SkillView are not the same thing and must not be used
+// interchangeably. A tag is vocabulary attached to a contribution; a skill is
+// a claim the user makes about themselves, carrying proficiency and duration.
+// Building the resume's Skills section out of tags treated every technology
+// anyone ever touched as an equal claim, and left the prompt no way to tell a
+// 25-year expert from a weekend prototype.
+type SkillView struct {
+	Name        string `json:"name"`
+	Category    string `json:"category"`
+	Proficiency string `json:"proficiency"`
+	// Nil where the duration was never recorded. Absent, not zero — an
+	// unrecorded duration is not evidence of a short one.
+	YearsExperience *float64 `json:"years_experience,omitempty"`
+}
+
 type ProjectView struct {
 	ID            uuid.UUID          `json:"id"`
 	Name          string             `json:"name"`
