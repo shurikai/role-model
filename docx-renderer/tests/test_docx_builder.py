@@ -72,7 +72,34 @@ def test_every_position_title_appears(resume: Resume) -> None:
     text = document_text(build_resume_document(resume))
     for employer in resume.experience:
         for position in employer.positions:
-            assert position.title in text, f"position dropped: {position.title}"
+            assert position.display_title in text, (
+                f"position dropped: {position.display_title}"
+            )
+
+
+def test_normalized_role_is_rendered_in_place_of_the_verbatim_title(
+    resume: Resume,
+) -> None:
+    """A verbatim title carries the employer's internal grade ladder rather
+    than the job. "Programmer VII" reads as junior to anyone outside that
+    company, and the database has carried the normalization all along."""
+    position = resume.experience[0].positions[0]
+    position.industry_role = "Senior Software Engineer"
+    position.title = "Programmer VII"
+
+    text = document_text(build_resume_document(resume))
+
+    assert "Senior Software Engineer" in text
+    assert "Programmer VII" not in text
+
+
+def test_verbatim_title_is_the_fallback(resume: Resume) -> None:
+    """Documents generated before industry_role existed must still render."""
+    position = resume.experience[0].positions[0]
+    position.industry_role = None
+    position.title = "Programmer VII"
+
+    assert "Programmer VII" in document_text(build_resume_document(resume))
 
 
 def test_every_bullet_appears(resume: Resume) -> None:

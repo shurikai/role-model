@@ -105,6 +105,16 @@ RULES:
 - Each position's position_id in the output must be copied verbatim from the
   id field of the corresponding position in the experience data. Never invent,
   abbreviate, or generate a position_id.
+- Copy each position's title, industry_role, and industry_level verbatim from
+  the experience data. All three are stored facts, not judgments for you to
+  make or refine:
+  - title is the verbatim title the employer used ("Programmer VII").
+  - industry_role is the industry-normalized name for the same job ("Senior
+    Software Engineer"). It is what the renderer displays.
+  Never normalize a title yourself, never adjust industry_role toward the
+  target role's level, and never omit industry_role when the experience data
+  provides one — dropping it silently falls the resume back to the verbatim
+  title.
 - Include projects only if their tags or contributions overlap meaningfully
   with the <jd_requirement_checklist>, unless force_include is true
 - Exclude projects where force_exclude is true regardless of relevance

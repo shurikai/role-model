@@ -325,7 +325,15 @@ Rules:
   edited_deltas
 - Tags are user-defined with user-defined categories, normalized via aliases
 - Positions carry both verbatim company title and industry-normalized level/role
-  with a level_rationale field
+  with a level_rationale field. **The rendered resume shows `industry_role`;
+  `title` is the fallback when it is absent.** A verbatim title carries the
+  employer's internal grade ladder rather than the job — "Programmer VII" tells
+  a reader nothing about the work and reads as junior outside that company. The
+  normalization was in the database from the start, survived every stage of the
+  pipeline, and was discarded on the renderer's last line. `title` stays in the
+  document for provenance; keep it there. `industry_role` is free text, not an
+  enum, because real roles are compound ("Senior Software Engineer / Architect")
+  — `industry_level` is the enum.
 - Contributions are richer than resume bullets: full_description, outcomes, and
   scale_context are separate fields to give the LLM distinct signals to draw from
 - Bullet traceability: each generated bullet in the JSON carries contribution_ids
