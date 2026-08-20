@@ -176,6 +176,18 @@ type narrativeInput struct {
 	// Requirements answered below the depth the JD asked for. Usually empty —
 	// only a posting that states a depth can produce one.
 	TechnicalPartial []SkillMatch `json:"technical_partial"`
+	// The capability-level requirements the JD stated in prose. Passed for
+	// context only: ScoreTechnicalFit does not read them, so nothing here is
+	// scored, matched, or reported as a gap.
+	//
+	// It is here because the unscored case is otherwise indistinguishable
+	// from a vague posting. A staff JD naming no technology scores nothing
+	// and produces no matches and no gaps, and the narrative — seeing an
+	// empty report — wrote that the posting "does not state requirements
+	// specific enough to score against" about a JD that had stated ten of
+	// them. The prompt can now say what was asked for and that it went
+	// unassessed, which are different claims.
+	CoreCompetencies []string `json:"core_competencies"`
 	// The four preference lists, each a projection rather than the db rows —
 	// see narrativePreference.
 	PreferenceMatches   []narrativePreference       `json:"preference_matches"`
@@ -232,12 +244,37 @@ func (s *Service) generateNarrative(
 		return "", err
 	}
 
-	input := narrativeInput{
+	input := buildNarrativeInput(
+		app, signals, gatePassed, technical, prefMatches, prefGaps, prefConflicts, gateHits)
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return "", fmt.Errorf("marshal narrative input: %w", err)
+	}
+
+	return s.client.Complete(ctx, prompt, string(inputJSON), narrativeMaxTokens)
+}
+
+// buildNarrativeInput assembles what the narrative prompt sees. Split out from
+// generateNarrative so the assembly is testable without an LLM call — the
+// wiring is where a signal gets silently dropped, which is how the unscored
+// case came to be narrated as a vague posting.
+func buildNarrativeInput(
+	app db.Application,
+	signals JDSignals,
+	gatePassed bool,
+	technical TechnicalFit,
+	prefMatches []db.Preference,
+	prefGaps []db.Preference,
+	prefConflicts []db.Preference,
+	gateHits []db.Preference,
+) narrativeInput {
+	return narrativeInput{
 		AntiPatternPassed:   gatePassed,
 		TechnicalScore:      narrativeScore(technical),
 		TechnicalGaps:       technical.Gaps,
 		TechnicalMatches:    technical.Matches,
 		TechnicalPartial:    technical.Partial,
+		CoreCompetencies:    signals.CoreCompetencies,
 		PreferenceMatches:   projectPreferences(prefMatches),
 		PreferenceGaps:      projectPreferences(prefGaps),
 		PreferenceConflicts: projectPreferences(prefConflicts),
@@ -245,12 +282,6 @@ func (s *Service) generateNarrative(
 		JDSummary:           fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
 		ScreeningSummary:    signals.ScreeningSummary,
 	}
-	inputJSON, err := json.Marshal(input)
-	if err != nil {
-		return "", fmt.Errorf("marshal narrative input: %w", err)
-	}
-
-	return s.client.Complete(ctx, prompt, string(inputJSON), narrativeMaxTokens)
 }
 
 // marshalScreeningSummary marshals the summary to a *json.RawMessage,
