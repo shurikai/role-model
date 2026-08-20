@@ -31,6 +31,7 @@ function makeApplication(overrides: Partial<Application> = {}): Application {
       domain: "defense",
       work_type: "onsite",
       culture_signals: [],
+      core_competencies: [],
       screening_summary: screeningSummary,
     },
     status: "draft",
@@ -349,6 +350,53 @@ describe("ApplicationDetail", () => {
       expect(screen.getByText("logistics")).toBeInTheDocument();
       expect(screen.getByText("on-call heavy")).toBeInTheDocument();
       expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("core competencies", () => {
+    // The case this block exists for: a staff posting that names no
+    // technology at all extracts with both skill lists correctly empty, and
+    // every requirement it does state lands in core_competencies. Before this
+    // rendered, the panel showed "—" twice and the ten capability-level asks
+    // the extractor captured were invisible.
+    it("renders the requirements of a JD whose skill lists are empty", async () => {
+      const application = makeApplication();
+      const app = {
+        ...application,
+        jd_signals: {
+          ...application.jd_signals!,
+          required_skills: [],
+          preferred_skills: [],
+          core_competencies: [
+            "designing and scaling distributed backend systems",
+            "API design at scale",
+          ],
+        },
+      };
+      vi.stubGlobal("fetch", stubFetch(app, []));
+      renderDetail();
+
+      expect(
+        await screen.findByText(
+          /designing and scaling distributed backend systems, API design at scale/,
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it("renders a dash when signals predate core_competencies", async () => {
+      const application = makeApplication();
+      const signals = { ...application.jd_signals! };
+      delete signals.core_competencies;
+      vi.stubGlobal(
+        "fetch",
+        stubFetch({ ...application, jd_signals: signals }, []),
+      );
+      renderDetail();
+
+      // The rest of the panel still renders, so an absent key is a dash and
+      // not a crash on undefined.
+      expect(await screen.findByText("principal")).toBeInTheDocument();
+      expect(screen.getByText("Core competencies:")).toBeInTheDocument();
     });
   });
 
