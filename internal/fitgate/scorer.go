@@ -314,10 +314,15 @@ func evidenceNames(evidence []SkillTerm) []string {
 // representation. Scored is what separates them, and returning a struct is
 // what makes the confusion unrepresentable rather than merely discouraged.
 //
-// Note that Stage 1 now also extracts core_competencies for exactly the
-// postings that trip this, so the unscored case should be rare — but a JD can
-// always fail to yield anything extractable, and the guard is independent of
-// how good extraction is on any given day.
+// This case is common, not rare. Stage 1 extracts core_competencies for
+// exactly the postings that trip it, but nothing here reads them — scoring
+// input is RequiredSkills and PreferredSkills only, and a capability-worded
+// staff JD stating ten requirements scores none of them. See #72; whether
+// competencies should score at all is a design decision, not an oversight.
+//
+// Until then the competencies reach the narrative as unscored context, so the
+// report can say what the posting asked for without claiming any of it was
+// answered.
 func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
 	if pointsPossible == 0 {
