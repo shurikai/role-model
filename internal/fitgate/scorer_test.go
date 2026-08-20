@@ -426,7 +426,9 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			score, gaps, _ := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals)
+			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals)
+			score := fit.Score
+			gaps := fit.Gaps
 			if score != tt.wantScore {
 				t.Errorf("score = %v, want %v", score, tt.wantScore)
 			}
@@ -520,7 +522,8 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, gaps, _ := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required})
+			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required})
+			gaps := fit.Gaps
 			if !slices.Equal(gaps, tt.wantGaps) {
 				t.Errorf("gaps = %q, want %q", gaps, tt.wantGaps)
 			}
@@ -538,7 +541,8 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 // closes it. Canonicalization in jd_extraction.tmpl remains the first line of
 // defence; aliases are the recovery path when it does not fire.
 func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) {
-	_, gaps, _ := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	fit := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	gaps := fit.Gaps
 	if len(gaps) == 0 {
 		t.Error("matchesAny appears to bridge RESTful->REST on the name alone now; " +
 			"update this test, the matchesAny doc comment, and the canonicalization " +
@@ -553,7 +557,10 @@ func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) 
 func TestScoreTechnicalFitBridgesAdjectivalFormsViaAliases(t *testing.T) {
 	skills := []SkillTerm{{Name: "REST", Aliases: []string{"rest api", "restful"}}}
 
-	score, gaps, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	score := fit.Score
+	gaps := fit.Gaps
+	matches := fit.Matches
 	if len(gaps) != 0 {
 		t.Fatalf("gaps = %q, want none — the 'restful' alias should answer this", gaps)
 	}
@@ -601,7 +608,10 @@ func TestScoreTechnicalFitCompetencyWordedJD(t *testing.T) {
 		PreferredSkills: []string{"IaC", "multi-agent", "RAG"},
 	}
 
-	score, gaps, matches := ScoreTechnicalFit(competencySkills, signals)
+	fit := ScoreTechnicalFit(competencySkills, signals)
+	score := fit.Score
+	gaps := fit.Gaps
+	matches := fit.Matches
 
 	wantGaps := []string{"auth/authz frameworks", "access control", "system design"}
 	if !slices.Equal(gaps, wantGaps) {
@@ -649,9 +659,10 @@ func TestScoreTechnicalFitCategoryRequiresAnActiveSkill(t *testing.T) {
 		{Name: "Jenkins", Category: "Tools & CI/CD", CategoryAliases: []string{"ci/cd"}},
 	}
 
-	_, gaps, matches := ScoreTechnicalFit(skills, JDSignals{
+	fit := ScoreTechnicalFit(skills, JDSignals{
 		RequiredSkills: []string{"observability", "CI/CD"},
 	})
+	gaps, matches := fit.Gaps, fit.Matches
 
 	if !slices.Equal(gaps, []string{"observability"}) {
 		t.Errorf("gaps = %q, want [observability] — no skill sits in an observability category", gaps)
@@ -670,7 +681,8 @@ func TestScoreTechnicalFitPrefersDirectMatchOverCategory(t *testing.T) {
 		{Name: "REST", Category: "Protocols & Messaging", CategoryAliases: []string{"kafka", "messaging"}},
 	}
 
-	_, _, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}})
+	matches := fit.Matches
 	if len(matches) != 1 {
 		t.Fatalf("matches = %+v, want one", matches)
 	}
@@ -692,7 +704,9 @@ func TestScoreTechnicalFitCategoryDoesNotMatchOnSubstrings(t *testing.T) {
 		{Name: "JUnit", Category: "Testing", CategoryAliases: []string{"automated testing", "test coverage"}},
 	}
 
-	_, gaps, matches := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}})
+	gaps := fit.Gaps
+	matches := fit.Matches
 	if len(matches) != 0 {
 		t.Errorf("matches = %+v, want none — 'rag' inside 'test coverage' is not a match", matches)
 	}
@@ -723,5 +737,47 @@ func TestSplitAlternatives(t *testing.T) {
 				t.Errorf("splitAlternatives(%q) = %q, want %q", tt.entry, got, tt.want)
 			}
 		})
+	}
+}
+
+// A JD from which Stage 1 extracted no technical requirements used to score a
+// perfect 100 with zero matches and zero evidence, and the narrative wrote
+// confident coverage prose around it: the stored AirBnB report asserted
+// "complete coverage across backend engineering, distributed systems, payment
+// platforms" against an empty requirement list.
+//
+// "Answers none of the requirements" and "there were no requirements" are
+// opposite findings. Scored is what keeps them apart.
+func TestScoreTechnicalFitUnscoredWhenJDStatesNoRequirements(t *testing.T) {
+	skills := nameOnlySkills([]string{"Java", "Spring Boot", "PostgreSQL"})
+
+	fit := ScoreTechnicalFit(skills, JDSignals{})
+
+	if fit.Scored {
+		t.Fatal("Scored = true, want false — the JD stated nothing to score")
+	}
+	if fit.Score == 100 {
+		t.Error("the unscored case is reporting a perfect score again")
+	}
+	if len(fit.Gaps) != 0 || len(fit.Matches) != 0 {
+		t.Errorf("gaps = %v, matches = %v, want both empty", fit.Gaps, fit.Matches)
+	}
+}
+
+// A profile that answers nothing must stay distinguishable from a JD that
+// asked nothing: same zero score, opposite Scored.
+func TestScoreTechnicalFitScoredWhenNothingMatches(t *testing.T) {
+	fit := ScoreTechnicalFit(nameOnlySkills([]string{"Java"}), JDSignals{
+		RequiredSkills: []string{"Erlang", "Elixir"},
+	})
+
+	if !fit.Scored {
+		t.Fatal("Scored = false, want true — the JD stated requirements, they just went unanswered")
+	}
+	if fit.Score != 0 {
+		t.Errorf("score = %v, want 0", fit.Score)
+	}
+	if len(fit.Gaps) != 2 {
+		t.Errorf("gaps = %v, want both requirements reported", fit.Gaps)
 	}
 }

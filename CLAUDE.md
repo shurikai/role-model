@@ -42,16 +42,72 @@ the client, not the old renderer implementation.
 
 ### LLM pipeline
 1. **JD signal extraction (Stage 1)** — takes raw job description text, returns
-   structured jd_signals JSON (priority skills, seniority, domain vocabulary)
+   structured jd_signals JSON: required/preferred skills, core competencies,
+   seniority, domain, work type, culture signals, and a screening summary.
+
+   **A JD's requirements arrive in two shapes, and both are extracted.**
+   `required_skills`/`preferred_skills` hold named technology. `core_competencies`
+   holds the capability-level asks a posting states in prose — "decomposing a
+   legacy service", "production ownership of services", "setting technical
+   direction". Senior and staff postings routinely name no technology at all,
+   which left both skill lists correctly but uselessly empty and degraded every
+   consumer at once and silently: the 2a requirement checklist rendered
+   "(none listed)" twice, disabling the prompt's entire skill-relevance
+   apparatus so it fell back to emitting the whole tag inventory, while
+   `ScoreTechnicalFit` reported a vacuous 100 against nothing.
+
+   The two lists stay separate because they are **satisfied** differently. A
+   required skill can be answered by a Skills entry; a competency can only be
+   evidenced by a bullet. Never let a competency into the Skills list — a
+   resume listing "setting technical direction" among its technologies reads
+   as padding and displaces a real skill.
+
+   `core_competencies` is deliberately **not** in the document projection. Per
+   the intermediate-JSON rule below, adding a field to `JDSignals` must not
+   change what the document emits.
 2. **Resume generation (Stage 2)** — split into two calls:
    - **2a body** (`resume_body.tmpl`) — selects and writes bullets and
      skills against jd_signals, under a seniority-informed length budget
+     and framing guidance
+
+     **Seniority drives two levers, and they are siblings on purpose.**
+     `buildLengthBudget` sets how much gets written; `buildFramingGuidance`
+     sets what altitude it is written at. Length was for a long time the only
+     one, so a staff posting got more bullets of the same altitude rather than
+     bullets pitched at the level it was hiring for — every other rule in the
+     prompt pushes toward implementation specificity. Add a third lever to
+     that pair, not somewhere else.
+
+     Staff framing adds ownership and scope **on top of** the evidence, never
+     in place of it. Trading the metric for the claim is the failure mode, not
+     the goal: the number is what makes the ownership claim believable, and a
+     broad claim with nothing behind it is what a skeptical reader discounts.
    - **2b summary** (`resume_summary.tmpl`) — writes the summary scoped to
      the bullets 2a already selected, so it cannot assert unsupported claims
 
    Facts that both calls would otherwise decide independently (e.g. the header
    title) are threaded through as explicit inputs rather than re-derived. This
    is the established pattern for cross-call consistency — follow it.
+
+Between the two calls, `reconcileSkills` enforces the bullet/skills invariant
+2a states but does not reliably honour: a claimed skill that an emitted bullet
+names must appear in the Skills section. It runs before 2b so the summary is
+written against the final Skills list. Three rules hold it together:
+
+- **Re-add only, never drop.** A skill can be legitimately claimed without a
+  dedicated bullet; dropping on that basis would delete a JD-relevant skill for
+  want of room in the bullet budget.
+- **Only claimed skills are eligible.** A bullet naming WAGO or NGTS must not
+  manufacture a skill with no `skills` row behind it.
+- **Whole-word matching, never substring** — the same rule the fit-gate matcher
+  documents, for the same reason. Substring matching makes "Go" a hit inside
+  "Golang" and "Java" a hit inside "JavaScript". The boundary test is
+  "not alphanumeric" rather than a regexp `\b`, because real skill names carry
+  punctuation (`C++`, `C#`, `.NET`, `CI/CD`) that `\b` breaks on.
+
+Category order is preserved on rewrite. The renderer prints categories in
+document order, so decoding to a plain map would silently re-alphabetize the
+resume's Skills section as a side effect of adding one entry.
 
 Both calls are recorded separately in generation_params for per-call
 traceability.
@@ -68,6 +124,19 @@ The two axes are orthogonal on purpose: technical score measures *capability*,
 preference score measures *desire*. A role you could do and would hate should
 read as high technical / low preference, not as one muddled number. Do not
 introduce a blended score.
+
+**A technical score can be absent, and absent is not zero and not 100.**
+`ScoreTechnicalFit` returns a `TechnicalFit` whose `Scored` field is false when
+the JD stated no technical requirements at all. It used to return a bare 100
+there — a perfect score with no matches and no evidence, which the narrative
+then wrote confident coverage prose around. "This profile answers none of the
+requirements" and "this JD stated no requirements to answer" are opposite
+findings and must not share a representation; that is why it is a struct field
+rather than a sentinel value. When `Scored` is false the report stores SQL NULL
+(the UI already renders that as "—") and the narrative input omits the score
+entirely, which the prompt reads as "nothing was assessed". An empty
+`technical_gaps` in that state means nothing was checked, not that there are no
+gaps.
 
 **Preferences carry severity and gate behavior separately.** `sentiment` is
 `positive|negative`, `weight` is NOT NULL, and `is_hard_gate` marks the rows
@@ -375,6 +444,16 @@ pg_format or sqlfluff.
   so the table holds a real spread of novice/proficient/expert with
   `years_experience` populated on most rows.
 
+  **Generation now reads it; the fit gate still does not.** `assembleSkills`
+  (`internal/generation/assemble.go`) selects the claimed skills with
+  proficiency and years via `ListActiveSkillProfileByUser` and passes them to
+  2a as `<skills>`, which filters on relevance and depth together and may
+  annotate a few deep, central skills as "Java (25 yrs)". That block is also
+  now the **only** source for the resume's Skills section — it used to be
+  built from contribution tags, which are vocabulary rather than claims, and
+  that is how JavaScript reached a rendered resume without a `skills` row
+  behind it.
+
   `internal/fitgate` never sees any of it. `ListActiveSkillMatchTermsByUser`
   (`internal/db/queries/skills.sql`) selects name, aliases, and category —
   but not proficiency or years — and `ScoreTechnicalFit` takes `[]SkillTerm`
@@ -383,8 +462,8 @@ pg_format or sqlfluff.
   preferred skill 1, whether it represents twenty years or a weekend. A one-off
   prototype and a decade of production use still look identical to scoring, but
   because the columns are dropped at the query layer, not because they are
-  empty. `ListActiveSkillsByUser` already returns full rows; threading
-  proficiency and years through to the scorer is the fix.
+  empty. `ListActiveSkillProfileByUser` already selects exactly what is
+  needed; threading proficiency and years through to the scorer is the fix.
 
   This is also why a category match earns full credit today (see the matching
   section above). Weighting a match by the depth behind it is the same missing

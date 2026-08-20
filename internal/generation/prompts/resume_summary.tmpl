@@ -8,6 +8,15 @@ Deliberate constraints, do not "fix" these without reading the reasoning:
   - HeaderTitle is passed in and must be echoed verbatim. The header title is
     authoritative personal branding; letting this pass derive its own level
     produced resumes stating two different seniorities in one document.
+  - YearsExperience is likewise computed in Go and passed in. Left to the
+    model, the same career and the same rule produced "27 years" for one
+    application and "over 26 years" for another generated three hours
+    earlier. Arithmetic over dates is not this pass's job.
+  - The SHAPE rules are stated once and stated together. They used to be
+    split, and contradicted each other outright: "must be 2-3 sentences"
+    four lines above "cap at 3-4 sentences". A one-idea-per-sentence rule
+    stacked behind two disagreeing count rules loses to both, and the output
+    was three sentences of comma-chained clauses running past the word cap.
 
 This file is unversioned by design. Its identity is the git blob hash recorded
 in generation_params; its history is `git log` on this path.
@@ -42,16 +51,30 @@ RULES:
   go in the summary.
 - Do not state a role, ownership, or responsibility (e.g. "on-call owner",
   "team lead") unless a bullet in the resume body explicitly supports it.
-- Total years of experience, if mentioned, must be derived only from the
-  started_on/ended_on dates present in the resume body's experience entries.
-- The summary must be 2-3 sentences, written in third person, targeting the
-  specific role and company below.
+- Total years of experience is given to you in <years_experience>. If you
+  mention it, use that number verbatim. Never compute your own, and never
+  state a figure the tag does not give you. If the tag is empty, do not
+  mention years at all.
 - Mirror the domain vocabulary from jd_signals where it is genuinely and
   accurately reflected in the resume body — never adopt jd_signals language
   the body does not support.
-- Cap the summary at 3-4 sentences, no more than ~90 words total.
-- Generate one idea per sentence, and don't chain multiple achievements together
-  with long comma-separated clauses or semicolons.
+
+SHAPE — these four rules decide whether the summary reads well, and they are
+the ones this pass most often gets wrong. Check the draft against each before
+returning it.
+
+- Exactly 3 sentences. Third person. Targeting the specific role and company
+  below.
+- ONE idea per sentence. Do not chain achievements together with
+  comma-separated clauses or semicolons. A sentence carrying three
+  accomplishments is three sentences badly written. If a draft sentence
+  contains a semicolon, it is wrong — split it and cut until 3 remain.
+- No more than 85 words total. A sentence over 30 words is nearly always a
+  chained one.
+- Pick the strongest three ideas and drop the rest. The summary's job is to
+  say what level this person operates at and what they are strongest at, not
+  to inventory the resume that follows it. Everything omitted here is still
+  right below in the body, where the reader will see it anyway.
 
 Return only a JSON object of the form {"summary": "..."} with no preamble,
 explanation, or markdown formatting.
@@ -68,6 +91,10 @@ Role: {{.RoleTitle}}
 <header_title>
 {{.HeaderTitle}}
 </header_title>
+
+<years_experience>
+{{.YearsExperience}}
+</years_experience>
 
 <resume_body>
 {{.Body}}

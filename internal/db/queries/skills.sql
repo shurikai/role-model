@@ -40,6 +40,25 @@ FROM skills s
 JOIN tags t ON t.id = s.tag_id
 WHERE s.user_id = $1 AND s.is_active = true;
 
+-- name: ListActiveSkillProfileByUser :many
+-- The claimed skills with their depth signal, for the generation prompt.
+--
+-- Generation previously built the resume's Skills section out of contribution
+-- tags, which are vocabulary rather than claims: a tag can be attached to a
+-- contribution without ever being a skill the user asserts, and JavaScript
+-- reached a rendered resume that way. It also meant proficiency and
+-- years_experience were dropped at the query layer, so a 25-year expert Java
+-- and a 2-year novice Python arrived at the prompt indistinguishable.
+--
+-- Ordered category-major, then strongest first within a category, so the
+-- prompt reads the depth ranking without having to derive it. NULL years sort
+-- last: an unrecorded duration is not evidence of a short one.
+SELECT t.name, t.category, s.proficiency, s.years_experience
+FROM skills s
+JOIN tags t ON t.id = s.tag_id AND t.user_id = s.user_id
+WHERE s.user_id = $1 AND s.is_active = true
+ORDER BY t.category, s.years_experience DESC NULLS LAST, t.name;
+
 -- name: ListActiveSkillMatchTermsByUser :many
 -- Everything the fit-gate matcher needs to answer a JD requirement: the
 -- canonical name, the synonyms a JD might use instead, and the category that

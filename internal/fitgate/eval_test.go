@@ -186,7 +186,8 @@ func TestFitEval(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			var res result
-			res.technicalScore, res.technicalGaps, _ = ScoreTechnicalFit(skills, c.Signals)
+			technical := ScoreTechnicalFit(skills, c.Signals)
+			res.technicalScore, res.technicalGaps = technical.Score, technical.Gaps
 			var hits []db.Preference
 			res.preferenceScore, res.preferenceGaps, res.prefConflicts, hits =
 				ScorePreferenceFit(prefs, c.Signals)
