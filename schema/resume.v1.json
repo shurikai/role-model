@@ -107,7 +107,14 @@
       "additionalProperties": false,
       "properties": {
         "position_id": { "type": "string" },
-        "title":       { "type": "string" },
+        "title": {
+          "type": "string",
+          "description": "The verbatim title the employer used, e.g. \"Programmer VII\". Carried for provenance; the renderer displays industry_role in preference to it."
+        },
+        "industry_role": {
+          "type": ["string", "null"],
+          "description": "The industry-normalized role name, e.g. \"Senior Software Engineer\". Free text, not an enum — real roles are compound (\"Senior Software Engineer / Architect\"). This is what the renderer displays; title is the fallback when it is absent."
+        },
         "industry_level": {
           "type": ["string", "null"],
           "enum": [
