@@ -65,6 +65,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 			Aliases:         r.Aliases,
 			Category:        r.Category,
 			CategoryAliases: r.CategoryAliases,
+			Proficiency:     r.Proficiency,
 		})
 	}
 
@@ -125,6 +126,10 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal technical matches: %w", err)
 	}
+	technicalPartialJSON, err := marshalRawNonEmpty(technical.Partial)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal technical partial matches: %w", err)
+	}
 	prefMatchesJSON, err := marshalRawNonEmpty(prefMatches)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal preference matches: %w", err)
@@ -147,6 +152,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		TechnicalScore:      technicalScoreColumn(technical),
 		TechnicalGaps:       technicalGapsJSON,
 		TechnicalMatches:    technicalMatchesJSON,
+		TechnicalPartial:    technicalPartialJSON,
 		PreferenceMatches:   prefMatchesJSON,
 		PreferenceGaps:      prefGapsJSON,
 		PreferenceConflicts: prefConflictsJSON,
@@ -167,6 +173,9 @@ type narrativeInput struct {
 	TechnicalScore   *float64     `json:"technical_score,omitempty"`
 	TechnicalGaps    []string     `json:"technical_gaps"`
 	TechnicalMatches []SkillMatch `json:"technical_matches"`
+	// Requirements answered below the depth the JD asked for. Usually empty —
+	// only a posting that states a depth can produce one.
+	TechnicalPartial []SkillMatch `json:"technical_partial"`
 	// The four preference lists, each a projection rather than the db rows —
 	// see narrativePreference.
 	PreferenceMatches   []narrativePreference       `json:"preference_matches"`
@@ -228,6 +237,7 @@ func (s *Service) generateNarrative(
 		TechnicalScore:      narrativeScore(technical),
 		TechnicalGaps:       technical.Gaps,
 		TechnicalMatches:    technical.Matches,
+		TechnicalPartial:    technical.Partial,
 		PreferenceMatches:   projectPreferences(prefMatches),
 		PreferenceGaps:      projectPreferences(prefGaps),
 		PreferenceConflicts: projectPreferences(prefConflicts),

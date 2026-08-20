@@ -54,11 +54,9 @@ type evalProfile struct {
 	Preferences []evalPreference `json:"preferences"`
 }
 
-// evalSkill carries proficiency and years even though ScoreTechnicalFit cannot
-// currently see either. That is the point: the fixture holds the whole skill,
-// the harness hands the scorer only what the production query hands it, and the
-// difference is exactly the surface #44 has to close. When depth is plumbed
-// through, this fixture already has the data and only activeSkills changes.
+// evalSkill carries proficiency and years. Proficiency now reaches the scorer;
+// years still does not, and the fixture holds it anyway so the harness keeps
+// modelling exactly what the production query selects and no more.
 type evalSkill struct {
 	Name        string   `json:"name"`
 	Proficiency string   `json:"proficiency"`
@@ -97,8 +95,9 @@ type evalCase struct {
 }
 
 type expectation struct {
-	TechnicalScore *scoreBand  `json:"technical_score"`
-	TechnicalGaps  *listExpect `json:"technical_gaps"`
+	TechnicalScore   *scoreBand  `json:"technical_score"`
+	TechnicalGaps    *listExpect `json:"technical_gaps"`
+	TechnicalPartial *listExpect `json:"technical_partial"`
 	// Preference fit has no score to band. All four lists assert membership,
 	// which is a stronger statement than a range was: a case can now name the
 	// preference it expects rather than a floor chosen to sit above a ceiling.
@@ -141,9 +140,13 @@ func (p evalProfile) toPreferences() []db.Preference {
 }
 
 // activeSkills returns what ListActiveSkillMatchTermsByUser returns today:
-// name, aliases, and category, for active rows only. Proficiency and years
-// are still dropped here, in the one place that models the production query,
-// so the loss stays visible rather than buried in the fixture.
+// name, aliases, category, and proficiency, for active rows only.
+//
+// years_experience is still dropped here, in the one place that models the
+// production query, so the loss stays visible rather than buried in the
+// fixture. Proficiency is no longer dropped — it is compared against a level
+// the JD asked for, where the JD asks for one. Nothing compares against years,
+// so selecting it would put a column in front of the scorer with no use for it.
 func (p evalProfile) activeSkills() []SkillTerm {
 	var out []SkillTerm
 	for _, s := range p.Skills {
@@ -153,6 +156,7 @@ func (p evalProfile) activeSkills() []SkillTerm {
 				Aliases:         s.Aliases,
 				Category:        s.Category,
 				CategoryAliases: s.CategoryAliases,
+				Proficiency:     s.Proficiency,
 			})
 		}
 	}
@@ -172,13 +176,14 @@ func evalLabels(prefs []db.Preference) []string {
 
 // result is one case's computed outcome, kept together for the scorecard.
 type result struct {
-	technicalScore float64
-	technicalGaps  []string
-	prefMatches    []string
-	preferenceGaps []string
-	prefConflicts  []string
-	gatePassed     bool
-	gateHits       []string
+	technicalScore   float64
+	technicalGaps    []string
+	technicalPartial []string
+	prefMatches      []string
+	preferenceGaps   []string
+	prefConflicts    []string
+	gatePassed       bool
+	gateHits         []string
 }
 
 func TestFitEval(t *testing.T) {
@@ -202,6 +207,22 @@ func TestFitEval(t *testing.T) {
 			var res result
 			technical := ScoreTechnicalFit(skills, c.Signals)
 			res.technicalScore, res.technicalGaps = technical.Score, technical.Gaps
+			for _, m := range technical.Partial {
+				res.technicalPartial = append(res.technicalPartial, m.Requirement)
+			}
+
+			// The additive invariant, asserted rather than assumed. Skill
+			// levels are opt-in per requirement: a case whose signals state no
+			// depth anywhere must score exactly what it scored before levels
+			// existed, and must produce no partial verdict. Every fixture here
+			// predates the feature, so this holds the whole corpus as a
+			// regression net against the common path changing under it.
+			if len(c.Signals.SkillLevels) == 0 && len(technical.Partial) > 0 {
+				t.Errorf("case states no skill_levels but produced %d partial match(es): %v\n"+
+					"a requirement with no stated depth must take the original "+
+					"full-credit path",
+					len(technical.Partial), res.technicalPartial)
+			}
 			matches, gaps, conflicts, hits := ScorePreferenceFit(prefs, c.Signals)
 			res.prefMatches = evalLabels(matches)
 			res.preferenceGaps = evalLabels(gaps)
@@ -282,6 +303,7 @@ func checkExpectations(e expectation, r result) []string {
 	var out []string
 	out = append(out, checkBand("technical_score", e.TechnicalScore, r.technicalScore)...)
 	out = append(out, checkList("technical_gaps", e.TechnicalGaps, r.technicalGaps)...)
+	out = append(out, checkList("technical_partial", e.TechnicalPartial, r.technicalPartial)...)
 	out = append(out, checkList("preference_matches", e.PreferenceMatches, r.prefMatches)...)
 	out = append(out, checkList("preference_gaps", e.PreferenceGaps, r.preferenceGaps)...)
 	out = append(out, checkList("preference_conflicts", e.PreferenceConflicts, r.prefConflicts)...)

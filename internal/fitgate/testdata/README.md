@@ -40,11 +40,16 @@ private seed so these fixtures stay public and reproducible, and because its
 skill depth is deliberately varied (8 expert, 22 proficient, 6 novice, 2
 inactive, with years independent of proficiency).
 
-The profile carries `proficiency` and `years_experience` even though
-`ScoreTechnicalFit` cannot currently see either. `evalProfile.activeSkills`
-models `ListActiveSkillMatchTermsByUser` and drops them in one visible place, so
-the loss is legible rather than baked into the fixture. When depth is plumbed
-through, the fixture already holds the data.
+The profile carries `proficiency` and `years_experience`.
+`evalProfile.activeSkills` models `ListActiveSkillMatchTermsByUser` exactly:
+proficiency now reaches the scorer, and `years_experience` is still dropped
+there, in the one place that models the production query, so the loss stays
+legible rather than baked into the fixture.
+
+Proficiency is only *consulted* where a posting states a depth for a specific
+requirement (`signals.skill_levels`). Every fixture written before that field
+existed states none, so proficiency is available and unused in all of them —
+which is why they still score exactly what they scored before.
 
 ## Case format
 
@@ -57,6 +62,7 @@ through, the fixture already holds the data.
   "expect": {
     "technical_score":      { "min": 80, "max": 100 },
     "technical_gaps":       { "must_include": [], "must_exclude": [], "empty": false },
+    "technical_partial":    { "must_include": [], "must_exclude": [] },
     "preference_matches":   { "must_include": [] },
     "preference_gaps":      { "must_include": [] },
     "preference_conflicts": { "must_exclude": [] },
@@ -91,6 +97,14 @@ ordinary matched negative are different kinds of finding.
 **Lists assert membership.** `must_include` / `must_exclude` match an entry
 whole or as one alternative inside a grouped entry, so an assertion naming
 `TimescaleDB` sees a gap recorded as `"TimescaleDB | ClickHouse"`.
+
+**Skill levels are opt-in, and the harness asserts it.** A case whose `signals`
+carry no `skill_levels` must produce an empty `technical_partial`; `TestFitEval`
+fails the case outright if it does not, independently of anything in `expect`.
+That is what keeps the depth comparison additive — every fixture here predates
+the feature, and all of them must keep scoring what they scored before it
+existed. `partial-match-depth-below-stated-level` is the positive counterpart,
+and the only case that states a depth at all.
 
 ## Known gaps
 

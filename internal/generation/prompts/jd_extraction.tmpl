@@ -77,6 +77,83 @@ primary_stack: array of strings — the technologies the posting frames the role
     An empty primary_stack is a correct answer for a posting that lists
     technologies without saying which ones the job centres on.
 
+skill_levels: array of objects — the depth requirement for individual skills,
+  and ONLY for the skills where the posting states one. Each object is:
+    { "requirement": "<the skill entry, verbatim>",
+      "level": "novice" | "proficient" | "expert",
+      "signal": "<the JD language this was read from>" }
+
+  This field is sparse on purpose. A posting that says "Kafka" is asking for
+  Kafka; only one that says "expert-level Kafka" or "5+ years of Kafka" is
+  asking for depth. Most requirements get NO entry here, and an empty array is
+  a perfectly correct answer for most postings. Emitting a level for every
+  skill would turn every ordinary requirement into a judgment the JD never
+  made, and the reader downstream cannot tell an inferred level from a stated
+  one.
+
+  Rules for skill_levels:
+  - Only emit an entry when the JD attaches an explicit depth signal to that
+    SPECIFIC skill. An adjective ("expert", "deep understanding of", "strong
+    command of", "familiarity with", "exposure to", "basic knowledge of") or a
+    stated years figure attached to the skill both qualify. A bare skill name
+    in a list gets no entry, however senior the role is overall.
+  - Seniority of the ROLE is not a depth signal for a SKILL. A staff-level
+    posting does not thereby require expert everything; that judgment already
+    lives in the seniority field.
+  - Use this rubric rather than inventing one:
+      expert     — "expert", "expert-level", "deep understanding of",
+                   "deep knowledge of internals", "mastery of", "authority on",
+                   "5+ years" or any higher figure
+      proficient — "strong experience with", "solid experience with",
+                   "proven experience", "hands-on experience with",
+                   "2-4 years", "3+ years"
+      novice     — "exposure to", "familiarity with", "some experience with",
+                   "basic knowledge of", "willingness to learn",
+                   "nice to have" phrasing attached to a depth word,
+                   "1 year" or less
+    When language and years disagree, prefer the years figure — it is the more
+    specific claim.
+  - requirement MUST reproduce the corresponding required_skills or
+    preferred_skills entry EXACTLY, character for character, including any
+    " | " group. This is a lookup key. A near-miss ("Apache Kafka" here against
+    "Kafka" there) is not a partial credit — it silently matches nothing and
+    the depth requirement is lost with no error anywhere.
+  - signal must quote or closely paraphrase the actual JD language that
+    produced the level, so a reader can check the judgment. Do not write a
+    rationale here; write what the posting said.
+  - OR-groups: emit an entry for the group ONLY when the depth applies to the
+    group as a whole, or to every alternative in it equally. If the posting
+    qualifies only SOME alternatives, emit NO entry for that group. The group
+    means the posting accepts a substitute, so it can be satisfied through an
+    alternative that carries no depth requirement at all, and asserting a level
+    for the whole group would fail a candidate on a bar the posting did not
+    hold them to. Losing the signal is the safe direction here; inventing one
+    is not.
+
+  Examples:
+    JD: "Expert-level Go. Experience with Kubernetes. Exposure to Terraform."
+    required_skills: ["Go", "Kubernetes", "Terraform"]
+    skill_levels: [
+      { "requirement": "Go", "level": "expert", "signal": "Expert-level Go" },
+      { "requirement": "Terraform", "level": "novice",
+        "signal": "Exposure to Terraform" }
+    ]
+    (Kubernetes gets no entry — "experience with" states no depth.)
+
+    JD: "8+ years with Java. Proficiency in Kafka or Kinesis."
+    required_skills: ["Java", "Kafka | Kinesis"]
+    skill_levels: [
+      { "requirement": "Java", "level": "expert", "signal": "8+ years with Java" }
+    ]
+    (The group gets no entry: "proficiency" covers both alternatives equally
+    and states no depth beyond the ordinary.)
+
+    JD: "Deep expertise in Kafka, or familiarity with Kinesis."
+    required_skills: ["Kafka | Kinesis"]
+    skill_levels: []
+    (No entry. The depth applies to one alternative only, and the posting will
+    accept the other on far weaker terms.)
+
 seniority: string — one of: "junior", "mid", "senior", "staff", "principal",
   "lead", "unknown". Infer from title and requirements if not explicit.
 
@@ -194,6 +271,9 @@ Example output shape:
     "production on-call ownership"
   ],
   "primary_stack": ["Go", "Kubernetes"],
+  "skill_levels": [
+    {"requirement": "Go", "level": "expert", "signal": "expert-level Go"}
+  ],
   "seniority": "senior",
   "domain": "observability",
   "work_type": "remote",
