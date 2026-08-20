@@ -38,8 +38,8 @@ func NewService(q *db.Queries, client *generation.Client) *Service {
 // result as a new fit_reports row.
 //
 // Every evaluation produces a complete report. Hard-gate preferences are
-// recorded and priced into preference_score, but they do not block: a JD that
-// trips one is still scored and still gets a narrative.
+// recorded as their own list, but they do not block: a JD that trips one is
+// still evaluated and still gets a narrative.
 func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uuid.UUID) (*db.FitReport, error) {
 	app, err := s.q.GetApplication(ctx, db.GetApplicationParams{ID: applicationID, UserID: userID})
 	if err != nil {
@@ -79,11 +79,10 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}
 
 	var (
-		wg                  sync.WaitGroup
-		technical           TechnicalFit
-		prefScore           float64
-		prefGaps, prefConfl []string
-		gateHits            []db.Preference
+		wg                               sync.WaitGroup
+		technical                        TechnicalFit
+		prefMatches, prefGaps, prefConfl []db.Preference
+		gateHits                         []db.Preference
 	)
 	wg.Add(2)
 	go func() {
@@ -92,7 +91,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	}()
 	go func() {
 		defer wg.Done()
-		prefScore, prefGaps, prefConfl, gateHits = ScorePreferenceFit(prefs, signals)
+		prefMatches, prefGaps, prefConfl, gateHits = ScorePreferenceFit(prefs, signals)
 	}()
 	wg.Wait()
 
@@ -102,16 +101,18 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	// hard-gate row it matched and the boolean is derived from that, so the
 	// two can no longer disagree about what a JD says.
 	//
-	// It remains non-blocking: a JD that trips a gate is still scored, still
-	// gets a narrative, and still generates. What changed is that the trip is
-	// now priced into preference_score instead of living only in this boolean.
+	// It remains non-blocking: a JD that trips a gate is still evaluated, still
+	// gets a narrative, and still generates. The trip is reported by name in
+	// gateHits rather than priced into a number, so this boolean is a summary
+	// of that list and never the only record of it.
 	gatePassed := len(gateHits) == 0
 	gateHitsJSON, err := marshalRawNonEmpty(gateHits)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
 	}
 
-	narrative, err := s.generateNarrative(ctx, app, signals, gatePassed, technical, prefScore, prefGaps, prefConfl)
+	narrative, err := s.generateNarrative(
+		ctx, app, signals, gatePassed, technical, prefMatches, prefGaps, prefConfl, gateHits)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
@@ -123,6 +124,10 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	technicalMatchesJSON, err := marshalRawNonEmpty(technical.Matches)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal technical matches: %w", err)
+	}
+	prefMatchesJSON, err := marshalRawNonEmpty(prefMatches)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: marshal preference matches: %w", err)
 	}
 	prefGapsJSON, err := marshalRawNonEmpty(prefGaps)
 	if err != nil {
@@ -142,7 +147,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		TechnicalScore:      technicalScoreColumn(technical),
 		TechnicalGaps:       technicalGapsJSON,
 		TechnicalMatches:    technicalMatchesJSON,
-		PreferenceScore:     numericFromScore(prefScore),
+		PreferenceMatches:   prefMatchesJSON,
 		PreferenceGaps:      prefGapsJSON,
 		PreferenceConflicts: prefConflictsJSON,
 		ScreeningSummary:    screeningJSON,
@@ -159,14 +164,47 @@ type narrativeInput struct {
 	// Absent when the JD stated no technical requirements. The narrative
 	// prompt reads an absent score as "nothing was assessed" — emitting 0
 	// instead would read as "covers nothing", the opposite finding.
-	TechnicalScore      *float64                    `json:"technical_score,omitempty"`
-	TechnicalGaps       []string                    `json:"technical_gaps"`
-	TechnicalMatches    []SkillMatch                `json:"technical_matches"`
-	PreferenceScore     float64                     `json:"preference_score"`
-	PreferenceGaps      []string                    `json:"preference_gaps"`
-	PreferenceConflicts []string                    `json:"preference_conflicts"`
+	TechnicalScore   *float64     `json:"technical_score,omitempty"`
+	TechnicalGaps    []string     `json:"technical_gaps"`
+	TechnicalMatches []SkillMatch `json:"technical_matches"`
+	// The four preference lists, each a projection rather than the db rows —
+	// see narrativePreference.
+	PreferenceMatches   []narrativePreference       `json:"preference_matches"`
+	PreferenceGaps      []narrativePreference       `json:"preference_gaps"`
+	PreferenceConflicts []narrativePreference       `json:"preference_conflicts"`
+	AntiPatternHits     []narrativePreference       `json:"anti_pattern_hits"`
 	JDSummary           string                      `json:"jd_summary"`
 	ScreeningSummary    generation.ScreeningSummary `json:"screening_summary"`
+}
+
+// narrativePreference is what a preference row looks like to the narrative
+// prompt: what it says, and which kind of thing it is about.
+//
+// It is a projection and not db.Preference on purpose, for two reasons. The
+// row carries ids, timestamps, and a user_id that cost tokens and tell the
+// model nothing. More importantly it carries weight, and the whole point of
+// replacing preference_score was that the narrative interprets findings rather
+// than doing arithmetic over them — handing it the weights would invite it
+// straight back into ranking rows by number. Which list an entry arrived in is
+// the severity signal, and there are four lists precisely so it can be.
+//
+// The fit_reports columns still store the complete rows; only the prompt sees
+// this narrower shape.
+type narrativePreference struct {
+	Label string `json:"label"`
+	Type  string `json:"preference_type"`
+}
+
+// projectPreferences maps db rows to the prompt's view of them, and returns an
+// empty slice rather than nil so every list marshals as [] instead of null. A
+// null list reads to the model as "unknown"; an empty one reads as "none",
+// which is the true statement.
+func projectPreferences(prefs []db.Preference) []narrativePreference {
+	out := make([]narrativePreference, 0, len(prefs))
+	for _, p := range prefs {
+		out = append(out, narrativePreference{Label: p.Label, Type: p.PreferenceType})
+	}
+	return out
 }
 
 func (s *Service) generateNarrative(
@@ -175,9 +213,10 @@ func (s *Service) generateNarrative(
 	signals JDSignals,
 	gatePassed bool,
 	technical TechnicalFit,
-	prefScore float64,
-	prefGaps []string,
-	prefConflicts []string,
+	prefMatches []db.Preference,
+	prefGaps []db.Preference,
+	prefConflicts []db.Preference,
+	gateHits []db.Preference,
 ) (string, error) {
 	prompt, err := generation.RawPrompt("fit_narrative.txt")
 	if err != nil {
@@ -189,9 +228,10 @@ func (s *Service) generateNarrative(
 		TechnicalScore:      narrativeScore(technical),
 		TechnicalGaps:       technical.Gaps,
 		TechnicalMatches:    technical.Matches,
-		PreferenceScore:     prefScore,
-		PreferenceGaps:      prefGaps,
-		PreferenceConflicts: prefConflicts,
+		PreferenceMatches:   projectPreferences(prefMatches),
+		PreferenceGaps:      projectPreferences(prefGaps),
+		PreferenceConflicts: projectPreferences(prefConflicts),
+		AntiPatternHits:     projectPreferences(gateHits),
 		JDSummary:           fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
 		ScreeningSummary:    signals.ScreeningSummary,
 	}
