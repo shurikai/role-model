@@ -31,6 +31,32 @@ type JDSignals struct {
 	// must not change what the document emits — see documentJDSignals.
 	CoreCompetencies []string `json:"core_competencies"`
 
+	// PrimaryStack holds the technologies the posting frames the role as being
+	// BUILT ON — the languages and platforms the work is actually done in, as
+	// opposed to RequiredSkills, which records only that a technology is asked
+	// for somewhere.
+	//
+	// The distinction is not cosmetic. Several preference rows make a claim
+	// about prominence rather than presence ("Python as a primary language",
+	// "Angular as co-equal frontend requirement"), and until this field existed
+	// there was nothing for that claim to be checked against. The fit gate
+	// matched them against RequiredSkills, where the qualifier was inert text:
+	// a posting whose must-haves read "Proficiency in Java and/or Python"
+	// tripped the Python gate on the bare token, capped the preference score at
+	// hardGateCeiling, and recommended a pass on a role that never asked for
+	// expert Python at all (#68).
+	//
+	// Interchangeable alternatives keep the " | " grouping RequiredSkills uses,
+	// and here the grouping is load-bearing rather than a convenience: a
+	// technology the posting offers a substitute for is, by definition, not
+	// what the role is built on. internal/fitgate deliberately does not split
+	// these apart — see prefFieldsFor.
+	//
+	// Deliberately NOT part of the document projection, same as
+	// CoreCompetencies. Adding a field here must not change what the document
+	// emits — see documentJDSignals.
+	PrimaryStack []string `json:"primary_stack"`
+
 	// Role classification
 	Seniority string `json:"seniority"`
 	Domain    string `json:"domain"`

@@ -43,6 +43,62 @@ func splitAlternatives(entry string) []string {
 	return out
 }
 
+// collapseSubsumed drops any entry whose alternatives are a strict subset of
+// another entry's, returning the survivors in their original order.
+// ["Java | Python", "Python", "Java"] collapses to ["Java | Python"].
+//
+// Postings routinely state the same stack twice — once in the must-have
+// qualifications as a choice ("Proficiency in Java and/or Python") and again in
+// a "Core Technical Stack" list as a flat enumeration ("Java and Python") — and
+// the two statements disagree about whether either language is actually
+// required. The stricter statement is the group: it says the role can be done
+// without any one member. A bare restatement of a member is the looser claim
+// and loses.
+//
+// This exists as a Go rule rather than a prompt instruction on purpose.
+// jd_extraction.tmpl asks for the same deduplication, but a prompt is a request
+// and this is the exact hazard that made #68 a hard gate misfire rather than a
+// rounding error. Extraction noise here must be harmless, not merely unlikely.
+func collapseSubsumed(entries []string) []string {
+	groups := make([]map[string]bool, len(entries))
+	for i, e := range entries {
+		g := make(map[string]bool)
+		for _, alt := range splitAlternatives(e) {
+			g[strings.ToLower(alt)] = true
+		}
+		groups[i] = g
+	}
+
+	var out []string
+	for i := range entries {
+		if len(groups[i]) == 0 {
+			continue
+		}
+		subsumed := false
+		for j := range entries {
+			// Strict subset only. Equal groups subsume each other, which would
+			// drop both and lose the entry entirely.
+			if i != j && len(groups[i]) < len(groups[j]) && isSubset(groups[i], groups[j]) {
+				subsumed = true
+				break
+			}
+		}
+		if !subsumed {
+			out = append(out, entries[i])
+		}
+	}
+	return out
+}
+
+func isSubset(a, b map[string]bool) bool {
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
+}
+
 // SkillTerm is one active skill as the matcher sees it: the canonical name,
 // the synonyms a JD might use instead, and the category it belongs to along
 // with that category's competency vocabulary.
@@ -352,6 +408,28 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (
 // describes a seniority level, so nothing should be matched against it. Add a
 // case if that ever changes.
 //
+// # primary_stack vs anti_pattern
+//
+// These two branches ask different questions of the same JD, and the split is
+// what closes #68. anti_pattern asks "does the JD demand this at all", which is
+// the right question for a bare label like "C# / .NET" — presence is the whole
+// claim. primary_stack asks "is the role built on this", which is the right
+// question for a label that makes a claim about prominence: "Python as a
+// primary language", "Angular as co-equal frontend requirement".
+//
+// Routing the second kind at required_skills is what produced the defect. The
+// qualifier in such a label has no counterpart in required_skills, so it was
+// inert text, and matchesSignal's field-inside-label direction matched the bare
+// token instead: containsPhrase("Python", "expert Python as primary
+// requirement") is true, because "python" is a whole word in the label. A
+// posting whose must-haves read "Proficiency in Java and/or Python" therefore
+// tripped a hard gate, capped the score at hardGateCeiling, and was narrated as
+// gating on expert Python. Every posting naming Python as a required skill did.
+//
+// Bidirectional matching is safe again in the primary_stack branch precisely
+// because the field is already filtered to prominence upstream. Routing does
+// the work, the same way it did for the staff/seniority collision.
+//
 // preferred_skills is deliberately absent too. A preference is a statement
 // about what the job actually demands, so it should fire on a genuine
 // requirement and not on an optional mention. The Angular exclude — "Angular
@@ -364,9 +442,39 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (
 func prefFieldsFor(prefType string, signals JDSignals) []string {
 	switch prefType {
 	case "domain":
-		return []string{signals.Domain}
+		// screening_summary.industry is here and nowhere else, and it is the
+		// only screening field any preference reads. The extraction prompt
+		// defines it as free-text industry explicitly NOT constrained to the
+		// domain enum, so it answers the same question signals.Domain answers,
+		// without the truncation: a freight-visibility platform extracts as
+		// domain "saas" because the enum has no logistics value, while the
+		// industry field says "freight logistics visibility platform". Reading
+		// the enum alone reported "logistics" — the strongest positive in the
+		// profile — as an unmet gap on the JD it matched best. The rest of
+		// screening_summary (location, clearance, other_flags) is still read by
+		// nothing; that is #48 and stays open.
+		//
+		// core_competencies carries the rest. A domain preference names a
+		// problem space, and a JD states its problem space in prose far more
+		// often than it picks the right enum value: "observability" was an
+		// unmet gap on a posting that required observability work outright.
+		return append(
+			[]string{signals.Domain, signals.ScreeningSummary.Industry},
+			signals.CoreCompetencies...,
+		)
 	case "work_type":
-		return []string{signals.WorkType}
+		// signals.WorkType alone is remote | hybrid | onsite | unknown, and no
+		// work_type label can appear in a four-value arrangement enum. "small
+		// team, high ownership", "product engineering", and "greenfield
+		// development" were therefore not merely unlikely to match — they could
+		// not match any JD, ever, which is 23 weight of guaranteed gap on every
+		// evaluation. Role shape lives in culture_signals ("small team", "high
+		// ownership") and core_competencies (what the person must be able to
+		// do), so both are read here.
+		return append(
+			append([]string{signals.WorkType}, signals.CultureSignals...),
+			signals.CoreCompetencies...,
+		)
 	case "culture":
 		// work_type is included here, and only looks like a type confusion.
 		// The enum is remote | hybrid | onsite | unknown — work *arrangement*,
@@ -376,17 +484,44 @@ func prefFieldsFor(prefType string, signals JDSignals) []string {
 		// a genuinely remote JD. Adopting the gate's routing wholesale did
 		// exactly that; the gate never noticed because its one culture row
 		// ("Big Four consulting culture") really does live in culture_signals.
-		return append([]string{signals.WorkType}, signals.CultureSignals...)
+		//
+		// core_competencies is included for the same reason it is on domain: a
+		// posting states "mentoring senior engineers" as a job requirement more
+		// often than it lists "mentoring" as a culture signal. The extraction
+		// prompt keeps the two fields from duplicating each other, so reading
+		// both widens coverage rather than double-counting.
+		return append(
+			append([]string{signals.WorkType}, signals.CultureSignals...),
+			signals.CoreCompetencies...,
+		)
+	case "primary_stack":
+		// Deliberately NOT split into alternatives, which is the one place this
+		// branch differs from anti_pattern below and the whole point of the
+		// type. An alternatives group means the JD offers substitutes; a
+		// technology you can be excused from is not what the role is built on,
+		// so an exclude naming only one member of a group must not fire.
+		// Splitting "Java | Python" back apart is exactly how the Python gate
+		// tripped on a posting asking for "Java and/or Python" (#68).
+		return collapseSubsumed(signals.PrimaryStack)
 	default:
 		// anti_pattern is the catch-all type and has no single corresponding
-		// signal field. It is also where every skills-shaped preference lives
-		// ("expert Python as primary requirement" and friends), which is why
-		// this is the only branch that sees the skills arrays — a domain or
-		// culture preference has no business matching against a tech stack.
+		// signal field. It keeps required_skills, and is the only branch that
+		// does — a domain or culture preference has no business matching
+		// against a tech stack.
+		//
+		// What lives here after #68 is the bare-label excludes, where presence
+		// IS the whole claim: "C# / .NET", "Windows / Microsoft ecosystem",
+		// "crypto / blockchain". A row whose label instead claims prominence
+		// belongs under primary_stack; leaving it here is what made every
+		// posting that merely mentioned Python trip a gate about expert Python.
 		fields := []string{signals.Domain, signals.WorkType}
 		fields = append(fields, signals.CultureSignals...)
 		// Alternatives are split back out so an exclude still matches a single
 		// option buried in a group — "Ruby" against "Java | Ruby | Python".
+		// Correct here and wrong for primary_stack, for the reason spelled out
+		// in that branch: this asks whether the JD demands the technology at
+		// all, and it demands each alternative in the sense that matters to a
+		// bare exclude.
 		for _, req := range signals.RequiredSkills {
 			fields = append(fields, splitAlternatives(req)...)
 		}
