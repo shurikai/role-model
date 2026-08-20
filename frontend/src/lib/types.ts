@@ -49,6 +49,11 @@ export interface JdSignals {
   domain: string;
   work_type: string;
   culture_signals: string[];
+  // The capability-level asks a posting states in prose. A senior or staff
+  // posting routinely names no technology at all, leaving both skill lists
+  // correctly but uselessly empty; this is where its requirements live.
+  // Absent on signals extracted before core_competencies was added.
+  core_competencies?: string[];
   // Absent on signals extracted before screening_summary was added.
   screening_summary: ScreeningSummary | null;
 }
