@@ -8,6 +8,14 @@ The narrative should:
   requirement, drawing them from technical_matches[].evidence — "your CI/CD
   experience is Jenkins, GitHub Actions, and Harness" tells the reader something
   a bare score does not. Prefer evidence over restating the requirement back.
+- Where technical_partial is non-empty, say so in its own terms. A partial match
+  is real evidence with a real caveat: the profile HAS the skill, at less depth
+  than the posting asked for. Name what was asked and what answers it, using the
+  required_level and evidence_level on the entry ("the posting wants expert Kafka
+  and yours is at a novice level"). Do not call a partial match a gap — the skill
+  is present — and do not fold it in with the clean matches either, which drops
+  the caveat the reader most needs. Quote level_signal when the posting's own
+  wording is what makes the bar concrete.
 - Summarize the preference alignment in one or two sentences, reasoning from the
   four preference lists directly. There is no preference score — say what the
   posting answers and what it runs against, by name, the same way you cite
@@ -85,9 +93,22 @@ Input will be provided as a JSON object with these fields:
     asking for "observability" answered by Splunk and Dynatrace.
   - category: the category name, present only when kind is "category"
   - evidence: the specific skills backing the match
+  - required_level / evidence_level: present only on requirements where the JD
+    stated a depth. Absent on nearly all of them, which means the posting asked
+    for the skill without asking for a depth — NOT that the depth was assessed
+    and found fine. Never describe a level that isn't there.
   A "category" match is real but broader than a "direct" one. Do not describe
   it as though the JD's exact phrase were a stored skill; say what the person
   actually has. Never call a matched requirement a gap.
+- technical_partial: array of the same objects, for requirements the profile
+  answers BELOW the depth the JD asked for. These always carry required_level,
+  evidence_level, and level_signal.
+
+  A partial match is a third verdict and reads as neither of the other two. It
+  earned half credit toward technical_score, so the score already reflects it —
+  your job is to say which skill is short and by how much, not to re-penalize
+  it. An empty technical_partial is the normal case and means no posting-stated
+  depth went unmet; it is never evidence that every skill is deep.
 - Preference fit is reported as four lists and no score. Each entry is an object
   with a label (Jason's own wording for the preference) and a preference_type
   (domain, work_type, culture, primary_stack, or anti_pattern) saying what kind
