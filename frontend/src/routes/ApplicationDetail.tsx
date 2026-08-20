@@ -294,6 +294,10 @@ export function ApplicationDetail() {
               {application.jd_signals.preferred_skills.join(", ") || "—"}
             </div>
             <div>
+              <span className="font-medium">Core competencies:</span>{" "}
+              {application.jd_signals.core_competencies?.join(", ") || "—"}
+            </div>
+            <div>
               <span className="font-medium">Culture signals:</span>{" "}
               {application.jd_signals.culture_signals.join(", ") || "—"}
             </div>
