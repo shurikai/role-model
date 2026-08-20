@@ -183,7 +183,7 @@ func (h *PositionHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	count, err := h.queries.CountContributionsByPosition(r.Context(), db.CountContributionsByPositionParams{
-		PositionID: id,
+		PositionID: &id,
 		UserID:     userID,
 	})
 	if err != nil {

@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset migrate-up migrate-down migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
+.PHONY: all build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -36,16 +36,52 @@ db-up:
 db-down:
 	docker compose down
 
-db-reset:
+# Destroys the Postgres volume. Everything entered through the app — every
+# application, jd_signals blob, resume version, and fit report — exists only
+# there, so this is not recoverable from the seed repo.
+db-reset: db-dump
+	@echo "This DESTROYS the database volume behind $(DATABASE_URL)."
+	@read -p "Type 'destroy' to continue: " confirm; \
+	 [ "$$confirm" = "destroy" ] || { echo "Aborted."; exit 1; }
 	docker compose down -v
 	docker compose up -d
+
+# Timestamped custom-format dump. Restore with:
+#   pg_restore --clean --if-exists -d "$(DATABASE_URL)" backups/<file>.dump
+#
+# Worth running before anything that rewrites schema or bulk data. The seed
+# repo covers career history; it does not cover applications, jd_signals,
+# resume versions, fit reports, or anything added through the UI — including,
+# as of 2026-08-19, seventeen skills rows that no seed file had ever carried.
+db-dump:
+	@mkdir -p backups
+	@out="backups/role_model-$$(date +%Y%m%d-%H%M%S).dump"; \
+	 pg_dump "$(DATABASE_URL)" -Fc -f "$$out" && echo "Wrote $$out"
 
 # Migrations
 migrate-up:
 	migrate -path migrations -database "$(DATABASE_URL)" up
 
+# One step, deliberately. `migrate ... down` with no count rolls back EVERY
+# migration and empties the database, and its only guard is a y/n prompt that
+# anything non-interactive sails straight through. That is what this target
+# used to do, and on 2026-08-19 it destroyed a dev database holding eight
+# applications and their generated resume versions — none of which live in the
+# seed repo, because the seed repo is not a backup.
+#
+# Stepping back one migration is the operation anyone actually wants here. Pass
+# STEPS=n for more.
+STEPS ?= 1
 migrate-down:
-	migrate -path migrations -database "$(DATABASE_URL)" down
+	migrate -path migrations -database "$(DATABASE_URL)" down $(STEPS)
+
+# The full teardown, behind its own name and its own confirmation. Takes a
+# dump first: the recovery path should not depend on remembering to.
+migrate-down-all: db-dump
+	@echo "This rolls back ALL migrations and empties $(DATABASE_URL)."
+	@read -p "Type 'destroy' to continue: " confirm; \
+	 [ "$$confirm" = "destroy" ] || { echo "Aborted."; exit 1; }
+	migrate -path migrations -database "$(DATABASE_URL)" down -all
 
 migrate-create:
 	@read -p "Migration name: " name; \

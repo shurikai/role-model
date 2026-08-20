@@ -14,6 +14,17 @@ sql:
         overrides:
           - db_type: "uuid"
             go_type: "github.com/google/uuid.UUID"
+          # Nullable uuids as *uuid.UUID, matching emit_pointers_for_null_types
+          # for every other type. Without this sqlc falls back to pgtype.UUID,
+          # which marshals as {"Bytes":[...],"Valid":true} — so the moment a
+          # uuid column becomes nullable, every API response carrying it
+          # silently changes shape.
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
           - db_type: "timestamptz"
             go_type: "time.Time"
           - column: "applications.jd_signals"
