@@ -1,0 +1,17 @@
+-- Requirements the profile answers, but not at the depth the posting asked for.
+--
+-- technical_matches and technical_gaps could only say "you have this" and "you
+-- do not". A JD that asks for expert-level Kafka against a novice Kafka skill
+-- is neither: it is real evidence with a real caveat, and filing it as a match
+-- loses the caveat while filing it as a gap loses the evidence. The narrative
+-- was left to re-derive a distinction the scorer is in a position to make.
+--
+-- Each entry is a SkillMatch carrying required_level, evidence_level, and the
+-- JD language the requirement was read from, so the comparison is auditable
+-- rather than a verdict to be trusted.
+--
+-- Nullable, and NULL on the overwhelming majority of rows by design: it is
+-- populated only where jd_signals.skill_levels stated a depth for a specific
+-- requirement, which most postings never do. Reports written before this
+-- migration have none, the same as technical_matches before 013.
+ALTER TABLE fit_reports ADD COLUMN technical_partial JSONB;

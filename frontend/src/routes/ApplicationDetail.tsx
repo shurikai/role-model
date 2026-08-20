@@ -15,7 +15,36 @@ import type {
   PreferenceListEntry,
   ResumeVersion,
   ScreeningSummary,
+  SkillMatch,
 } from "../lib/types";
+
+/**
+ * Requirements the profile answers but not as deeply as the posting asked.
+ *
+ * Rendered separately from gaps on purpose: the skill is present, so filing it
+ * under gaps would say the opposite of what the scorer found. Each row names
+ * the bar and what met it, since "Kafka" alone doesn't tell the reader what is
+ * short about it. Plain text, no severity treatment — a partial is not a
+ * lesser gap, it is a different finding.
+ */
+function PartialMatchList({ entries }: { entries: SkillMatch[] | null }) {
+  if (!entries || entries.length === 0) return null;
+  return (
+    <div>
+      <span className="font-medium">Below the level asked for:</span>
+      <ul className="ml-4 list-disc text-gray-700">
+        {entries.map((m) => (
+          <li key={m.requirement}>
+            {m.requirement}
+            {m.required_level && m.evidence_level
+              ? ` — posting asks for ${m.required_level}, yours is ${m.evidence_level}`
+              : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /**
  * One of the preference lists a fit report carries, rendered plainly.
@@ -338,6 +367,7 @@ export function ApplicationDetail() {
                   ? "—"
                   : `${latestFitReport.technical_score}/100`}
               </p>
+              <PartialMatchList entries={latestFitReport.technical_partial} />
               {latestFitReport.technical_gaps &&
                 latestFitReport.technical_gaps.length > 0 && (
                   <div>

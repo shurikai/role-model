@@ -231,6 +231,44 @@ narrative cites what the person actually has instead of asserting a score, and
 so a remaining gap is trustworthy. Gaps previously conflated "named
 differently" with "does not have it".
 
+**A match can be partial, and partial is a third verdict — not a weak match and
+not a soft gap.** `jd_signals.skill_levels` is a sparse side table recording the
+depth a posting states for a specific requirement ("expert-level Kafka", "5+
+years of Go"), on the same three-value scale as `skills.proficiency`. Where a
+requirement carries one and the strongest proficiency behind its evidence falls
+below it, the requirement earns half credit and is filed in
+`TechnicalFit.Partial` / `fit_reports.technical_partial`.
+
+Four rules hold this together:
+
+- **No stated level means no change.** Most requirements carry no entry, and
+  that is the correct case rather than an extraction gap. A JD whose signals
+  hold no `skill_levels` scores byte-for-byte what it scored before the feature
+  existed — `TestFitEval` fails any fixture that produces a partial without one.
+- **`pointsPossible` never moves.** Discounting the denominator alongside the
+  numerator would cancel the penalty and make a partial score like a full match.
+- **Level is consulted only after presence.** A requirement nothing answers is a
+  plain gap whether or not a depth was stated, and the gap keeps the JD's
+  phrasing. "You do not have this" and "you have this but not deeply enough" are
+  different findings.
+- **Match kind and level are orthogonal axes.** `Kind` says how evidence was
+  found; the level fields say whether it clears the bar. A match can be direct
+  and partial at once. Do not collapse them into one enum.
+
+`SkillMatch.RequiredLevel` / `EvidenceLevel` are empty when no level was
+assessed — deliberately not a `LevelMet bool`, for the same reason
+`TechnicalFit.Scored` is not a sentinel score. A false would read as "the bar
+was missed" while meaning "no bar was set". Carrying both levels also makes the
+comparison auditable rather than a verdict to trust, and `LevelSignal` quotes
+the JD wording it was read from.
+
+`" | "` groups are looked up whole. `jd_extraction.tmpl` emits a level for a
+group only when the depth applies to every alternative — a posting reading "deep
+expertise in Kafka, or familiarity with Kinesis" gets no entry, because the
+group can be satisfied through the alternative that carries no bar. Losing the
+signal is the safe direction; asserting a bar the posting never held anyone to
+is not.
+
 **One matcher.** `prefFieldsFor` routes every preference by `preference_type`;
 there is no second matcher for the gate, and `anti_pattern` is the only branch
 that reads `required_skills`. The previous split (a broad `signalFields` for
@@ -559,7 +597,25 @@ pg_format or sqlfluff.
   so the table holds a real spread of novice/proficient/expert with
   `years_experience` populated on most rows.
 
-  **Generation now reads it; the fit gate still does not.** `assembleSkills`
+  **Partly resolved as of migration 017.** `ListActiveSkillMatchTermsByUser`
+  now selects `s.proficiency`, and `ScoreTechnicalFit` compares it against
+  `jd_signals.skill_levels` — see the partial-match rules in the Fit gate
+  section. What that closes is the *JD-side* half: a posting that asks for
+  expert Kafka no longer scores a novice Kafka as a clean match.
+
+  **The profile-side half is still open, and is the harder call.** Where a
+  posting states no depth — most postings — a one-off prototype and a decade of
+  production use still score identically, because nothing asked. Discounting a
+  match for shallowness the JD never enquired about would rescore every
+  application already in the database, which is a design decision rather than a
+  bug fix. `known-gap-depth-blind-scoring` holds that case and stays a known gap.
+
+  `years_experience` remains dropped at the query layer, deliberately: nothing
+  compares against a number. Where a JD gives a years figure, extraction reads
+  it as a level signal instead.
+
+  **Generation reads depth directly; the fit gate reads only proficiency.**
+  `assembleSkills`
   (`internal/generation/assemble.go`) selects the claimed skills with
   proficiency and years via `ListActiveSkillProfileByUser` and passes them to
   2a as `<skills>`, which filters on relevance and depth together and may
@@ -569,21 +625,11 @@ pg_format or sqlfluff.
   that is how JavaScript reached a rendered resume without a `skills` row
   behind it.
 
-  `internal/fitgate` never sees any of it. `ListActiveSkillMatchTermsByUser`
-  (`internal/db/queries/skills.sql`) selects name, aliases, and category —
-  but not proficiency or years — and `ScoreTechnicalFit` takes `[]SkillTerm`
-  built from exactly those columns. Scoring is therefore still pure
-  presence/absence: a matched required skill is worth 2 points and a matched
-  preferred skill 1, whether it represents twenty years or a weekend. A one-off
-  prototype and a decade of production use still look identical to scoring, but
-  because the columns are dropped at the query layer, not because they are
-  empty. `ListActiveSkillProfileByUser` already selects exactly what is
-  needed; threading proficiency and years through to the scorer is the fix.
-
-  This is also why a category match earns full credit today (see the matching
-  section above). Weighting a match by the depth behind it is the same missing
-  signal, and belongs with this work rather than as a constant bolted onto the
-  matcher.
+  A category match still earns full credit, and the strongest proficiency in
+  the category answers any stated bar — one expert in Observability carries the
+  whole category over an expert requirement. That follows from category evidence
+  being every skill in the category, and it is visible in the report because
+  `Kind` records that the match was a category match in the first place.
 
 Resolved: the renderer service question (Go-native vs Python) — Python won,
 see Architecture above.

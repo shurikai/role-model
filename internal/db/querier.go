@@ -82,6 +82,13 @@ type Querier interface {
 	// The join is constrained on user_id as well as tag_id. FK integrity on
 	// skills.tag_id already implies it; stating it keeps the row set correct if a
 	// tag is ever re-pointed.
+	//
+	// s.proficiency is selected but s.years_experience deliberately is not. The
+	// scorer compares an ordinal level against a level the JD asked for, and a JD
+	// states depth as a level far more often than as a number — where it does give
+	// a figure ("5+ years"), extraction reads it as a level signal rather than
+	// handing the scorer a number to compare. Selecting years here would put a
+	// column in front of the matcher with nothing to compare it to.
 	ListActiveSkillMatchTermsByUser(ctx context.Context, userID uuid.UUID) ([]ListActiveSkillMatchTermsByUserRow, error)
 	// The claimed skills with their depth signal, for the generation prompt.
 	//

@@ -77,6 +77,40 @@ func TestForDocumentDropsScreeningSummary(t *testing.T) {
 	assertKeySet(t, got)
 }
 
+// The projection invariant, exercised by the newest field to land on
+// JDSignals. skill_levels is extraction's, not the document's — the renderer
+// has no use for a depth requirement — and the schema sets
+// additionalProperties: false, so a field that leaked here would fail
+// validation for every application carrying one.
+//
+// This test is really about the rule rather than about skill_levels: adding a
+// field to JDSignals must not change what the document emits. If it ever
+// should, the schema declares it first and documentJDSignals follows.
+func TestForDocumentDropsSkillLevels(t *testing.T) {
+	sch := compileJDSignalsSchema(t)
+
+	got := validateProjection(t, sch, JDSignals{
+		RequiredSkills:  []string{"Go", "Kafka"},
+		PreferredSkills: []string{"Redis"},
+		Seniority:       "senior",
+		Domain:          "saas",
+		WorkType:        "remote",
+		CultureSignals:  []string{"remote-first"},
+		SkillLevels: []SkillLevel{
+			{Requirement: "Go", Level: "expert", Signal: "expert-level Go"},
+		},
+		CoreCompetencies: []string{"distributed systems design"},
+		PrimaryStack:     []string{"Go"},
+	})
+
+	for _, key := range []string{"skill_levels", "core_competencies", "primary_stack"} {
+		if _, ok := got[key]; ok {
+			t.Errorf("%s leaked into the document projection", key)
+		}
+	}
+	assertKeySet(t, got)
+}
+
 // The other half of the same defect, and the larger one: 15 stored
 // applications predate the required/preferred split and carry the deprecated
 // fields, which the schema forbids just as firmly.

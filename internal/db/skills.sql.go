@@ -92,7 +92,7 @@ func (q *Queries) GetSkill(ctx context.Context, arg GetSkillParams) (Skill, erro
 }
 
 const listActiveSkillMatchTermsByUser = `-- name: ListActiveSkillMatchTermsByUser :many
-SELECT t.name, t.aliases, t.category, c.aliases AS category_aliases
+SELECT t.name, t.aliases, t.category, c.aliases AS category_aliases, s.proficiency
 FROM skills s
 JOIN tags t ON t.id = s.tag_id AND t.user_id = s.user_id
 JOIN tag_categories c ON c.user_id = t.user_id AND c.name = t.category
@@ -104,6 +104,7 @@ type ListActiveSkillMatchTermsByUserRow struct {
 	Aliases         []string `json:"aliases"`
 	Category        string   `json:"category"`
 	CategoryAliases []string `json:"category_aliases"`
+	Proficiency     string   `json:"proficiency"`
 }
 
 // Everything the fit-gate matcher needs to answer a JD requirement: the
@@ -115,6 +116,13 @@ type ListActiveSkillMatchTermsByUserRow struct {
 // The join is constrained on user_id as well as tag_id. FK integrity on
 // skills.tag_id already implies it; stating it keeps the row set correct if a
 // tag is ever re-pointed.
+//
+// s.proficiency is selected but s.years_experience deliberately is not. The
+// scorer compares an ordinal level against a level the JD asked for, and a JD
+// states depth as a level far more often than as a number — where it does give
+// a figure ("5+ years"), extraction reads it as a level signal rather than
+// handing the scorer a number to compare. Selecting years here would put a
+// column in front of the matcher with nothing to compare it to.
 func (q *Queries) ListActiveSkillMatchTermsByUser(ctx context.Context, userID uuid.UUID) ([]ListActiveSkillMatchTermsByUserRow, error) {
 	rows, err := q.db.Query(ctx, listActiveSkillMatchTermsByUser, userID)
 	if err != nil {
@@ -129,6 +137,7 @@ func (q *Queries) ListActiveSkillMatchTermsByUser(ctx context.Context, userID uu
 			&i.Aliases,
 			&i.Category,
 			&i.CategoryAliases,
+			&i.Proficiency,
 		); err != nil {
 			return nil, err
 		}

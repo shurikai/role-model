@@ -57,6 +57,29 @@ type JDSignals struct {
 	// emits — see documentJDSignals.
 	PrimaryStack []string `json:"primary_stack"`
 
+	// SkillLevels records a depth requirement for individual entries in
+	// RequiredSkills or PreferredSkills, and only where the posting states one.
+	//
+	// It is a sparse side table rather than an encoding inside the skill
+	// strings because those strings are consumed directly by resume generation
+	// and the frontend, which want the plain technology name. Requirement is a
+	// lookup key back into those arrays, matching an entry verbatim including
+	// any " | " group.
+	//
+	// Most requirements have no entry here and that is the correct case, not a
+	// gap in extraction. A posting that says "Kafka" is asking for Kafka; only
+	// one that says "expert-level Kafka" or "5+ years of Kafka" is asking for
+	// depth, and inventing a level for the rest would turn every unqualified
+	// requirement into a judgment the JD never made.
+	//
+	// The scale is the same three values as skills.proficiency, so the fit
+	// gate compares ordinals with no translation layer in between.
+	//
+	// Deliberately NOT part of the document projection, same as
+	// CoreCompetencies and PrimaryStack. Adding a field here must not change
+	// what the document emits — see documentJDSignals.
+	SkillLevels []SkillLevel `json:"skill_levels"`
+
 	// Role classification
 	Seniority string `json:"seniority"`
 	Domain    string `json:"domain"`
@@ -72,6 +95,27 @@ type JDSignals struct {
 	// Do not use in new code. Will be removed in a future cleanup.
 	PrioritySkills   []string `json:"priority_skills,omitempty"`
 	DomainVocabulary []string `json:"domain_vocabulary,omitempty"`
+}
+
+// SkillLevel is one requirement's stated depth, as the posting phrased it.
+//
+// Signal carries the JD language the level was inferred from. The level itself
+// is a judgment made at extraction time, and a judgment that cannot be checked
+// against its source is one nobody can audit later — the same reason a fit
+// report records the evidence behind a match instead of asserting a score.
+type SkillLevel struct {
+	// Requirement matches an entry in RequiredSkills or PreferredSkills
+	// verbatim, " | " group included. A string that does not match one is
+	// dead data: the lookup simply finds nothing, and the requirement scores
+	// exactly as it would have without any level stated.
+	Requirement string `json:"requirement"`
+
+	// Level is "novice", "proficient", or "expert".
+	Level string `json:"level"`
+
+	// Signal is the JD language that produced the inference — "expert-level
+	// Kafka", "5+ years of Go", "exposure to Terraform".
+	Signal string `json:"signal"`
 }
 
 // documentJDSignals is the jd_signals projection embedded in the resume

@@ -134,6 +134,7 @@ type FitReport struct {
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
 	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
 	PreferenceMatches   *json.RawMessage `json:"preference_matches"`
+	TechnicalPartial    *json.RawMessage `json:"technical_partial"`
 }
 
 type ImportBatch struct {
