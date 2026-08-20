@@ -247,3 +247,74 @@ that survived.
 being matchable, which it still is not (#48). Row 8 ("pure frontend",
 miscategorized as `work_type`) is still miscategorized. Rows 5–7 are still
 candidates for retirement on evidence, not on this table.
+
+---
+
+## Resolution, 2026-08-20 — prominence is its own signal (#68, #53)
+
+Group A was closed twice, and the second time is the one that mattered.
+
+The 2026-08-17 pass made the four skills-shaped rows *able* to fire, by routing
+`anti_pattern` at `required_skills`. That was the option this audit named, and
+it was the right half of the fix. The half it did not examine is what those rows
+actually claim. `expert Python as primary requirement` is not a statement that a
+JD mentions Python; it is a statement about how central Python is to the role.
+`required_skills` records presence and nothing else, so the qualifier had nothing
+to be checked against — and `matchesSignal`'s field-inside-label direction
+matched the bare token instead. `containsPhrase("Python", "expert Python as
+primary requirement")` is true, because `python` is a whole word in the label.
+
+Every posting naming Python as a required skill therefore tripped a hard gate.
+The ZoomInfo Senior SWE posting in #68 is the one that surfaced it: its
+must-haves read "Proficiency in **Java and/or Python**", the score capped at
+`hardGateCeiling`, and the narrative reported that the role "gates on expert
+Python as a primary requirement" — wording supplied by the preference label and
+never by the posting.
+
+Two paths tripped it independently, which is worth recording because fixing only
+the obvious one would have looked like a fix:
+
+1. The OR-group. Extraction correctly emitted `"Java | Python"`;
+   `prefFieldsFor` split it back apart, so the exclude reached a requirement the
+   profile already satisfied with Java.
+2. A bare `"Python"` entry, from the posting's separate "Core Technical Stack"
+   listing. This tripped the gate on its own, with no group involved.
+
+### What changed
+
+Stage 1 now extracts `jd_signals.primary_stack`, and migration 015 adds a
+`primary_stack` preference type routed at it. Seven rows moved:
+Python, TypeScript/Node, LLM/AI, Angular, Ruby/Rails, Jenkins, and Oracle.
+`anti_pattern` keeps `required_skills` and keeps the bare-label excludes
+(`C# / .NET`, `Windows / Microsoft ecosystem`, `crypto / blockchain`), where
+presence genuinely is the whole objection.
+
+The `primary_stack` branch does not split alternatives, and runs
+`collapseSubsumed` first so a bare restatement of a grouped member is dropped.
+Bidirectional matching is safe there because the *field* is filtered to
+prominence upstream — routing does the work, exactly as it did for the staff
+collision above.
+
+### Group C is half closed, and Group B is unchanged
+
+#53 landed in the same pass. `work_type` and `culture` now also read
+`culture_signals` and `core_competencies`; `domain` reads `core_competencies`
+and `screening_summary.industry`. That is the audit's Group C observation
+generalized: `"pure frontend"` under `work_type` was miscategorized in the sense
+that the *field* could not hold it, and widening the field is what a closed enum
+needed rather than a new type.
+
+Row 7 (`defense / aerospace`) still fires. Rows 5–6 are still retirement
+candidates on evidence. `screening_summary` is still unreadable by
+`anti_pattern`, which is why the sample dataset's `adtech` gate still cannot
+fire — #48 stays open, now narrowed to everything except `industry`-for-`domain`.
+
+### The general lesson this audit keeps re-teaching
+
+Three times now the defect has been the same shape: a value compared against a
+field at the wrong level of abstraction. Seniority vs. business model. Category
+alias vs. technology. And now presence vs. prominence. Each time the matcher had
+access to more text than the question warranted, and each time the fix was
+routing rather than a cleverer string rule. A preference label is prose written
+for a human; whenever it carries a qualifier, ask what field could possibly
+falsify it before trusting that it does anything.

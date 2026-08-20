@@ -62,9 +62,17 @@ the client, not the old renderer implementation.
    resume listing "setting technical direction" among its technologies reads
    as padding and displaces a real skill.
 
-   `core_competencies` is deliberately **not** in the document projection. Per
-   the intermediate-JSON rule below, adding a field to `JDSignals` must not
-   change what the document emits.
+   A third shape sits alongside them: `primary_stack`, the technologies the
+   posting frames the role as being **built on**. It is a strict subset of
+   `required_skills` and answers a different question — not "does the JD ask for
+   this" but "is this what the role is made of" — and it exists because the fit
+   gate had preference rows making claims about prominence with nothing to check
+   them against. Interchangeable alternatives keep the `" | "` grouping, and
+   there the grouping is load-bearing rather than a convenience.
+
+   Neither `core_competencies` nor `primary_stack` is in the document
+   projection. Per the intermediate-JSON rule below, adding a field to
+   `JDSignals` must not change what the document emits.
 2. **Resume generation (Stage 2)** — split into two calls:
    - **2a body** (`resume_body.tmpl`) — selects and writes bullets and
      skills against jd_signals, under a seniority-informed length budget
@@ -198,6 +206,60 @@ that reads `required_skills`. The previous split (a broad `signalFields` for
 scoring, a routed `gateFieldsFor` for the gate) is what hid #49: scoring never
 saw the skills arrays, so a technology-shaped negative could not fire and,
 because an unmatched negative earns its weight, paid out a bonus instead.
+
+**Prominence is a separate signal from presence, and the types encode which one
+a row is about.** `jd_signals.primary_stack` holds what the posting says the role
+is *built on*; `required_skills` holds only that a technology is asked for. A
+preference whose label claims prominence — "Python as a primary language",
+"Angular as co-equal frontend requirement" — is typed `primary_stack` and routed
+at that field. A preference where presence *is* the objection — "C# / .NET",
+"crypto / blockchain" — stays `anti_pattern` and keeps `required_skills`.
+
+Routing the first kind at `required_skills` is what made #68: the qualifier had
+nothing to be checked against, so it was inert text, and `matchesSignal`'s
+field-inside-label direction matched the bare token instead — `"Python"` is a
+whole word inside `"expert Python as primary requirement"`. Every posting naming
+Python as a required skill tripped a hard gate, capped at `hardGateCeiling`, and
+was narrated as gating on expert Python. Do not add a prominence-claiming label
+under `anti_pattern`; the qualifier will read as documentation and behave as
+nothing.
+
+Two rules specific to `primary_stack`:
+
+- **Alternatives are never split there**, which is the one place it differs from
+  `anti_pattern`. A `" | "` group means the posting offers substitutes, and a
+  technology you can be excused from is not what the role is built on. Splitting
+  `"Java | Python"` back apart is how a JD reading "Proficiency in Java and/or
+  Python" tripped the Python gate. `anti_pattern` still splits, correctly: it
+  asks whether the JD demands the technology at all.
+- **`collapseSubsumed` runs first.** Postings state their stack twice — a choice
+  in the must-haves, a flat list under "Core Technical Stack" — and an entry
+  whose alternatives are a strict subset of another's is the looser restatement
+  and is dropped. `jd_extraction.tmpl` asks for the same deduplication, but a
+  prompt is a request; this makes extraction noise harmless rather than unlikely.
+
+**A preference is matched against the fields it is *about*, and enum fields alone
+are rarely enough.** `signals.WorkType` is `remote|hybrid|onsite|unknown` and
+`signals.Domain` is one closed-enum value, so labels routed at those alone were
+not merely unlikely to match — roughly 50 of 139 possible weight could not match
+any JD, ever (#53). `work_type` and `culture` therefore also read
+`culture_signals` and `core_competencies`; `domain` reads `core_competencies` and
+`screening_summary.industry`.
+
+`screening_summary.industry` is the only screening field any preference reads,
+and only `domain` reads it. The extraction prompt defines it as free-text
+industry explicitly *not* constrained to the `domain` enum, so it answers the
+same question without the truncation — a freight-visibility platform extracts as
+`saas` while the industry says "freight logistics visibility platform". Location,
+clearance, and `other_flags` are still read by nothing; that is #48.
+
+A consequence worth knowing before adding rows: **two labels that tokenize to the
+same bag of words will both match the same JD.** `matchesSignal` compares token
+runs and cannot tell "X over Y" from "Y over X", so the seeded pair "product over
+platform / internal tooling" (positive) and "platform / internal tooling over
+product" (negative) earned and conflicted at once. Migration 015 split them into
+disjoint labels; the ordering the wording tried to express is already carried by
+the weights. Write labels that share no vocabulary with their opposite.
 
 Conditional preferences are modelled by **decomposing the root cause into its
 own weighted row**, not by a dependency edge. "C# is only bad because of the
