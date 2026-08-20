@@ -111,6 +111,12 @@ type SkillTerm struct {
 	Aliases         []string
 	Category        string
 	CategoryAliases []string
+
+	// Proficiency is the recorded depth — novice, proficient, or expert. It is
+	// compared against a level the JD asked for, and only when the JD asked
+	// for one; see ScoreTechnicalFit. years_experience is deliberately not
+	// carried alongside it, because nothing compares against a number.
+	Proficiency string
 }
 
 // MatchKind records how a requirement came to be satisfied. It is carried
@@ -126,11 +132,39 @@ const (
 )
 
 // SkillMatch is one satisfied requirement and the evidence behind it.
+//
+// # Kind and level are two different axes, and collapsing them loses one
+//
+// Kind says HOW the evidence was found — the skill's own name, a recorded
+// synonym, or the category it sits in. The level fields say WHETHER the depth
+// found meets the depth the JD asked for. A match can be direct and still
+// short of the bar: holding a skill named exactly right, at novice, against a
+// posting that wants an expert. Folding "partial" into Kind as a fourth value
+// would make that match pick one fact to report and discard the other.
+//
+// # The level fields are empty when no level was assessed, and that is not "unmet"
+//
+// RequiredLevel is empty exactly when the JD stated no depth for this
+// requirement, which is the common case. It is NOT a bool for the same reason
+// TechnicalFit.Scored is not a sentinel score: "the posting asked for expert
+// and the profile is proficient" and "the posting asked for nothing" are
+// opposite findings, and a false would read as the former while meaning the
+// latter. Carrying both levels also makes the comparison auditable — a reader
+// sees what was asked and what answered it, rather than a verdict to trust.
 type SkillMatch struct {
 	Requirement string    `json:"requirement"`
 	Kind        MatchKind `json:"kind"`
 	Category    string    `json:"category,omitempty"`
 	Evidence    []string  `json:"evidence"`
+
+	// RequiredLevel is the depth the JD asked for, empty when it asked for
+	// none. EvidenceLevel is the strongest proficiency behind the match, and
+	// is populated only alongside RequiredLevel — absent a stated requirement
+	// there is nothing to report it against. LevelSignal quotes the JD
+	// language the requirement was read from.
+	RequiredLevel string `json:"required_level,omitempty"`
+	EvidenceLevel string `json:"evidence_level,omitempty"`
+	LevelSignal   string `json:"level_signal,omitempty"`
 }
 
 // satisfies reports how skills cover the requirement in entry, and returns
@@ -141,14 +175,14 @@ type SkillMatch struct {
 // rather than settling for the first alternative that matches somehow. A JD
 // entry of "Kubernetes | container orchestration" should report the stored
 // Kubernetes skill, not a category match on the phrase beside it.
-func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category string, evidence []string, ok bool) {
+func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category string, evidence []SkillTerm, ok bool) {
 	alts := splitAlternatives(entry)
 
 	// Strongest: the skill's own name answers the requirement.
 	for _, alt := range alts {
 		for _, s := range skills {
 			if matchesAny([]string{s.Name}, alt) {
-				evidence = appendUnique(evidence, s.Name)
+				evidence = appendUnique(evidence, s)
 			}
 		}
 	}
@@ -160,7 +194,7 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 	for _, alt := range alts {
 		for _, s := range skills {
 			if matchesPhrase(s.Aliases, alt) {
-				evidence = appendUnique(evidence, s.Name)
+				evidence = appendUnique(evidence, s)
 			}
 		}
 	}
@@ -184,7 +218,7 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 			category = s.Category
 			for _, peer := range skills {
 				if peer.Category == category {
-					evidence = appendUnique(evidence, peer.Name)
+					evidence = appendUnique(evidence, peer)
 				}
 			}
 			return MatchCategory, category, evidence, true
@@ -196,12 +230,26 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 
 // appendUnique appends v to out if it isn't already there, keeping evidence
 // lists stable and free of repeats when several alternatives hit the same
-// skill.
-func appendUnique(out []string, v string) []string {
-	if slices.Contains(out, v) {
-		return out
+// skill. Identity is the skill name — the same skill reached twice through
+// two alternatives is one piece of evidence.
+func appendUnique(out []SkillTerm, v SkillTerm) []SkillTerm {
+	for _, s := range out {
+		if s.Name == v.Name {
+			return out
+		}
 	}
 	return append(out, v)
+}
+
+// evidenceNames reduces matched skills to the names a SkillMatch records. The
+// match carries names rather than whole terms because that is what the report
+// stores and what the narrative cites.
+func evidenceNames(evidence []SkillTerm) []string {
+	out := make([]string, 0, len(evidence))
+	for _, s := range evidence {
+		out = append(out, s.Name)
+	}
+	return out
 }
 
 // ScoreTechnicalFit scores how well the user's skills cover the JD's required
@@ -216,9 +264,42 @@ func appendUnique(out []string, v string) []string {
 // A category match earns the same points as a direct one. Five CI/CD tools
 // really is evidence of CI/CD, and a fractional constant would need defending
 // against every future JD. The distinction is preserved in the match kind,
-// where a reader can weigh it, rather than baked into the number. Weighting
-// credit by actual depth is a separate problem — skills.proficiency and
-// years_experience are still dropped before scoring ever sees them.
+// where a reader can weigh it, rather than baked into the number.
+//
+// # Partial matches
+//
+// A requirement the JD attached a depth to — "expert-level Kafka", "5+ years
+// of Go" — is scored against the strongest proficiency behind its evidence.
+// Falling short earns half credit (1 of 2 for a required skill, 0.5 of 1 for a
+// preferred one) and files the requirement under Partial rather than Matches.
+//
+// Three properties hold this together, and each is easy to break:
+//
+//   - **No stated level means no change.** signals.SkillLevels is sparse by
+//     design — most requirements carry no entry — and a requirement without one
+//     takes the original path and the original full credit. A JD carrying no
+//     skill_levels at all must score byte-for-byte what it scored before this
+//     existed, which is what makes the feature additive rather than a
+//     rescoring of every stored application.
+//   - **pointsPossible does not move.** Each entry still counts once at its
+//     full required or preferred weight. Discounting the denominator too would
+//     cancel the penalty out and make a partial match score identically to a
+//     full one.
+//   - **Level is only consulted once presence is established.** A requirement
+//     nothing answers is a plain gap whether or not the JD stated a depth for
+//     it, and the gap records the JD's phrasing exactly as before. "You do not
+//     have this" and "you have this but not deeply enough" are different
+//     findings, and a gap that started reporting the level would blur them.
+//
+// Partial is its own list for the same reason gaps and conflicts are separate
+// on the preference axis: a partial match is real evidence with a real caveat.
+// Filing it under Matches loses the caveat and filing it under Gaps loses the
+// evidence, and the narrative would then have to re-derive a distinction the
+// scorer already made.
+//
+// Depth still does nothing where the JD asks for nothing, which is most of the
+// time — the profile-side half of #44 (a novice match and a twenty-year match
+// scoring identically on an unqualified requirement) is untouched by this.
 //
 // # The unscored case
 //
@@ -247,24 +328,55 @@ func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 		pointsEarned float64
 		gaps         []string
 		matches      []SkillMatch
+		partial      []SkillMatch
 	)
+
+	// score awards one entry its points and files it, reporting whether
+	// anything answered it at all. Full points when it is satisfied at or
+	// above any level the JD asked for, half when it is satisfied but short of
+	// that level.
+	score := func(entry string, full float64) (matched bool) {
+		kind, category, evidence, ok := satisfies(skills, entry)
+		if !ok {
+			return false
+		}
+		match := SkillMatch{
+			Requirement: entry, Kind: kind, Category: category,
+			Evidence: evidenceNames(evidence),
+		}
+
+		required, signal := requiredLevelFor(entry, signals.SkillLevels)
+		if required == "" {
+			// The JD stated no depth here. Original path, original credit.
+			pointsEarned += full
+			matches = append(matches, match)
+			return true
+		}
+
+		held := strongestProficiency(evidence)
+		match.RequiredLevel = required
+		match.EvidenceLevel = held
+		match.LevelSignal = signal
+
+		if proficiencyRank(held) >= proficiencyRank(required) {
+			pointsEarned += full
+			matches = append(matches, match)
+			return true
+		}
+		pointsEarned += full / 2
+		partial = append(partial, match)
+		return true
+	}
+
 	for _, req := range signals.RequiredSkills {
-		if kind, category, evidence, ok := satisfies(skills, req); ok {
-			pointsEarned += 2
-			matches = append(matches, SkillMatch{
-				Requirement: req, Kind: kind, Category: category, Evidence: evidence,
-			})
-		} else {
+		// A gap records the JD's phrasing and nothing else, level stated or
+		// not. Level only means something once presence is established.
+		if !score(req, 2) {
 			gaps = append(gaps, req)
 		}
 	}
 	for _, pref := range signals.PreferredSkills {
-		if kind, category, evidence, ok := satisfies(skills, pref); ok {
-			pointsEarned += 1
-			matches = append(matches, SkillMatch{
-				Requirement: pref, Kind: kind, Category: category, Evidence: evidence,
-			})
-		}
+		score(pref, 1)
 	}
 
 	return TechnicalFit{
@@ -272,6 +384,7 @@ func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 		Scored:  true,
 		Gaps:    gaps,
 		Matches: matches,
+		Partial: partial,
 	}
 }
 
@@ -286,6 +399,12 @@ type TechnicalFit struct {
 	Scored  bool
 	Gaps    []string
 	Matches []SkillMatch
+
+	// Partial holds requirements the profile answers but not at the depth the
+	// JD asked for. Parallel to Matches and Gaps, never merged into either —
+	// see ScoreTechnicalFit. Always empty for a JD whose signals carry no
+	// skill_levels, which is most of them.
+	Partial []SkillMatch
 }
 
 // ScorePreferenceFit reports how a JD lines up with the user's preferences.
@@ -632,4 +751,67 @@ func clampScore(v float64) float64 {
 		return 100
 	}
 	return v
+}
+
+// proficiencyRank orders the three-value scale skills.proficiency and
+// jd_signals.skill_levels share. Anything unrecognised ranks 0, below novice,
+// so a typo in either source degrades to "no level established" rather than
+// silently satisfying an expert requirement.
+func proficiencyRank(level string) int {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "novice":
+		return 1
+	case "proficient":
+		return 2
+	case "expert":
+		return 3
+	default:
+		return 0
+	}
+}
+
+// requiredLevelFor returns the depth the JD asked for on this requirement, and
+// the JD language behind it.
+//
+// The lookup is by exact requirement string, including any " | " group, and is
+// case-insensitive on the whole entry only — extraction is asked to copy the
+// entry verbatim, so a near-miss is a prompt failure rather than something to
+// paper over with fuzzy matching here. A miss returns an empty level, which
+// every caller reads as "the JD stated no depth for this", and scoring then
+// proceeds exactly as it did before skill levels existed.
+func requiredLevelFor(entry string, levels []generation.SkillLevel) (level, signal string) {
+	for _, sl := range levels {
+		if strings.EqualFold(strings.TrimSpace(sl.Requirement), strings.TrimSpace(entry)) {
+			if proficiencyRank(sl.Level) == 0 {
+				// A level nobody can rank cannot be compared against, so it is
+				// not a requirement — treat it as unstated rather than as
+				// unmet. Reporting a partial here would blame the profile for
+				// an extraction defect.
+				return "", ""
+			}
+			return sl.Level, sl.Signal
+		}
+	}
+	return "", ""
+}
+
+// strongestProficiency returns the highest proficiency among the skills behind
+// a match.
+//
+// Highest rather than lowest because the evidence list is a set of skills that
+// each independently answer the requirement — any one of them satisfying the
+// depth asked for means the person can do the work. This reads differently for
+// a category match, where the evidence is every active skill in the category:
+// one expert anywhere in "Observability" carries the whole category over an
+// expert bar. That is a known consequence of category evidence being broad,
+// not an oversight, and it is visible in the report because Kind records that
+// the match was a category match in the first place.
+func strongestProficiency(evidence []SkillTerm) string {
+	best := ""
+	for _, s := range evidence {
+		if proficiencyRank(s.Proficiency) > proficiencyRank(best) {
+			best = s.Proficiency
+		}
+	}
+	return best
 }

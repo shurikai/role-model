@@ -51,6 +51,7 @@ function makeFitReport(overrides: Partial<FitReport> = {}): FitReport {
     anti_pattern_hits: null,
     technical_score: 100,
     technical_gaps: null,
+    technical_partial: null,
     preference_matches: [
       {
         id: "pref-match-1",
@@ -276,6 +277,55 @@ describe("ApplicationDetail", () => {
       // it would be the only thing pretending otherwise.
       expect(
         screen.queryByText("Preferences not mentioned:"),
+      ).not.toBeInTheDocument();
+    });
+
+    // A partial match is a third verdict: the skill is present, below the
+    // depth the posting asked for. It must not render as a gap (which would
+    // say the profile lacks it) and must name the bar, since the requirement
+    // alone doesn't say what is short about it.
+    it("renders a partial match with the level it fell short of", async () => {
+      vi.stubGlobal(
+        "fetch",
+        stubFetch(makeApplication(), [
+          makeFitReport({
+            technical_gaps: ["GraphQL"],
+            technical_partial: [
+              {
+                requirement: "Kafka",
+                kind: "direct",
+                evidence: ["Kafka"],
+                required_level: "expert",
+                evidence_level: "novice",
+                level_signal: "expert-level Kafka",
+              },
+            ],
+          }),
+        ]),
+      );
+      renderDetail();
+
+      expect(
+        await screen.findByText("Below the level asked for:"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/posting asks for expert, yours is novice/),
+      ).toBeInTheDocument();
+      // Present, not missing: it must not have been filed under gaps.
+      expect(
+        screen.getByText("Technical gaps:").closest("div"),
+      ).not.toHaveTextContent("Kafka");
+    });
+
+    it("omits the partial section entirely when nothing is partial", async () => {
+      vi.stubGlobal("fetch", stubFetch(makeApplication(), [makeFitReport()]));
+      renderDetail();
+
+      expect(
+        await screen.findByText("This is the narrative."),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Below the level asked for:"),
       ).not.toBeInTheDocument();
     });
 

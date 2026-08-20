@@ -1,0 +1,76 @@
+{
+  "name": "partial-match-depth-below-stated-level",
+  "jd_fixture": "synthetic",
+  "description": "A backend role that states depth on three of its requirements and leaves the rest bare. The persona is an expert in Go and Kafka and a novice in TypeScript and DynamoDB, so the same posting produces all three verdicts at once: cleared bars, a bar fallen short of, and requirements with no bar at all. This is the end-to-end proof that a stated depth reaches scoring and separates into its own list.",
+
+  "comment": "Every other case in this directory predates skill_levels and asserts the opposite property -- that a posting stating no depth scores exactly as it always did. This one is the positive counterpart. Two things are under test and both have to hold. (1) TypeScript and DynamoDB are matched, not missing: they must appear in technical_partial and must NOT appear in technical_gaps, because the persona holds both. (2) Go and Kafka carry stated levels the persona clears at expert, so a level that is MET must not file a match as partial -- the boundary that a > instead of a >= would break. PostgreSQL and Redis carry no level at all and take the original full-credit path alongside them.",
+
+  "signals": {
+    "required_skills": [
+      "Go",
+      "Kafka",
+      "PostgreSQL",
+      "TypeScript",
+      "DynamoDB"
+    ],
+    "preferred_skills": [
+      "Redis"
+    ],
+    "skill_levels": [
+      {
+        "requirement": "Go",
+        "level": "expert",
+        "signal": "expert-level Go, 8+ years"
+      },
+      {
+        "requirement": "Kafka",
+        "level": "proficient",
+        "signal": "strong hands-on experience with Kafka"
+      },
+      {
+        "requirement": "TypeScript",
+        "level": "expert",
+        "signal": "deep expertise in TypeScript across a large frontend codebase"
+      },
+      {
+        "requirement": "DynamoDB",
+        "level": "proficient",
+        "signal": "3+ years operating DynamoDB at scale"
+      }
+    ],
+    "core_competencies": [
+      "distributed systems design",
+      "production on-call ownership"
+    ],
+    "primary_stack": ["Go", "Kafka"],
+    "seniority": "senior",
+    "domain": "saas",
+    "work_type": "remote",
+    "culture_signals": ["remote-first", "high ownership"],
+    "screening_summary": {
+      "location": "Remote, US",
+      "work_arrangement": "fully remote",
+      "travel": "not mentioned",
+      "industry": "synthetic fixture, not a real posting",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": []
+    }
+  },
+
+  "expect": {
+    "technical_partial": {
+      "comment": "Both are held at novice against a bar above it. Present but shallow is a third verdict, not a gap and not a clean match.",
+      "must_include": ["TypeScript", "DynamoDB"],
+      "must_exclude": ["Go", "Kafka", "PostgreSQL", "Redis"]
+    },
+    "technical_gaps": {
+      "comment": "The persona holds every requirement here. A partial must never be double-reported as a gap -- that would tell the reader they lack a skill they have.",
+      "empty": true
+    },
+    "technical_score": {
+      "comment": "Three required entries at full credit (6) plus two at half (2) plus the preferred Redis (1), out of 11 possible: 81.8. The band is wide enough to survive reweighting but tight enough that scoring both partials at full credit (100) or as gaps (63.6) breaks it.",
+      "min": 75,
+      "max": 90
+    }
+  }
+}

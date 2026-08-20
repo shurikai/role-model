@@ -1056,3 +1056,240 @@ func TestScoreTechnicalFitScoredWhenNothingMatches(t *testing.T) {
 		t.Errorf("gaps = %v, want both requirements reported", fit.Gaps)
 	}
 }
+
+// Skill levels are the JD's side of a depth requirement, and the axis they add
+// is orthogonal to match kind: a match can be found by exact name and still sit
+// below the bar the posting set.
+func TestTechnicalFitSkillLevels(t *testing.T) {
+	skill := func(name, proficiency string) SkillTerm {
+		return SkillTerm{Name: name, Proficiency: proficiency, Category: "Backend"}
+	}
+	level := func(req, lvl string) generation.SkillLevel {
+		return generation.SkillLevel{Requirement: req, Level: lvl, Signal: lvl + " " + req}
+	}
+
+	t.Run("evidence above the required level earns full credit", func(t *testing.T) {
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "expert")},
+			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
+		)
+		if fit.Score != 100 {
+			t.Errorf("score = %.1f, want 100", fit.Score)
+		}
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none — expert clears a proficient bar", fit.Partial)
+		}
+		if len(fit.Matches) != 1 {
+			t.Fatalf("Matches = %d, want 1", len(fit.Matches))
+		}
+		// The comparison is recorded even when it passes, so a reader can see
+		// what bar was cleared rather than inferring it from the absence of a
+		// partial entry.
+		if fit.Matches[0].RequiredLevel != "proficient" || fit.Matches[0].EvidenceLevel != "expert" {
+			t.Errorf("levels = %q/%q, want proficient/expert",
+				fit.Matches[0].RequiredLevel, fit.Matches[0].EvidenceLevel)
+		}
+	})
+
+	t.Run("evidence at exactly the required level earns full credit", func(t *testing.T) {
+		// The boundary. A >= comparison written as > would file every exact
+		// match as partial, which is the most likely way to get this wrong.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "proficient")},
+			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
+		)
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none at exactly the required level", fit.Partial)
+		}
+		if fit.Score != 100 {
+			t.Errorf("score = %.1f, want 100", fit.Score)
+		}
+	})
+
+	t.Run("evidence below the required level earns half credit and lands in Partial", func(t *testing.T) {
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "novice")},
+			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "expert")}},
+		)
+		if fit.Score != 50 {
+			t.Errorf("score = %.1f, want 50 — one required entry at half of 2 points", fit.Score)
+		}
+		if len(fit.Matches) != 0 {
+			t.Errorf("Matches = %v, want none — a partial is not a clean match", fit.Matches)
+		}
+		if len(fit.Gaps) != 0 {
+			t.Errorf("Gaps = %v, want none — the skill is present", fit.Gaps)
+		}
+		if len(fit.Partial) != 1 {
+			t.Fatalf("Partial = %d, want 1", len(fit.Partial))
+		}
+		p := fit.Partial[0]
+		if p.RequiredLevel != "expert" || p.EvidenceLevel != "novice" {
+			t.Errorf("levels = %q/%q, want expert/novice", p.RequiredLevel, p.EvidenceLevel)
+		}
+		if p.LevelSignal == "" {
+			t.Error("LevelSignal is empty — the JD wording is what makes the bar auditable")
+		}
+		if !slices.Equal(p.Evidence, []string{"Kafka"}) {
+			t.Errorf("Evidence = %v, want the matched skill", p.Evidence)
+		}
+	})
+
+	t.Run("a preferred skill below level earns half of one point", func(t *testing.T) {
+		// Two required entries matched cleanly (4 points) plus a preferred one
+		// at half (0.5) out of a possible 5.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Go", "expert"), skill("PostgreSQL", "expert"), skill("Kafka", "novice")},
+			JDSignals{
+				RequiredSkills:  []string{"Go", "PostgreSQL"},
+				PreferredSkills: []string{"Kafka"},
+				SkillLevels:     []generation.SkillLevel{level("Kafka", "expert")},
+			},
+		)
+		want := 4.5 / 5 * 100
+		if fit.Score != want {
+			t.Errorf("score = %.2f, want %.2f", fit.Score, want)
+		}
+		if len(fit.Partial) != 1 {
+			t.Errorf("Partial = %d, want the preferred entry", len(fit.Partial))
+		}
+	})
+
+	t.Run("an unmatched requirement stays a plain gap even with a level stated", func(t *testing.T) {
+		// Level only means something once presence is established. A gap must
+		// keep the JD's phrasing and say nothing about depth, or "you do not
+		// have this" and "you have this but not deeply enough" blur together.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Go", "expert")},
+			JDSignals{
+				RequiredSkills: []string{"Go", "Erlang"},
+				SkillLevels:    []generation.SkillLevel{level("Erlang", "expert")},
+			},
+		)
+		if !slices.Equal(fit.Gaps, []string{"Erlang"}) {
+			t.Errorf("Gaps = %v, want [Erlang] verbatim", fit.Gaps)
+		}
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none — nothing answered Erlang at all", fit.Partial)
+		}
+	})
+
+	t.Run("the strongest evidence answers the bar", func(t *testing.T) {
+		// A category match's evidence is every skill in the category, so this
+		// is where "highest wins" is most visible: one expert carries it.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{
+				{Name: "Splunk", Proficiency: "novice", Category: "Observability"},
+				{Name: "Dynatrace", Proficiency: "expert", Category: "Observability"},
+			},
+			JDSignals{
+				RequiredSkills: []string{"Observability"},
+				SkillLevels:    []generation.SkillLevel{level("Observability", "expert")},
+			},
+		)
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none — Dynatrace at expert answers the bar", fit.Partial)
+		}
+		if len(fit.Matches) != 1 || fit.Matches[0].EvidenceLevel != "expert" {
+			t.Errorf("matches = %+v, want one at expert", fit.Matches)
+		}
+	})
+
+	t.Run("an OR-group is looked up by the whole entry", func(t *testing.T) {
+		// jd_extraction.tmpl emits a level for a group only when the depth
+		// applies to the group as a whole, and requirement reproduces the
+		// entry verbatim including the " | ". A lookup that split the group
+		// apart, or matched one alternative, would miss it entirely.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "novice")},
+			JDSignals{
+				RequiredSkills: []string{"Kafka | Kinesis"},
+				SkillLevels:    []generation.SkillLevel{level("Kafka | Kinesis", "expert")},
+			},
+		)
+		if len(fit.Partial) != 1 {
+			t.Fatalf("Partial = %d, want 1 — the group carries the level", len(fit.Partial))
+		}
+		if fit.Partial[0].Requirement != "Kafka | Kinesis" {
+			t.Errorf("Requirement = %q, want the group verbatim", fit.Partial[0].Requirement)
+		}
+	})
+
+	t.Run("a level naming one alternative does not reach the group", func(t *testing.T) {
+		// The prompt is told to emit nothing for a partially-qualified group,
+		// because the posting accepts a substitute that carries no depth bar.
+		// This is the Go-side consequence if one leaks through anyway: it does
+		// not match the entry, so the requirement scores as though unstated.
+		// Failing safe matters more here than rescuing the signal.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "novice")},
+			JDSignals{
+				RequiredSkills: []string{"Kafka | Kinesis"},
+				SkillLevels:    []generation.SkillLevel{level("Kafka", "expert")},
+			},
+		)
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none — the level does not name this entry", fit.Partial)
+		}
+		if fit.Score != 100 {
+			t.Errorf("score = %.1f, want 100 — unmatched level data is inert", fit.Score)
+		}
+	})
+
+	t.Run("an unrankable level is treated as unstated, not unmet", func(t *testing.T) {
+		// Garbage from extraction must not manufacture a partial. Blaming the
+		// profile for a bad level string would be a defect reported as a
+		// finding about the person.
+		fit := ScoreTechnicalFit(
+			[]SkillTerm{skill("Kafka", "novice")},
+			JDSignals{
+				RequiredSkills: []string{"Kafka"},
+				SkillLevels:    []generation.SkillLevel{level("Kafka", "wizard")},
+			},
+		)
+		if len(fit.Partial) != 0 {
+			t.Errorf("Partial = %v, want none for an unrankable required level", fit.Partial)
+		}
+		if fit.Score != 100 {
+			t.Errorf("score = %.1f, want 100", fit.Score)
+		}
+	})
+}
+
+// The additive invariant: a JD carrying no skill_levels must score exactly what
+// it scored before levels existed, and must produce no partial entries. This is
+// what makes the feature additive rather than a silent rescoring of every
+// application already in the database.
+func TestNoSkillLevelsMeansNoBehaviorChange(t *testing.T) {
+	skills := []SkillTerm{
+		{Name: "Go", Proficiency: "expert", Category: "Languages"},
+		{Name: "Kafka", Proficiency: "novice", Category: "Messaging"},
+		{Name: "PostgreSQL", Proficiency: "proficient", Category: "Datastores"},
+	}
+	signals := JDSignals{
+		RequiredSkills:  []string{"Go", "Kafka", "Erlang"},
+		PreferredSkills: []string{"PostgreSQL"},
+	}
+
+	fit := ScoreTechnicalFit(skills, signals)
+
+	// 2 of 3 required matched (4 points) plus the preferred (1) out of 7.
+	if want := 5.0 / 7 * 100; fit.Score != want {
+		t.Errorf("score = %.4f, want %.4f", fit.Score, want)
+	}
+	if len(fit.Partial) != 0 {
+		t.Errorf("Partial = %v, want none — no level was stated anywhere", fit.Partial)
+	}
+	// Novice Kafka is a full match here. Depth alone does not downgrade
+	// anything; only a depth the JD asked for does. The profile-side half of
+	// #44 is deliberately untouched by this change.
+	for _, m := range fit.Matches {
+		if m.RequiredLevel != "" || m.EvidenceLevel != "" {
+			t.Errorf("%s carries levels %q/%q, want both empty",
+				m.Requirement, m.RequiredLevel, m.EvidenceLevel)
+		}
+	}
+	if !slices.Equal(fit.Gaps, []string{"Erlang"}) {
+		t.Errorf("Gaps = %v, want [Erlang]", fit.Gaps)
+	}
+}

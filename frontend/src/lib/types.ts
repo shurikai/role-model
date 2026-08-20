@@ -102,6 +102,23 @@ export interface CreateApplicationRequest {
   notes?: string | null;
 }
 
+/**
+ * One satisfied requirement from a fit report's technical scoring.
+ *
+ * `required_level` / `evidence_level` are present only where the posting
+ * stated a depth for that requirement, which is the uncommon case. Their
+ * absence means no depth was asked for — not that a depth check passed.
+ */
+export interface SkillMatch {
+  requirement: string;
+  kind: "direct" | "alias" | "category";
+  category?: string;
+  evidence: string[];
+  required_level?: string;
+  evidence_level?: string;
+  level_signal?: string;
+}
+
 export interface FitReport {
   id: string;
   user_id: string;
@@ -110,6 +127,10 @@ export interface FitReport {
   anti_pattern_hits: PreferenceEntry[] | null;
   technical_score: number | null;
   technical_gaps: string[] | null;
+  // Requirements answered below the depth the posting asked for. Null on
+  // reports predating the column, and on the many postings that state no
+  // depth at all.
+  technical_partial: SkillMatch[] | null;
   // Preference fit is a hit list, not a score: which preferences the JD
   // answers, which it is silent on, and which it runs against. Hard-gate
   // matches stay in anti_pattern_hits and are not repeated in conflicts.

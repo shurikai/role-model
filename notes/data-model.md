@@ -289,6 +289,7 @@ initial migration, each fixing a distinct narrative defect.
 | `screening_summary` | JSONB | **010** — plain-language screening facts from Stage 1 |
 | `technical_matches` | JSONB | **013** — per-requirement match provenance and evidence |
 | `preference_matches` | JSONB | **016** — positive preferences the JD answered |
+| `technical_partial` | JSONB | **017** — requirements answered below a stated depth |
 
 `preference_score` was **dropped in 016**. Preference fit is now four lists and
 no number: `preference_matches`, `preference_gaps`, `preference_conflicts`, and
@@ -297,6 +298,15 @@ subtracted and a ceiling clamped over it, and nearly every preference defect
 this project has fixed lived in that arithmetic rather than in the matching.
 Existing rows lost the column and nothing backfills it — the scorer that
 produced those numbers no longer exists.
+
+`technical_partial` is the third technical verdict. `technical_matches` and
+`technical_gaps` could only say "you have this" and "you do not"; a posting
+asking for expert Kafka against a novice Kafka skill is neither. Populated only
+where `jd_signals.skill_levels` states a depth for a specific requirement, which
+most postings never do — NULL is the normal value. Each entry carries
+`required_level`, `evidence_level`, and the JD wording behind the bar, so the
+comparison can be checked rather than trusted. A partial earns half credit and
+is never also reported as a gap.
 
 Technical fit still scores. The two axes were never comparable and are not
 becoming so: `technical_score` measures capability against stated requirements,
