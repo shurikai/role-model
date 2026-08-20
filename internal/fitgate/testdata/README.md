@@ -42,7 +42,7 @@ inactive, with years independent of proficiency).
 
 The profile carries `proficiency` and `years_experience` even though
 `ScoreTechnicalFit` cannot currently see either. `evalProfile.activeSkills`
-models `ListActiveSkillTagNamesByUser` and drops them in one visible place, so
+models `ListActiveSkillMatchTermsByUser` and drops them in one visible place, so
 the loss is legible rather than baked into the fixture. When depth is plumbed
 through, the fixture already holds the data.
 
@@ -57,7 +57,7 @@ through, the fixture already holds the data.
   "expect": {
     "technical_score":      { "min": 80, "max": 100 },
     "technical_gaps":       { "must_include": [], "must_exclude": [], "empty": false },
-    "preference_score":     { "min": 30 },
+    "preference_matches":   { "must_include": [] },
     "preference_gaps":      { "must_include": [] },
     "preference_conflicts": { "must_exclude": [] },
     "gate_passed":          true,
@@ -72,7 +72,21 @@ may carry a `"comment"` explaining the assertion — it is ignored by the loader
 **Scores assert bands, not exact values.** #43 and #44 both require reweighting
 the scorer, and exact-score assertions would fail on every legitimate tuning
 change and be deleted within a week. A band says what a score has to *mean*
-without freezing how it is computed.
+without freezing how it is computed. Only `technical_score` is a score;
+preference fit has none.
+
+**Preference fit is four lists, not a number.** `preference_matches`,
+`preference_gaps`, `preference_conflicts`, and `gate_hits` each assert
+membership, and a case names the preference it expects rather than a threshold
+standing in for one. Two cases used to carry a `preference_score` band —
+`hard-gate-fires` asserted a ceiling and `regression-or-group-primary-language`
+a floor set just above that ceiling — and both now say directly what the band
+was a proxy for.
+
+**A gate hit appears in `gate_hits` and nowhere else.** It is no longer copied
+into `preference_conflicts`; the duplication existed so a single score could be
+narrated, and the two lists are separate precisely because a disqualifier and an
+ordinary matched negative are different kinds of finding.
 
 **Lists assert membership.** `must_include` / `must_exclude` match an entry
 whole or as one alternative inside a grouped entry, so an assertion naming
@@ -95,7 +109,7 @@ the code:
 |---|---|---|
 | `known-gap-adtech-exclude-cannot-fire` | #48 | The `adtech` hard exclude does not fire on the adtech JD. `domain` is a closed enum with no adtech value, and the industry survives only in `screening_summary.industry`, which the gate never reads. |
 | `known-gap-domain-enum-loses-industry` | #45 | `logistics` (weight 9) and `supply chain` (weight 8) are reported as preference gaps on a freight logistics JD, for the same enum reason. |
-| `known-gap-role-shape-conflicts` | #45 | `frontend`, `on-call heavy`, and `mandatory overtime` do not surface as conflicts on a frontend-majority, on-call-heavy JD. Worse than silence: an unmatched negative preference *earns* its weight, so the JD is scored as having avoided what it advertises. |
+| `known-gap-role-shape-conflicts` | #45 | `frontend`, `on-call heavy`, and `mandatory overtime` do not surface as conflicts on a frontend-majority, on-call-heavy JD. The bonus an unmatched negative used to earn is gone with the score, but the silence is not: the report still says nothing about what the posting advertises. |
 | `known-gap-depth-blind-scoring` | #44 | Full coverage at novice depth scores 100.0, identical to full coverage at expert depth. |
 
 ## Adding a case

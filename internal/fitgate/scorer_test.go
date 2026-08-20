@@ -36,15 +36,24 @@ func hardGate(label, prefType string) db.Preference {
 	}
 }
 
+// labelsOf reduces a preference list to its labels. Every list ScorePreferenceFit
+// returns is []db.Preference now — the full row is what the report stores and
+// what the frontend renders — but a test only ever asserts on the label, and
+// comparing whole rows would make a failure message unreadable.
+func labelsOf(prefs []db.Preference) []string {
+	out := make([]string, 0, len(prefs))
+	for _, p := range prefs {
+		out = append(out, p.Label)
+	}
+	return out
+}
+
 // gateHitLabels runs the scorer and reports which hard-gate rows matched.
 // The gate is no longer a separate pass — this is how RunFitEvaluation
 // derives anti_pattern_passed, so the tests exercise the same path.
 func gateHitLabels(prefs []db.Preference, signals JDSignals) (passed bool, labels []string) {
 	_, _, _, hits := ScorePreferenceFit(prefs, signals)
-	for _, h := range hits {
-		labels = append(labels, h.Label)
-	}
-	return len(hits) == 0, labels
+	return len(hits) == 0, labelsOf(hits)
 }
 
 func TestHardGateMatching(t *testing.T) {
@@ -218,37 +227,38 @@ func TestHardGateMatching(t *testing.T) {
 	}
 }
 
-// TestHardGateScoring covers the arithmetic hazards in the penalty/ceiling
-// shape. Each of these was a real way to reintroduce the bug the shape exists
-// to fix.
-func TestHardGateScoring(t *testing.T) {
+// TestPreferenceReporting covers how the four lists divide the preference rows
+// up. Every case here was an arithmetic hazard back when this function
+// returned a score; each one survives as the list-shaped statement of the same
+// property, because the property was never really about the number.
+func TestPreferenceReporting(t *testing.T) {
 	positive := func(label string, w int16) db.Preference {
 		return db.Preference{ID: uuid.New(), Label: label, PreferenceType: "domain", Sentiment: "positive", Weight: w}
 	}
 
-	t.Run("a matched gate caps the score even with no other preferences", func(t *testing.T) {
-		// The hazard: hard gates are excluded from the average, so a profile
-		// of only gates leaves possible == 0. If the empty-average
-		// short-circuit returned early, this would score a perfect 100 on a
-		// JD that trips a gate — the original bug, relocated.
+	t.Run("a matched gate is reported as a gate and not as a conflict", func(t *testing.T) {
+		// The gate list and the conflict list are structurally separate: a
+		// disqualifying match and an ordinary matched negative are different
+		// kinds of finding, and the narrative has to be able to say which it
+		// is looking at. A gate hit used to be copied into both, which is
+		// meaningful only when a single score is collapsing them anyway.
 		prefs := []db.Preference{hardGate(pythonLabel, "anti_pattern")}
 		signals := JDSignals{Domain: "saas", RequiredSkills: []string{"Python"}}
 
-		score, _, conflicts, hits := ScorePreferenceFit(prefs, signals)
-		if score > hardGateCeiling {
-			t.Errorf("score = %.1f, want <= %.1f", score, hardGateCeiling)
+		_, _, conflicts, hits := ScorePreferenceFit(prefs, signals)
+		if !slices.Contains(labelsOf(hits), pythonLabel) {
+			t.Errorf("gateHits = %v, want the Python gate", labelsOf(hits))
 		}
-		if len(hits) != 1 {
-			t.Fatalf("hits = %d, want 1", len(hits))
-		}
-		if !slices.Contains(conflicts, pythonLabel) {
-			t.Errorf("a matched gate must be reported as a conflict, got %v", conflicts)
+		if slices.Contains(labelsOf(conflicts), pythonLabel) {
+			t.Errorf("conflicts = %v: a gate hit must not also appear here",
+				labelsOf(conflicts))
 		}
 	})
 
-	t.Run("an unmatched gate neither penalises nor inflates", func(t *testing.T) {
-		// The mirror hazard: if gates counted toward the average, a profile
-		// full of unmatched excludes would pull every clean JD toward 100.
+	t.Run("an unmatched gate is reported nowhere", func(t *testing.T) {
+		// The mirror property. Avoiding a stated dislike is the ideal outcome
+		// and there is nothing to say about it — this is the behavior that,
+		// under the old average, silently paid out a bonus instead.
 		signals := JDSignals{Domain: "observability", RequiredSkills: []string{"Go"}}
 
 		bare := []db.Preference{positive("observability", 8)}
@@ -257,20 +267,31 @@ func TestHardGateScoring(t *testing.T) {
 			hardGate(typescriptLabel, "anti_pattern"),
 		)
 
-		want, _, _, _ := ScorePreferenceFit(bare, signals)
-		got, _, _, hits := ScorePreferenceFit(withGates, signals)
-		if got != want {
-			t.Errorf("adding unmatched gates changed the score: %.1f -> %.1f", want, got)
+		wantM, wantG, wantC, wantH := ScorePreferenceFit(bare, signals)
+		gotM, gotG, gotC, gotH := ScorePreferenceFit(withGates, signals)
+
+		for _, tc := range []struct {
+			name      string
+			want, got []db.Preference
+		}{
+			{"matches", wantM, gotM},
+			{"gaps", wantG, gotG},
+			{"conflicts", wantC, gotC},
+			{"gateHits", wantH, gotH},
+		} {
+			if !slices.Equal(labelsOf(tc.want), labelsOf(tc.got)) {
+				t.Errorf("adding unmatched gates changed %s: %v -> %v",
+					tc.name, labelsOf(tc.want), labelsOf(tc.got))
+			}
 		}
-		if len(hits) != 0 {
-			t.Errorf("hits = %v, want none", hits)
+		if len(gotH) != 0 {
+			t.Errorf("gateHits = %v, want none", labelsOf(gotH))
 		}
 	})
 
 	t.Run("multiple matched gates all accumulate", func(t *testing.T) {
 		// The hazard: the old gate returned on its first hit. Reusing that
-		// loop would subtract one weight and report one label no matter how
-		// many matched.
+		// loop would report one label no matter how many matched.
 		prefs := []db.Preference{
 			hardGate(pythonLabel, "anti_pattern"),
 			hardGate(typescriptLabel, "anti_pattern"),
@@ -279,13 +300,18 @@ func TestHardGateScoring(t *testing.T) {
 
 		_, _, _, hits := ScorePreferenceFit(prefs, signals)
 		if len(hits) != 2 {
-			t.Errorf("hits = %d, want 2 — the scorer must not short-circuit", len(hits))
+			t.Errorf("hits = %v, want both — the scorer must not short-circuit",
+				labelsOf(hits))
 		}
 	})
 
-	t.Run("the ceiling is an upper bound, never a floor", func(t *testing.T) {
-		// The hazard: setting the score *to* the ceiling on a match would
-		// raise a JD that already scored below it.
+	t.Run("a gate hit does not disturb the other lists", func(t *testing.T) {
+		// This replaces the ceiling test. The old shape clamped the score on a
+		// gate hit, and the hazard was clamping in the wrong direction and
+		// raising a bad JD. With no score there is no clamp, and the property
+		// that mattered underneath it survives: a gate hit is one finding
+		// among several, and the positives it sits beside are still reported
+		// honestly rather than being swallowed by it.
 		prefs := []db.Preference{
 			positive("distributed systems", 9),
 			positive("observability", 8),
@@ -294,13 +320,18 @@ func TestHardGateScoring(t *testing.T) {
 		// Nothing positive matches, and the gate does.
 		signals := JDSignals{Domain: "saas", RequiredSkills: []string{"Python"}}
 
-		score, _, _, hits := ScorePreferenceFit(prefs, signals)
+		matches, gaps, _, hits := ScorePreferenceFit(prefs, signals)
 		if len(hits) != 1 {
-			t.Fatalf("expected the gate to match, hits = %d", len(hits))
+			t.Fatalf("expected the gate to match, hits = %v", labelsOf(hits))
 		}
-		if score >= hardGateCeiling {
-			t.Errorf("score = %.1f, want strictly below the ceiling %.1f — "+
-				"a gate hit must never raise a score", score, hardGateCeiling)
+		if len(matches) != 0 {
+			t.Errorf("matches = %v, want none", labelsOf(matches))
+		}
+		for _, want := range []string{"distributed systems", "observability"} {
+			if !slices.Contains(labelsOf(gaps), want) {
+				t.Errorf("gaps = %v, want %q — an unmatched positive is still a gap "+
+					"on a JD that trips a gate", labelsOf(gaps), want)
+			}
 		}
 	})
 
@@ -312,40 +343,67 @@ func TestHardGateScoring(t *testing.T) {
 			ID: uuid.New(), Label: "remote-first", PreferenceType: "culture",
 			Sentiment: "positive", Weight: 8,
 		}
-		score, gaps, _, _ := ScorePreferenceFit(
+		matches, gaps, _, _ := ScorePreferenceFit(
 			[]db.Preference{remote},
 			JDSignals{Domain: "observability", WorkType: "remote"},
 		)
-		if slices.Contains(gaps, remote.Label) {
-			t.Errorf("remote-first reported as a gap on a remote JD (score %.1f)", score)
+		if slices.Contains(labelsOf(gaps), remote.Label) {
+			t.Errorf("remote-first reported as a gap on a remote JD")
+		}
+		if !slices.Contains(labelsOf(matches), remote.Label) {
+			t.Errorf("matches = %v, want remote-first", labelsOf(matches))
 		}
 	})
 
-	t.Run("a technology negative fires against required skills", func(t *testing.T) {
+	t.Run("a technology negative fires against the primary stack", func(t *testing.T) {
 		// #49: ScorePreferenceFit matched against domain/work_type/culture
 		// only, so this row could never fire — and because an unmatched
-		// negative earns its weight, it paid out a bonus on every JD instead.
+		// negative earned its weight, it paid out a bonus on every JD instead.
 		// The field it fires against changed with #68 (primary_stack, not
-		// required_skills); the property under test did not.
+		// required_skills); the property under test did not. What changed here
+		// is only how the miss shows up: as an empty conflicts list rather
+		// than as a score that failed to drop.
 		jenkins := db.Preference{
 			ID: uuid.New(), Label: "Jenkins administration as primary responsibility",
 			PreferenceType: "primary_stack", Sentiment: "negative", Weight: 8,
 		}
 		prefs := []db.Preference{jenkins}
 
-		hit, _, conflicts, _ := ScorePreferenceFit(prefs, JDSignals{
+		_, _, hitConflicts, _ := ScorePreferenceFit(prefs, JDSignals{
 			Domain: "platform", PrimaryStack: []string{"Jenkins", "Groovy"},
 		})
-		clean, _, _, _ := ScorePreferenceFit(prefs, JDSignals{
+		_, _, cleanConflicts, _ := ScorePreferenceFit(prefs, JDSignals{
 			Domain: "observability", PrimaryStack: []string{"Go", "Kafka"},
 		})
 
-		if hit >= clean {
-			t.Errorf("a Jenkins-admin JD scored %.1f and a clean JD %.1f; "+
-				"the negative must cost something", hit, clean)
+		if !slices.Contains(labelsOf(hitConflicts), jenkins.Label) {
+			t.Errorf("conflicts = %v, want the Jenkins label", labelsOf(hitConflicts))
 		}
-		if !slices.Contains(conflicts, jenkins.Label) {
-			t.Errorf("conflicts = %v, want the Jenkins label", conflicts)
+		if len(cleanConflicts) != 0 {
+			t.Errorf("conflicts = %v on a JD with no Jenkins in its stack, want none",
+				labelsOf(cleanConflicts))
+		}
+	})
+
+	t.Run("an unmatched negative is reported nowhere", func(t *testing.T) {
+		// Not a conflict (the JD does not signal it), and not a gap either —
+		// gaps are unmet *positives*. Reporting it as a gap would put "the
+		// posting doesn't mention something you dislike" in front of a reader
+		// as though it were a shortcoming of the role.
+		disliked := db.Preference{
+			ID: uuid.New(), Label: "on-call heavy", PreferenceType: "culture",
+			Sentiment: "negative", Weight: 7,
+		}
+		matches, gaps, conflicts, hits := ScorePreferenceFit(
+			[]db.Preference{disliked},
+			JDSignals{Domain: "observability", WorkType: "remote"},
+		)
+		for name, got := range map[string][]db.Preference{
+			"matches": matches, "gaps": gaps, "conflicts": conflicts, "gateHits": hits,
+		} {
+			if len(got) != 0 {
+				t.Errorf("%s = %v, want none", name, labelsOf(got))
+			}
 		}
 	})
 }
@@ -483,9 +541,10 @@ func TestPreferenceRoutingReachesProseSignals(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, gaps, _, _ := ScorePreferenceFit([]db.Preference{tt.pref}, tt.signals)
-			gotGap := slices.Contains(gaps, tt.pref.Label)
+			gotGap := slices.Contains(labelsOf(gaps), tt.pref.Label)
 			if gotGap != tt.wantGap {
-				t.Errorf("reported as gap = %v, want %v (gaps: %v)", gotGap, tt.wantGap, gaps)
+				t.Errorf("reported as gap = %v, want %v (gaps: %v)",
+					gotGap, tt.wantGap, labelsOf(gaps))
 			}
 		})
 	}
@@ -510,12 +569,12 @@ func TestOppositeWorkTypePreferencesDoNotBothMatch(t *testing.T) {
 
 	_, gaps, conflicts, _ := ScorePreferenceFit(prefs, signals)
 
-	if !slices.Contains(conflicts, "internal platform / developer tooling") {
-		t.Errorf("conflicts = %v, want the internal-tooling negative", conflicts)
+	if !slices.Contains(labelsOf(conflicts), "internal platform / developer tooling") {
+		t.Errorf("conflicts = %v, want the internal-tooling negative", labelsOf(conflicts))
 	}
-	if !slices.Contains(gaps, "product engineering") {
+	if !slices.Contains(labelsOf(gaps), "product engineering") {
 		t.Errorf("gaps = %v: an internal-tooling JD must not also earn the "+
-			"product-engineering positive", gaps)
+			"product-engineering positive", labelsOf(gaps))
 	}
 }
 
