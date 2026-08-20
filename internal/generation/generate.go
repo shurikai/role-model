@@ -20,6 +20,17 @@ import (
 // ErrSignalsRequired is returned when jd_signals have not been extracted yet.
 var ErrSignalsRequired = errors.New("jd_signals must be extracted before generating a resume")
 
+// bodyMaxTokens caps the 2a response. It was 4096, which fit comfortably until
+// projects started reaching the document: a staff-length resume plus a project
+// section landed close enough to the ceiling to truncate intermittently, and a
+// truncated body is invalid JSON. 8192 leaves real headroom above the largest
+// document observed (~12KB, roughly 3,000 tokens).
+//
+// The limit is not the length control — <length_budget> is. This exists so
+// that hitting it is an obvious, reportable failure rather than a corrupt
+// document.
+const bodyMaxTokens = 8192
+
 // ValidationError wraps a JSON schema validation failure from the generation pipeline.
 type ValidationError struct {
 	Detail string
@@ -399,7 +410,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	}
 
 	bodyMsg, err := s.client.api.Messages.New(ctx, anthropic.MessageNewParams{
-		MaxTokens: 4096,
+		MaxTokens: bodyMaxTokens,
 		Model:     s.client.model,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(bodyPrompt)),
@@ -407,6 +418,18 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("anthropic messages (body): %w", err)
+	}
+
+	// Truncation has to be reported as truncation. A body cut off at the token
+	// limit is invalid JSON, and the parse error that follows points at
+	// whatever field happened to be under the knife — the first occurrence
+	// blamed "generation_model", which is stamped by the generator and could
+	// not have been at fault.
+	if bodyMsg.StopReason == anthropic.StopReasonMaxTokens {
+		return nil, fmt.Errorf(
+			"generate: body response hit the %d token limit and was truncated; "+
+				"the resume is too long for one response — reduce the length budget "+
+				"or raise bodyMaxTokens", bodyMaxTokens)
 	}
 
 	bodyRaw, err := extractText(bodyMsg)
