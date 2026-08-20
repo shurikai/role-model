@@ -1,9 +1,9 @@
 {
   "name": "hard-gate-fires",
   "jd_fixture": "synthetic",
-  "description": "A freight-domain backend role built on the Microsoft stack. The persona's domain preferences all match -- logistics is their strongest positive -- and the role is remote, backend, and IC. The only thing wrong with it is the stack, which is a hard gate. This is the enforced counterpart to the unit tests: it proves a gate still fires, is priced into preference_score, and is reported as a conflict, through the same path RunFitEvaluation uses.",
+  "description": "A freight-domain backend role built on the Microsoft stack. The persona's domain preferences all match -- logistics is their strongest positive -- and the role is remote, backend, and IC. The only thing wrong with it is the stack, which is a hard gate. This is the enforced counterpart to the unit tests: it proves a gate still fires, is reported as its own kind of finding, and is not quietly downgraded into an ordinary conflict, through the same path RunFitEvaluation uses.",
 
-  "comment": "Before the hard-gate change a tripped gate contributed nothing to preference_score, so a JD like this one scored as though the exclusion had never been recorded. The max band below is what makes that regression impossible to reintroduce silently.",
+  "comment": "The gate has been through two representations. It first contributed nothing at all, so a JD like this one read as though the exclusion had never been recorded; it was then priced into preference_score with a penalty and a ceiling, and copied into preference_conflicts so the narrative could name it. Preference fit is now four lists and no score, so the assertion moves rather than weakens: the .NET gate must appear in gate_hits and must NOT appear in preference_conflicts. Collapsing the two lists is the regression this case exists to prevent -- a disqualifier reading as one more dislike is exactly what the ceiling was compensating for.",
 
   "signals": {
     "required_skills": [
@@ -42,13 +42,13 @@
       "comment": "The .NET hard gate is anti_pattern-typed, so it reads required_skills.",
       "must_include": [".NET"]
     },
-    "preference_score": {
-      "comment": "Capped by hardGateCeiling. A tripped gate must never present as a good preference fit, however well the rest of the role matches.",
-      "max": 25
-    },
     "preference_conflicts": {
-      "comment": "A gate hit is a conflict, not a gap -- the narrative has to be able to name it.",
-      "must_include": [".NET"]
+      "comment": "The gate hit belongs to gate_hits and appears nowhere else. A hard gate and an ordinary matched negative are different kinds of finding, and the narrative reads them differently -- duplicating the row here would make one exclusion look like two objections of unequal weight.",
+      "must_exclude": [".NET"]
+    },
+    "preference_matches": {
+      "comment": "The rest of the role genuinely fits: logistics is the persona's strongest positive and the posting is remote and IC. A gate hit does not erase that, and with no score to average them into each other, both findings survive intact -- which is the whole reason the score went away.",
+      "must_include": ["logistics"]
     }
   }
 }

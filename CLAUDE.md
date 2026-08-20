@@ -121,17 +121,53 @@ Both calls are recorded separately in generation_params for per-call
 traceability.
 
 ### Fit gate
-`internal/fitgate` runs a deterministic scoring pass before generation:
-technical coverage plus preference fit, scored in Go. The LLM only writes
-prose narrative from those scores — it interprets, it does not score.
-Unmet preferences (JD simply doesn't mention something) and genuine conflicts
-(JD involves something actively unwanted) are tracked as separate lists and
-must stay that way; collapsing them produces false conflict language.
+`internal/fitgate` runs a deterministic pass before generation, evaluating two
+axes in Go. The LLM only writes prose narrative from the result — it interprets,
+it does not score.
 
-The two axes are orthogonal on purpose: technical score measures *capability*,
-preference score measures *desire*. A role you could do and would hate should
-read as high technical / low preference, not as one muddled number. Do not
-introduce a blended score.
+The two axes are orthogonal on purpose: technical fit measures *capability*,
+preference fit measures *desire*. A role you could do and would hate should read
+as high technical / poor preference, not as one muddled number. Do not introduce
+a blended score.
+
+**They are also shaped differently, and that is not an inconsistency to tidy
+up.** `ScoreTechnicalFit` returns a score, because coverage of stated
+requirements genuinely is a ratio — matched over asked-for. `ScorePreferenceFit`
+returns **four lists and no number at all**: `matches` (positives the JD
+answers), `gaps` (positives it is silent on), `conflicts` (matched negatives),
+and `gateHits` (matched hard gates).
+
+Preference fit used to return a 0-100 float — a normalized weighted average,
+minus a raw-points penalty for gate hits, clamped under a `hardGateCeiling`.
+Migration 016 dropped `fit_reports.preference_score` and deleted all of it.
+Nearly every preference defect this project has fixed lived in that arithmetic
+rather than in the matching: unmatched negatives paid out a bonus because an
+absent dislike earned its weight, gate hits read as a ten-point dip until the
+ceiling was bolted on, and a gates-only profile scored a perfect 100 through the
+empty-average short-circuit. Each fix added another interacting term to a number
+nobody could read back to the rows that produced it. **Do not compute a
+preference number anywhere in the backend** — not in `scorer.go`, not in the
+narrative prompt, not in the API shape. An at-a-glance summary is a frontend
+concern.
+
+**The four lists must stay four lists.** Unmet preferences (the JD simply
+doesn't mention something) and genuine conflicts (the JD involves something
+actively unwanted) collapse into false conflict language. `gateHits` is
+separate from `conflicts` for the same class of reason: a disqualifier and an
+ordinary matched negative are different *kinds* of finding, not different
+weights of one, and folding them together makes an exclusion read as one more
+dislike. A gate hit appears in `gateHits` only — it used to be copied into
+`conflicts` as well, which was meaningful only while a single score was
+collapsing them anyway.
+
+An unmatched negative — gate or not — is reported nowhere. Avoiding a stated
+dislike is the ideal outcome and there is nothing to say about the absence of
+an absence.
+
+The narrative prompt sees a projection of these rows (`narrativePreference`:
+label and type), not `db.Preference`. Weight is deliberately withheld — handing
+the model the numbers invites it straight back into ranking rows arithmetically.
+Which list an entry arrived in is the whole of its severity.
 
 **A technical score can be absent, and absent is not zero and not 100.**
 `ScoreTechnicalFit` returns a `TechnicalFit` whose `Scored` field is false when
@@ -151,20 +187,15 @@ gaps.
 that disqualify. A hard exclude is a heavy negative that also gates — there is
 no `hard_exclude` sentiment (migration 011 removed it).
 
-Hard-gate rows are deliberately **not** terms in the normalized average. A
-matched gate subtracts its weight as raw points and then caps the score at
-`hardGateCeiling`. Two rules that are easy to get wrong and are load-bearing:
+`weight` is still NOT NULL and still carried on every row, but nothing in the
+scorer reads it any more. It survives because it records how much the user
+cares, which a future presentation layer will want and which no other column
+holds. Do not read it back into the backend to build a ranking.
 
-- Feeding gates into `earned`/`possible` would let a profile full of unmatched
-  excludes inflate every clean JD toward 100. Keep them out of the average.
-- The ceiling is `min()`, an upper bound. Setting the score *to* the ceiling
-  on a match would raise a JD that already scored below it.
-- The empty-average short-circuit governs only the average. Penalty and
-  ceiling still apply on top, or a gates-only profile scores 100 on a JD that
-  trips one — the original bug, relocated.
-
-Gating does **not** block. A tripped JD is still scored, still narrated, still
-generated; the trip is priced into the score rather than living in a boolean.
+Gating does **not** block. A tripped JD is still evaluated, still narrated,
+still generated; the trip is a named finding in `gateHits`, and
+`anti_pattern_passed` is derived from that list rather than being the only
+record of it.
 
 **Technical matching runs in three layers, strongest first**, and the layer
 that won is recorded on every match as `kind` (`direct` | `alias` | `category`):

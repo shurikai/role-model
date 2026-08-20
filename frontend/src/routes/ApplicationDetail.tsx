@@ -10,7 +10,48 @@ import {
   useRenderResumeVersion,
 } from "../hooks/useApplications";
 import { formatApiError } from "../lib/api-client";
-import type { ResumeVersion, ScreeningSummary } from "../lib/types";
+import { preferenceLabel } from "../lib/types";
+import type {
+  PreferenceListEntry,
+  ResumeVersion,
+  ScreeningSummary,
+} from "../lib/types";
+
+/**
+ * One of the preference lists a fit report carries, rendered plainly.
+ *
+ * A stopgap, deliberately: preference fit stopped being a score and became
+ * four lists, and this is what makes them visible until the fit report gets a
+ * real design pass. It reuses the technical-gaps shape — bold label, bulleted
+ * list — and adds nothing else. `tone` picks between the two treatments the
+ * page already had rather than introducing a severity scale.
+ */
+function PreferenceList({
+  label,
+  entries,
+  tone = "neutral",
+}: {
+  label: string;
+  entries: PreferenceListEntry[] | null;
+  tone?: "neutral" | "conflict";
+}) {
+  if (!entries || entries.length === 0) return null;
+  const conflict = tone === "conflict";
+  return (
+    <div>
+      <span className={conflict ? "font-medium text-red-800" : "font-medium"}>
+        {label}
+      </span>
+      <ul
+        className={`ml-4 list-disc ${conflict ? "text-red-700" : "text-gray-700"}`}
+      >
+        {entries.map((entry) => (
+          <li key={preferenceLabel(entry)}>{preferenceLabel(entry)}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /**
  * Screening facts, presented plainly. This answers "should I even consider
@@ -308,38 +349,25 @@ export function ApplicationDetail() {
                     </ul>
                   </div>
                 )}
-              <p>
-                <span className="font-medium">Preference score:</span>{" "}
-                {latestFitReport.preference_score === null
-                  ? "—"
-                  : `${latestFitReport.preference_score}/100`}
-              </p>
-              {latestFitReport.preference_conflicts &&
-                latestFitReport.preference_conflicts.length > 0 && (
-                  <div>
-                    <span className="font-medium text-red-800">
-                      Preference conflicts:
-                    </span>
-                    <ul className="ml-4 list-disc text-red-700">
-                      {latestFitReport.preference_conflicts.map((conflict) => (
-                        <li key={conflict}>{conflict}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              {latestFitReport.preference_gaps &&
-                latestFitReport.preference_gaps.length > 0 && (
-                  <div>
-                    <span className="font-medium">
-                      Preferences not mentioned:
-                    </span>
-                    <ul className="ml-4 list-disc text-gray-700">
-                      {latestFitReport.preference_gaps.map((gap) => (
-                        <li key={gap}>{gap}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              {/*
+                Preference fit is a hit list, not a score. The fourth list —
+                the hard-gate hits — is the anti-pattern callout above; it is
+                not repeated here, since a disqualifier reading twice as two
+                findings is exactly the confusion the separate lists prevent.
+              */}
+              <PreferenceList
+                label="Preferences matched:"
+                entries={latestFitReport.preference_matches}
+              />
+              <PreferenceList
+                label="Preference conflicts:"
+                entries={latestFitReport.preference_conflicts}
+                tone="conflict"
+              />
+              <PreferenceList
+                label="Preferences not mentioned:"
+                entries={latestFitReport.preference_gaps}
+              />
               {latestFitReport.narrative && (
                 <p className="text-gray-700 italic">
                   {latestFitReport.narrative}

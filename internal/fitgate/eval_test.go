@@ -97,9 +97,12 @@ type evalCase struct {
 }
 
 type expectation struct {
-	TechnicalScore      *scoreBand  `json:"technical_score"`
-	TechnicalGaps       *listExpect `json:"technical_gaps"`
-	PreferenceScore     *scoreBand  `json:"preference_score"`
+	TechnicalScore *scoreBand  `json:"technical_score"`
+	TechnicalGaps  *listExpect `json:"technical_gaps"`
+	// Preference fit has no score to band. All four lists assert membership,
+	// which is a stronger statement than a range was: a case can now name the
+	// preference it expects rather than a floor chosen to sit above a ceiling.
+	PreferenceMatches   *listExpect `json:"preference_matches"`
 	PreferenceGaps      *listExpect `json:"preference_gaps"`
 	PreferenceConflicts *listExpect `json:"preference_conflicts"`
 	GatePassed          *bool       `json:"gate_passed"`
@@ -156,15 +159,26 @@ func (p evalProfile) activeSkills() []SkillTerm {
 	return out
 }
 
+// evalLabels reduces a preference list to the labels the expectations assert
+// on. ScorePreferenceFit returns whole rows; the fixtures name preferences by
+// label, the way a person reading the scorecard would.
+func evalLabels(prefs []db.Preference) []string {
+	out := make([]string, 0, len(prefs))
+	for _, p := range prefs {
+		out = append(out, p.Label)
+	}
+	return out
+}
+
 // result is one case's computed outcome, kept together for the scorecard.
 type result struct {
-	technicalScore  float64
-	technicalGaps   []string
-	preferenceScore float64
-	preferenceGaps  []string
-	prefConflicts   []string
-	gatePassed      bool
-	gateHits        []string
+	technicalScore float64
+	technicalGaps  []string
+	prefMatches    []string
+	preferenceGaps []string
+	prefConflicts  []string
+	gatePassed     bool
+	gateHits       []string
 }
 
 func TestFitEval(t *testing.T) {
@@ -188,16 +202,15 @@ func TestFitEval(t *testing.T) {
 			var res result
 			technical := ScoreTechnicalFit(skills, c.Signals)
 			res.technicalScore, res.technicalGaps = technical.Score, technical.Gaps
-			var hits []db.Preference
-			res.preferenceScore, res.preferenceGaps, res.prefConflicts, hits =
-				ScorePreferenceFit(prefs, c.Signals)
+			matches, gaps, conflicts, hits := ScorePreferenceFit(prefs, c.Signals)
+			res.prefMatches = evalLabels(matches)
+			res.preferenceGaps = evalLabels(gaps)
+			res.prefConflicts = evalLabels(conflicts)
+			res.gateHits = evalLabels(hits)
 
 			// Mirrors RunFitEvaluation: the gate boolean is derived from the
 			// hard-gate rows scoring matched, not computed by a second pass.
 			res.gatePassed = len(hits) == 0
-			for _, h := range hits {
-				res.gateHits = append(res.gateHits, h.Label)
-			}
 
 			failures := checkExpectations(c.Expect, res)
 
@@ -235,7 +248,10 @@ func TestFitEval(t *testing.T) {
 		var b strings.Builder
 		fmt.Fprintf(&b, "\nfit gate scorecard — profile %q (%d active skills, %d preferences)\n\n",
 			profile.Name, len(skills), len(prefs))
-		fmt.Fprintf(&b, "  %-42s %6s %6s %5s  %s\n", "CASE", "TECH", "PREF", "GATE", "VERDICT")
+		// PREF is m/g/c — matched, unmentioned, conflicting — rather than a
+		// score. Three counts read as what they are; a single number here was
+		// the thing that could not be read back to the rows behind it.
+		fmt.Fprintf(&b, "  %-42s %6s %9s %5s  %s\n", "CASE", "TECH", "PREF m/g/c", "GATE", "VERDICT")
 		for _, r := range scorecard {
 			gate := "pass"
 			if !r.res.gatePassed {
@@ -250,8 +266,10 @@ func TestFitEval(t *testing.T) {
 			case len(r.failing) > 0:
 				verdict = fmt.Sprintf("%d assertion(s) failed", len(r.failing))
 			}
-			fmt.Fprintf(&b, "  %-42s %6.1f %6.1f %5s  %s\n",
-				r.name, r.res.technicalScore, r.res.preferenceScore, gate, verdict)
+			pref := fmt.Sprintf("%d/%d/%d",
+				len(r.res.prefMatches), len(r.res.preferenceGaps), len(r.res.prefConflicts))
+			fmt.Fprintf(&b, "  %-42s %6.1f %9s %5s  %s\n",
+				r.name, r.res.technicalScore, pref, gate, verdict)
 		}
 		t.Log(b.String())
 	})
@@ -264,7 +282,7 @@ func checkExpectations(e expectation, r result) []string {
 	var out []string
 	out = append(out, checkBand("technical_score", e.TechnicalScore, r.technicalScore)...)
 	out = append(out, checkList("technical_gaps", e.TechnicalGaps, r.technicalGaps)...)
-	out = append(out, checkBand("preference_score", e.PreferenceScore, r.preferenceScore)...)
+	out = append(out, checkList("preference_matches", e.PreferenceMatches, r.prefMatches)...)
 	out = append(out, checkList("preference_gaps", e.PreferenceGaps, r.preferenceGaps)...)
 	out = append(out, checkList("preference_conflicts", e.PreferenceConflicts, r.prefConflicts)...)
 	out = append(out, checkList("gate_hits", e.GateHits, r.gateHits)...)

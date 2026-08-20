@@ -54,16 +54,28 @@ export interface JdSignals {
 }
 
 /**
- * A preference row the anti-pattern check matched. The API returns whole
- * preference records here, not labels — `anti_pattern_hits` is a raw JSONB
- * passthrough of []db.Preference.
+ * One preference row as a fit report carries it. All four preference lists —
+ * matches, gaps, conflicts, and anti-pattern hits — are raw JSONB
+ * passthroughs of []db.Preference, so they hold whole records rather than
+ * labels.
  */
-export interface PreferenceHit {
+export interface PreferenceEntry {
   id: string;
   label: string;
   preference_type: string;
   sentiment: string;
   notes: string | null;
+}
+
+/**
+ * Preference gaps and conflicts used to be stored as bare label strings, and
+ * reports written before that changed are still in the database. Anything
+ * rendering them has to handle both shapes; `preferenceLabel` is how.
+ */
+export type PreferenceListEntry = PreferenceEntry | string;
+
+export function preferenceLabel(entry: PreferenceListEntry): string {
+  return typeof entry === "string" ? entry : entry.label;
 }
 
 export interface Application {
@@ -95,12 +107,15 @@ export interface FitReport {
   user_id: string;
   application_id: string;
   anti_pattern_passed: boolean;
-  anti_pattern_hits: PreferenceHit[] | null;
+  anti_pattern_hits: PreferenceEntry[] | null;
   technical_score: number | null;
   technical_gaps: string[] | null;
-  preference_score: number | null;
-  preference_gaps: string[] | null;
-  preference_conflicts: string[] | null;
+  // Preference fit is a hit list, not a score: which preferences the JD
+  // answers, which it is silent on, and which it runs against. Hard-gate
+  // matches stay in anti_pattern_hits and are not repeated in conflicts.
+  preference_matches: PreferenceListEntry[] | null;
+  preference_gaps: PreferenceListEntry[] | null;
+  preference_conflicts: PreferenceListEntry[] | null;
   narrative: string | null;
   // Copy captured at fit-evaluation time. Null for reports predating the
   // screening_summary migration.
