@@ -114,3 +114,29 @@ def test_optional_sections_may_be_empty(minimal_resume_data: dict) -> None:
     assert resume.projects == []
     assert resume.credentials == []
     assert resume.education == []
+
+
+def test_industry_role_is_free_text_not_an_enum() -> None:
+    """Real normalized roles are compound: the seed data carries "Senior
+    Software Engineer / Architect" and "Senior Software Engineer / Team Lead".
+    industry_level is the enum; industry_role is prose."""
+    position = PositionBlock(
+        position_id="p1",
+        title="Programmer VII",
+        industry_role="Senior Software Engineer / Architect",
+        started_on="2020-01",
+        bullets=[Bullet(text="x", contribution_ids=["c1"])],
+    )
+    assert position.display_title == "Senior Software Engineer / Architect"
+
+
+def test_display_title_falls_back_to_the_verbatim_title() -> None:
+    """Documents generated before industry_role existed carry only title."""
+    position = PositionBlock(
+        position_id="p1",
+        title="Programmer VII",
+        started_on="2020-01",
+        bullets=[Bullet(text="x", contribution_ids=["c1"])],
+    )
+    assert position.industry_role is None
+    assert position.display_title == "Programmer VII"

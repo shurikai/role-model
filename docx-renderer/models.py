@@ -10,7 +10,13 @@ class Bullet(BaseModel):
 
 class PositionBlock(BaseModel):
     position_id: str
+    #: The verbatim title the employer used, e.g. "Programmer VII". Carried for
+    #: provenance; see display_title for what actually reaches the page.
     title: str
+    #: The industry-normalized name for the same job, e.g. "Senior Software
+    #: Engineer". Free text rather than an enum, because real roles are
+    #: compound: "Senior Software Engineer / Architect".
+    industry_role: str | None = None
     industry_level: Literal[
         "junior",
         "mid",
@@ -27,6 +33,22 @@ class PositionBlock(BaseModel):
     started_on: str = Field(pattern=r"^\d{4}-\d{2}$")
     ended_on: str | None = Field(pattern=r"^\d{4}-\d{2}$", default=None)
     bullets: list[Bullet]
+
+    @property
+    def display_title(self) -> str:
+        """What the page shows for this role.
+
+        The normalized role wins. A verbatim title carries the employer's
+        internal grade ladder rather than the job -- "Programmer VII" tells a
+        reader nothing about the work and reads as junior to anyone outside
+        that company -- while the database has carried the normalization since
+        the schema was written. It survived every stage of the pipeline and was
+        discarded on the last line.
+
+        title remains the fallback, so documents generated before
+        industry_role existed still render.
+        """
+        return self.industry_role or self.title
 
 
 class EmployerBlock(BaseModel):
