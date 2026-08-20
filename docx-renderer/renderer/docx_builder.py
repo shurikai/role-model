@@ -217,7 +217,7 @@ def _render_experience(doc: DocumentObject, experience: list[EmployerBlock]) -> 
         for position in employer_block.positions:
             tenure = _format_tenure(position.started_on, position.ended_on)
             _header_line(doc, employer_block.employer, tenure)
-            _subtitle_line(doc, position.title)
+            _subtitle_line(doc, position.display_title)
 
             for bullet in position.bullets:
                 _add_bullet(doc, bullet.text)
