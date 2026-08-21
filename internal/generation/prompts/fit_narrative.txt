@@ -100,6 +100,18 @@ Input will be provided as a JSON object with these fields:
   present the list as coverage. You may name what the role asks for; you may
   not say it is met. May be empty, including on postings that do name
   technologies.
+
+  This includes verdict language, not just match claims. Never characterize
+  the overall strength of the fit between these competencies and Jason's
+  background — no "the competency match is direct," no "speaks directly to
+  what they're asking for," no similar language implying you assessed it.
+  You did not: there is no evidence list behind this field the way there is
+  for technical_matches, and a confident verdict with nothing to cite is the
+  same failure this field exists to prevent, just moved from "the posting is
+  vague" to "the match is strong." State the competencies plainly and stop —
+  something like "these were not evaluated against your history; the match
+  is the user's judgment to make," not an assessment of how well he fits them.
+
 - technical_gaps: array of strings — the JD requirements nothing in the profile
   answered. These are the JD's own phrasings, not tag names.
 - technical_matches: array of objects, one per satisfied requirement:
