@@ -202,7 +202,13 @@ that won is recorded on every match as `kind` (`direct` | `alias` | `category`):
 
 1. **direct** — the JD term against the skill's own name. This is the only
    layer that keeps the raw-substring direction, so a JD asking for "SQL" is
-   answered by "PostgreSQL".
+   answered by "PostgreSQL". That direction is unanchored and over-reaches
+   ("API" is answered by Anthropic API and FastAPI; "systems" by Distributed
+   systems), and because direct outranks alias it also **shadows more precise
+   vocabulary** — there is no way to say "this term means REST" for a term that
+   sits inside another skill's name. Nothing here stems either, so a bare plural
+   clears all three layers. Both are #75; do not work around them by widening
+   the substring rule.
 2. **alias** — against `tags.aliases`. That column had been populated since
    migration 001 and read by nothing, so "Golang" scored a gap against a
    stored "Go" and "RESTful APIs" against "REST".
@@ -225,6 +231,47 @@ Two rules hold this together:
   The converse also bites: bare "frameworks" is deliberately not an alias of
   Frameworks & Libraries, because "auth/authz frameworks" and "evaluation
   frameworks" would both claim credit for React.
+- **The seed owns `tag_categories.aliases`, not a migration.** Migration 012
+  introduced the column and seeded it with `UPDATE ... WHERE name = '...'`, but
+  migrations run before `make seed` and the categories do not exist yet — the
+  UPDATEs matched zero rows, nine of ten categories sat on NULL, and the whole
+  category layer was inert in the live database while every unit test stayed
+  green, because they all build `CategoryAliases` inline. A staff posting
+  requiring "APIs" scored it as a gap against REST at expert (#74). Migration
+  018 repairs existing databases with a `COALESCE` backfill; the durable fix is
+  that both `001_foundation.sql` seeds now carry the vocabulary in the same
+  INSERT that creates the row. **Whoever creates a row populates its columns** —
+  a migration cannot seed rows the seed has not created yet.
+  `TestSampleSeedCarriesCategoryVocabulary` is the guard, and it reads the seed
+  file because no Go-level fixture can see an empty production column.
+
+**One term can map to many skills, and there are two mechanisms with different
+behavior.** A **category alias** maps a term to a category, and evidence is
+every skill in it — the set *auto-follows*, so a tag added to Observability
+later joins that evidence automatically. A **shared tag alias** maps a term to
+an explicit list: the alias layer does not stop at the first hit, so the same
+string on several tags accumulates into one match carrying all of them. That is
+the only way to express a capability whose evidence spans categories, because
+`tags.category` is a single NOT NULL column and categories strictly partition
+tags — "backend systems" needs Java (Languages), Microservices and Distributed
+systems (Methodologies), and REST (Protocols & Messaging) at once.
+
+Prefer the narrowest layer that answers the term. Migration 018 made a JD
+requiring "APIs" match through the Protocols & Messaging category, with DDS,
+DIS and HLA — distributed-simulation protocols — in the evidence; naming REST
+directly (migration 019) returns REST alone, and because the layers run
+direct → alias → category, the precise alias demotes the broad match on its own
+without removing the fallback.
+
+The cost of the shared-alias mechanism is recorded rather than hidden:
+`tags.aliases` means "other names for this tag", and "backend systems" is not
+another name for Java, so the column now carries two relations. The match
+reports `Kind: alias`, overstating a competency roll-up as a synonym; the
+mapping has no single home; and it does not follow new skills. A
+`competency_terms` / `competency_term_tags` pair with its own `MatchKind` is the
+correct model. Build it when the term list outgrows a handful or someone needs
+to ask what a term currently covers — `TestSampleSeedCarriesCrossCategoryTerms`
+stands in for the constraint the schema does not express.
 
 Every match carries `evidence` — the specific skills behind it — so the
 narrative cites what the person actually has instead of asserting a score, and
