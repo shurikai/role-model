@@ -50,6 +50,13 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+      # Paired with the format check on purpose. The Python job had only the
+      # formatter for a long time, while the frontend job has always run both a
+      # linter and a format check -- and four ruff check violations accumulated
+      # in that gap, unnoticed, because nothing ever ran it.
+      - name: Ruff lint
+        run: uv run ruff check .
+
       - name: Test
         run: uv run pytest
 
