@@ -120,16 +120,23 @@ endif
 #   Python  -- ruff format, pinned in docx-renderer's dev group
 # SQL is deliberately not formatted: migrations are applied history, and the
 # sqlc query files carry load-bearing `-- name: ... :one` directives.
+#
+# Python also runs `ruff check` here, which is lint rather than formatting and
+# so stretches these targets' name slightly. It earns the place: `ruff check`
+# had never been wired into anything, in the Makefile or in CI, and four
+# violations accumulated in that gap unnoticed. A lint that nothing runs is a
+# lint that does not exist. `fmt` applies only ruff's safe fixes -- the
+# unsafe ones change types or semantics and stay a human decision.
 fmt:
 	gofmt -w $(shell find . -name '*.go' -not -path './frontend/*')
 	cd frontend && npm run format
-	cd docx-renderer && uv run ruff format .
+	cd docx-renderer && uv run ruff format . && uv run ruff check --fix .
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './frontend/*'))"; \
 		if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 	cd frontend && npm run format:check
-	cd docx-renderer && uv run ruff format --check .
+	cd docx-renderer && uv run ruff format --check . && uv run ruff check .
 
 sqlc:
 	sqlc generate
