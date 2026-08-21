@@ -1,11 +1,12 @@
 from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class Bullet(BaseModel):
     text: str
     contribution_ids: list[str] = Field(min_length=1)
-    feedback_signal: Literal["accepted", "rejected", "edited", None] = None
+    feedback_signal: Literal["accepted", "rejected", "edited"] | None = None
 
 
 class PositionBlock(BaseModel):
@@ -17,19 +18,21 @@ class PositionBlock(BaseModel):
     #: Engineer". Free text rather than an enum, because real roles are
     #: compound: "Senior Software Engineer / Architect".
     industry_role: str | None = None
-    industry_level: Literal[
-        "junior",
-        "mid",
-        "senior",
-        "staff",
-        "principal",
-        "lead",
-        "manager",
-        "director",
-        "vp",
-        "ic",
-        None,
-    ] = None
+    industry_level: (
+        Literal[
+            "junior",
+            "mid",
+            "senior",
+            "staff",
+            "principal",
+            "lead",
+            "manager",
+            "director",
+            "vp",
+            "ic",
+        ]
+        | None
+    ) = None
     started_on: str = Field(pattern=r"^\d{4}-\d{2}$")
     ended_on: str | None = Field(pattern=r"^\d{4}-\d{2}$", default=None)
     bullets: list[Bullet]

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date
 
 from docx import Document
 from docx.document import Document as DocumentObject
@@ -267,4 +267,17 @@ def _format_tenure(started_on: str, ended_on: str | None) -> str:
 
 
 def format_date(value: str) -> str:
-    return datetime.strptime(value, "%Y-%m").strftime("%b %Y")
+    """Render a YYYY-MM resume date as "Mon YYYY".
+
+    Built on `date` rather than `datetime.strptime` deliberately. A resume
+    tenure has no time of day and no timezone, so parsing it into a datetime
+    invited the question of which timezone it was naive about (ruff DTZ007)
+    and there was no meaningful answer. `date` has no such concept, so the
+    rule is satisfied by construction rather than suppressed with a noqa.
+
+    The models validate these fields as ^\\d{4}-\\d{2}$ before they reach
+    here, so a malformed value is a programming error; it still raises
+    ValueError, as strptime did.
+    """
+    year, month = value.split("-")
+    return date(int(year), int(month), 1).strftime("%b %Y")
