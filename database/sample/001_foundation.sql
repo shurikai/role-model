@@ -151,19 +151,46 @@ ON CONFLICT (id) DO UPDATE SET
 -- Deliberately the same nine categories the private seed set uses, so the
 -- sample exercises the same category vocabulary the generator expects.
 -- ============================================================
-INSERT INTO tag_categories (id, user_id, name, sort_order) VALUES
-  ('5c000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001', 'Languages', 1),
-  ('5c000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'Frameworks & Libraries', 2),
-  ('5c000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Cloud & Infrastructure', 3),
-  ('5c000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'Databases', 4),
-  ('5c000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'Protocols & Messaging', 5),
-  ('5c000000-0000-0000-0000-000000000006', '5a000000-0000-0000-0000-000000000001', 'Testing', 6),
-  ('5c000000-0000-0000-0000-000000000007', '5a000000-0000-0000-0000-000000000001', 'Observability', 7),
-  ('5c000000-0000-0000-0000-000000000008', '5a000000-0000-0000-0000-000000000001', 'Methodologies', 8),
-  ('5c000000-0000-0000-0000-000000000009', '5a000000-0000-0000-0000-000000000001', 'Tools & CI/CD', 9)
+-- aliases carries the same competency vocabulary the private seed set uses, and
+-- for the same reason: it is the fit gate's third matching layer, the one that
+-- lets a capability-worded JD ("CI/CD", "observability", "apis") reach a
+-- technology-worded skill inventory. Seeded here rather than by migration 012,
+-- which introduced the column but whose UPDATEs run before these rows exist
+-- and so matched nothing — see #74 and the note in seed/001_foundation.sql.
+--
+-- The sample must carry it too, or it stops exercising the layer the generator
+-- depends on and a regression here would go unnoticed against sample data.
+INSERT INTO tag_categories (id, user_id, name, aliases, sort_order) VALUES
+  ('5c000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001', 'Languages', NULL, 1),
+  ('5c000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'Frameworks & Libraries', NULL, 2),
+  ('5c000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Cloud & Infrastructure', NULL, 3),
+  ('5c000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'Databases',
+   ARRAY['data modeling', 'data modelling', 'database design', 'data systems',
+         'data stores', 'schema design', 'persistence', 'data pipelines', 'sql'], 4),
+  ('5c000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'Protocols & Messaging',
+   ARRAY['event-driven systems', 'event driven systems', 'event-driven',
+         'event driven architecture', 'api design', 'apis', 'messaging',
+         'message brokers', 'pub/sub', 'streaming', 'rpc'], 5),
+  ('5c000000-0000-0000-0000-000000000006', '5a000000-0000-0000-0000-000000000001', 'Testing',
+   ARRAY['automated testing', 'test automation', 'automated tests',
+         'unit testing', 'integration testing', 'testing frameworks',
+         'test coverage'], 6),
+  ('5c000000-0000-0000-0000-000000000007', '5a000000-0000-0000-0000-000000000001', 'Observability',
+   ARRAY['observability', 'monitoring', 'instrumentation', 'telemetry',
+         'logging', 'tracing', 'distributed tracing', 'apm',
+         'production operations', 'operational readiness'], 7),
+  ('5c000000-0000-0000-0000-000000000008', '5a000000-0000-0000-0000-000000000001', 'Methodologies',
+   ARRAY['system design', 'systems design', 'architecture',
+         'software architecture', 'distributed systems', 'scalability',
+         'agile', 'agile development', 'sdlc'], 8),
+  ('5c000000-0000-0000-0000-000000000009', '5a000000-0000-0000-0000-000000000001', 'Tools & CI/CD',
+   ARRAY['ci/cd', 'ci', 'cd', 'continuous integration', 'continuous delivery',
+         'continuous deployment', 'build tooling', 'build automation',
+         'release automation', 'devops'], 9)
 
 ON CONFLICT (id) DO UPDATE SET
   name       = EXCLUDED.name,
+  aliases    = EXCLUDED.aliases,
   sort_order = EXCLUDED.sort_order;
 
 -- ============================================================
@@ -173,7 +200,8 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   -- Languages
   ('57000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001', 'Go',         ARRAY['Golang'],                    'Languages', 1),
   ('57000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'Python',     ARRAY['Python 3'],                  'Languages', 2),
-  ('57000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Java',       ARRAY['Java 8','Java 17'],          'Languages', 3),
+  ('57000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Java',
+   ARRAY['Java 8','Java 17','backend systems','backend services','backend engineering','backend development'], 'Languages', 3),
   ('57000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'SQL',        ARRAY['ANSI SQL'],                  'Languages', 4),
   ('57000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'TypeScript', ARRAY['TS'],                        'Languages', 5),
 
@@ -199,7 +227,8 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   -- Protocols & Messaging
   ('57000000-0000-0000-0000-000000000040', '5a000000-0000-0000-0000-000000000001', 'Kafka',      ARRAY['Apache Kafka'],              'Protocols & Messaging', 1),
   ('57000000-0000-0000-0000-000000000041', '5a000000-0000-0000-0000-000000000001', 'gRPC',       ARRAY['protobuf','Protocol Buffers'], 'Protocols & Messaging', 2),
-  ('57000000-0000-0000-0000-000000000042', '5a000000-0000-0000-0000-000000000001', 'REST',       ARRAY['REST API','HTTP API'],       'Protocols & Messaging', 3),
+  ('57000000-0000-0000-0000-000000000042', '5a000000-0000-0000-0000-000000000001', 'REST',
+   ARRAY['REST API','HTTP API','apis','restful api','backend systems','backend services','backend engineering','backend development'], 'Protocols & Messaging', 3),
   ('57000000-0000-0000-0000-000000000043', '5a000000-0000-0000-0000-000000000001', 'EDI',        ARRAY['EDI 214','EDI 204','X12'],   'Protocols & Messaging', 4),
   ('57000000-0000-0000-0000-000000000044', '5a000000-0000-0000-0000-000000000001', 'WebSockets', NULL,                               'Protocols & Messaging', 5),
 
@@ -214,7 +243,8 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   ('57000000-0000-0000-0000-000000000062', '5a000000-0000-0000-0000-000000000001', 'OpenTelemetry', ARRAY['OTel','distributed tracing'], 'Observability', 3),
 
   -- Methodologies
-  ('57000000-0000-0000-0000-000000000070', '5a000000-0000-0000-0000-000000000001', 'Distributed Systems',       NULL,                 'Methodologies', 1),
+  ('57000000-0000-0000-0000-000000000070', '5a000000-0000-0000-0000-000000000001', 'Distributed Systems',
+   ARRAY['backend systems','backend services','backend engineering','backend development'], 'Methodologies', 1),
   ('57000000-0000-0000-0000-000000000071', '5a000000-0000-0000-0000-000000000001', 'Event-Driven Architecture', ARRAY['EDA','event streaming'], 'Methodologies', 2),
   ('57000000-0000-0000-0000-000000000072', '5a000000-0000-0000-0000-000000000001', 'Domain-Driven Design',      ARRAY['DDD'],         'Methodologies', 3),
   ('57000000-0000-0000-0000-000000000073', '5a000000-0000-0000-0000-000000000001', 'Incident Response',         ARRAY['on-call','SRE practices'], 'Methodologies', 4),
