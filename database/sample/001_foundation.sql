@@ -177,6 +177,42 @@ ON CONFLICT (user_id, value) DO UPDATE SET
   updated_at = now();
 
 -- ============================================================
+-- Resume sections
+--
+-- The section manifest: which content blocks print, in what order, under what
+-- heading. Seeded here for the same reason the level vocabularies are --
+-- whoever creates a row populates its columns, and neither migration 022's
+-- backfill nor signup reaches a user a seed file invents.
+--
+-- An account with none still renders: the document falls back to the shipped
+-- default order rather than emitting a page with a name on it and nothing
+-- else. So a missing manifest is invisible until someone reads the .docx and
+-- notices the order is not theirs, which is exactly the class of silence this
+-- seed exists to prevent.
+--
+-- These are the conventional headings and the conventional order. That is the
+-- default because a resume read by a stranger is not the place to be
+-- surprising; the point of the table is that changing it is now a row.
+-- ============================================================
+INSERT INTO resume_sections (id, user_id, key, heading, sort_order, hidden, source) VALUES
+  ('52000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001', 'summary',     'SUMMARY',     1, FALSE, 'default'),
+  ('52000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'skills',      'SKILLS',      2, FALSE, 'default'),
+  ('52000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'experience',  'EXPERIENCE',  3, FALSE, 'default'),
+  ('52000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'projects',    'PROJECTS',    4, FALSE, 'default'),
+  ('52000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'education',   'EDUCATION',   5, FALSE, 'default'),
+  ('52000000-0000-0000-0000-000000000006', '5a000000-0000-0000-0000-000000000001', 'credentials', 'CREDENTIALS', 6, FALSE, 'default')
+
+-- Conflict target is (user_id, key), not (id), for the same reason the level
+-- vocabularies use it: migration 022 backfills any account that already
+-- exists, with UUIDs of its own.
+ON CONFLICT (user_id, key) DO UPDATE SET
+  heading    = EXCLUDED.heading,
+  sort_order = EXCLUDED.sort_order,
+  hidden     = EXCLUDED.hidden,
+  source     = EXCLUDED.source,
+  updated_at = now();
+
+-- ============================================================
 -- Employers
 -- ============================================================
 INSERT INTO employers (id, user_id, name, industry, notes) VALUES

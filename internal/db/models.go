@@ -235,6 +235,18 @@ type ProjectTag struct {
 	TagID     uuid.UUID `json:"tag_id"`
 }
 
+type ResumeSection struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Key       string    `json:"key"`
+	Heading   string    `json:"heading"`
+	SortOrder int32     `json:"sort_order"`
+	Hidden    bool      `json:"hidden"`
+	Source    string    `json:"source"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type ResumeVersion struct {
 	ID               uuid.UUID        `json:"id"`
 	UserID           uuid.UUID        `json:"user_id"`
