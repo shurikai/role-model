@@ -21,9 +21,14 @@ def test_minimal_document_validates(minimal_resume_data: dict) -> None:
     Resume.model_validate(minimal_resume_data)
 
 
+# skills is deliberately absent from this list. Schema v2 dropped it, along
+# with education, credentials and projects, from `required`: the section
+# manifest decides what prints, so a document carrying no skills block is a
+# configuration rather than a malformed document. The five below are what a
+# resume cannot be a resume without.
 @pytest.mark.parametrize(
     "field",
-    ["schema_version", "summary", "identity", "experience", "skills", "meta"],
+    ["schema_version", "summary", "identity", "experience", "meta"],
 )
 def test_missing_required_field_is_rejected(
     minimal_resume_data: dict, field: str

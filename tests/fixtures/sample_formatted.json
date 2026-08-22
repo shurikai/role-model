@@ -58,6 +58,32 @@
     ]
   },
   "summary": "Senior backend engineer with extensive distributed systems expertise and production PostgreSQL experience across high-scale microservice architectures. Led API design and service decomposition efforts at Northwind Financial and Meridian Airlines, owned Route Exchange services processing crew scheduling data in PostgreSQL, and designed distributed observability workflows tracking system health across multiple Spring Boot microservices. Skilled in Go prototyping, Java/Spring Boot production systems, and debugging distributed service latency issues using traces and logs.",
+  "sections": [
+    {
+      "key": "summary",
+      "heading": "SUMMARY"
+    },
+    {
+      "key": "skills",
+      "heading": "SKILLS"
+    },
+    {
+      "key": "experience",
+      "heading": "EXPERIENCE"
+    },
+    {
+      "key": "projects",
+      "heading": "PROJECTS"
+    },
+    {
+      "key": "education",
+      "heading": "EDUCATION"
+    },
+    {
+      "key": "credentials",
+      "heading": "CREDENTIALS"
+    }
+  ],
   "identity": {
     "name": "Alex Rivera",
     "email": "alex.rivera@example.com",

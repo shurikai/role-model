@@ -3,11 +3,14 @@ package generation
 import (
 	"bytes"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
+
+	"github.com/shurikai/role-model/internal/db"
 	resumeschema "github.com/shurikai/role-model/schema"
 )
 
@@ -269,5 +272,64 @@ func assertKeySet(t *testing.T, got map[string]any) {
 	slices.Sort(want)
 	if !slices.Equal(keys, want) {
 		t.Errorf("projection keys = %v, want %v", keys, want)
+	}
+}
+
+// The section manifest is a document field the model must not own, the same
+// way meta is. These test the projection rather than the stamping: what makes
+// it into the document, and what a manifest row keeps to itself.
+func TestDocumentSectionsDropHiddenRows(t *testing.T) {
+	rows := []db.ResumeSection{
+		{Key: "summary", Heading: "SUMMARY", SortOrder: 1},
+		{Key: "projects", Heading: "PROJECTS", SortOrder: 2, Hidden: true},
+		{Key: "experience", Heading: "EXPERIENCE", SortOrder: 3},
+	}
+
+	got := projectSections(rows)
+
+	want := []documentSection{
+		{Key: "summary", Heading: "SUMMARY"},
+		{Key: "experience", Heading: "EXPERIENCE"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sections = %v, want %v", got, want)
+	}
+}
+
+// Hidden must reach the renderer as ABSENT, never as a flag. A renderer given
+// a flag has to be trusted to check it; a renderer given nothing cannot print
+// what the user turned off. This is the same reasoning as dropping a level
+// rather than passing an unranked one — see LevelScale.
+func TestDocumentSectionsCarryNothingButKeyAndHeading(t *testing.T) {
+	raw, err := json.Marshal(projectSections([]db.ResumeSection{
+		{Key: "skills", Heading: "SKILLS", SortOrder: 9, Hidden: false, Source: "user"},
+	}))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+
+	var decoded []map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(decoded) != 1 {
+		t.Fatalf("got %d sections, want 1", len(decoded))
+	}
+	for _, leaked := range []string{"sort_order", "hidden", "source", "id", "user_id"} {
+		if _, ok := decoded[0][leaked]; ok {
+			t.Errorf("%s leaked into the document manifest", leaked)
+		}
+	}
+}
+
+// An account with no manifest must not render a document with a name on it and
+// nothing else. Signup installs one, so an empty result means the account was
+// made another way — the same safety net seniorityLevers keeps.
+func TestDocumentSectionsFallBackWhenEmpty(t *testing.T) {
+	if got := fallbackSections(nil); len(got) == 0 {
+		t.Fatal("no manifest and no fallback: the document would carry no sections at all")
+	}
+	if got := fallbackSections([]db.ResumeSection{{Key: "skills", Heading: "SKILLS", Hidden: true}}); len(got) == 0 {
+		t.Error("a manifest of nothing but hidden rows produced no fallback")
 	}
 }

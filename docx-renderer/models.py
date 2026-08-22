@@ -88,6 +88,23 @@ class ProjectEntry(BaseModel):
     bullets: list[Bullet]
 
 
+class ResumeSection(BaseModel):
+    """One printed section: which content block, under what heading.
+
+    The document's `sections` array is the print order. Hidden sections are
+    absent from it entirely rather than flagged, so a renderer cannot print one
+    the user turned off by forgetting to check a boolean.
+    """
+
+    #: The content block this section renders: summary, skills, experience,
+    #: projects, education, or credentials. Free text rather than a Literal --
+    #: an unrecognised key is skipped, not rejected, because a document is
+    #: still a resume without one section and a renderer a version behind
+    #: should degrade rather than 422.
+    key: str
+    heading: str
+
+
 class Identity(BaseModel):
     name: str
     email: str
@@ -130,8 +147,12 @@ class Resume(BaseModel):
     summary: str
     identity: Identity
     experience: list[EmployerBlock]
-    skills: dict[str, list[str]]
-    education: list[EducationEntry]
-    credentials: list[CredentialEntry]
-    projects: list[ProjectEntry]
+    skills: dict[str, list[str]] = Field(default_factory=dict)
+    education: list[EducationEntry] = Field(default_factory=list)
+    credentials: list[CredentialEntry] = Field(default_factory=list)
+    projects: list[ProjectEntry] = Field(default_factory=list)
+    #: The section manifest, in print order. Defaulted rather than required so
+    #: a document from a producer that predates it still renders -- see
+    #: build_resume_document, which falls back to the conventional order.
+    sections: list[ResumeSection] = Field(default_factory=list)
     meta: MetaBlock

@@ -47,11 +47,19 @@ def minimal_resume_data() -> dict:
     mutates one field is unambiguous about what it is removing.
     """
     return {
-        "schema_version": "resume.v1",
+        "schema_version": "2.0",
         "generated_at": "2026-08-17T00:00:00Z",
         "application_id": "11111111-1111-1111-1111-111111111111",
         "resume_version_id": "22222222-2222-2222-2222-222222222222",
         "summary": "A summary.",
+        "sections": [
+            {"key": "summary", "heading": "SUMMARY"},
+            {"key": "skills", "heading": "SKILLS"},
+            {"key": "experience", "heading": "EXPERIENCE"},
+            {"key": "projects", "heading": "PROJECTS"},
+            {"key": "education", "heading": "EDUCATION"},
+            {"key": "credentials", "heading": "CREDENTIALS"},
+        ],
         "identity": {"name": "Test Person", "email": "test@example.com"},
         "experience": [
             {

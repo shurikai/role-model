@@ -91,6 +91,15 @@ type CareerLevel struct {
 	IsFallback      bool
 }
 
+// ResumeSection is one entry of a starting section manifest: which content
+// block prints, under what heading, in what order.
+type ResumeSection struct {
+	Key       string
+	Heading   string
+	SortOrder int32
+	Hidden    bool
+}
+
 // ProficiencyLevel is one band of a starting depth scale.
 type ProficiencyLevel struct {
 	Value   string
@@ -149,6 +158,29 @@ func DefaultProficiencyLevels() []ProficiencyLevel {
 	}
 }
 
+// DefaultResumeSections returns the starting section manifest: the order and
+// headings the renderer used to hardcode.
+//
+// These are field-neutral already — every working life has experience and
+// skills — so unlike the career ladder there is nothing to make less specific.
+// What changes per user is which ones they want, in what order, under what
+// heading: "EDUCATION & TRAINING", "LICENSURE", "SELECTED PERFORMANCES".
+//
+// The order is the conventional one and stays the default because a resume
+// read by a stranger is not the place to be surprising. `key` names a content
+// block the pipeline produces; a key nothing produces renders as silence, so
+// this list is not the place to invent a new kind of section.
+func DefaultResumeSections() []ResumeSection {
+	return []ResumeSection{
+		{Key: "summary", Heading: "SUMMARY", SortOrder: 1},
+		{Key: "skills", Heading: "SKILLS", SortOrder: 2},
+		{Key: "experience", Heading: "EXPERIENCE", SortOrder: 3},
+		{Key: "projects", Heading: "PROJECTS", SortOrder: 4},
+		{Key: "education", Heading: "EDUCATION", SortOrder: 5},
+		{Key: "credentials", Heading: "CREDENTIALS", SortOrder: 6},
+	}
+}
+
 // Install writes the default vocabularies for a newly created user.
 //
 // Called on the signup path. An account with no rows is not broken -- the
@@ -188,6 +220,21 @@ func Install(ctx context.Context, q *db.Queries, userID uuid.UUID) error {
 		})
 		if err != nil {
 			return fmt.Errorf("install proficiency level %q: %w", p.Value, err)
+		}
+	}
+
+	for _, sec := range DefaultResumeSections() {
+		_, err := q.CreateResumeSection(ctx, db.CreateResumeSectionParams{
+			ID:        uuid.New(),
+			UserID:    userID,
+			Key:       sec.Key,
+			Heading:   sec.Heading,
+			SortOrder: sec.SortOrder,
+			Hidden:    sec.Hidden,
+			Source:    "default",
+		})
+		if err != nil {
+			return fmt.Errorf("install resume section %q: %w", sec.Key, err)
 		}
 	}
 
