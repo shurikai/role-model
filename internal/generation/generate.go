@@ -104,30 +104,31 @@ On the 2-3 most JD-relevant positions, open each bullet with what was owned,
 decided, or changed at the system or team level, then land the supporting
 evidence — the metric, the scale, the team size — in the same sentence.
 
-  Weaker: "Reduced cruise data API response times from several seconds to
-    under 500ms by separating historical and future data endpoints."
-  Stronger: "Owned performance of the guest-facing cruise data APIs across an
-    8-ship fleet, cutting response times from seconds to under 500ms by
-    separating historical from future data."
+  Weaker: "Rebuilt the referral intake process, cutting average wait from
+    three weeks to four days."
+  Stronger: "Owned referral intake across a six-site region, cutting average
+    wait from three weeks to four days by rebuilding how referrals were
+    routed and triaged."
 
 Both sentences carry the same fact. The second also says what the candidate
-was responsible for.
+was responsible for. This holds in every field; nothing about it is specific
+to any one kind of work.
 
 Two hard limits on this:
   - NEVER trade the evidence for the framing. A bullet that claims ownership
     and drops the number is weaker than one that only reports the number.
     Both together, or the number alone — never the claim alone.
   - NEVER manufacture scope the source material does not support. "Owned",
-    "led", "set technical direction for" are factual claims and need backing
-    in the contribution data like any other. If the data shows the work but
-    not the ownership, write the work.`
+    "led", "set direction for" are factual claims and need backing in the
+    contribution data like any other. If the data shows the work but not the
+    ownership, write the work.`
 
 	framingDefault = `This role is pitched at senior level or below. Lead with the concrete work
 and the outcome it produced.
 
 Where the source material genuinely supports ownership or leadership scope,
-say so — but do not reach for it. A bullet claiming architectural ownership
-the contribution data does not support reads as padding, and costs more
+say so — but do not reach for it. A bullet claiming ownership or scope the
+contribution data does not support reads as padding, and costs more
 credibility than the framing gains.`
 )
 
