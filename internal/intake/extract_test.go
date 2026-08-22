@@ -1,6 +1,7 @@
 package intake
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -198,5 +199,41 @@ func TestPlannedDraftsResolveInDependencyOrder(t *testing.T) {
 			}
 		}
 		seen[d.ID.String()] = true
+	}
+}
+
+// stubExtractor returns a canned response, so the staging path is exercised
+// without a model call. The point of the Extractor interface.
+type stubExtractor struct{ response string }
+
+func (s stubExtractor) Complete(_ context.Context, _, _ string, _ int64) (string, error) {
+	return s.response, nil
+}
+
+// A model asked not to emit a code fence sometimes emits one anyway, and a
+// fence turns the whole import into a parse error. Asking is the first line of
+// defence; this is the recovery.
+func TestStripFence(t *testing.T) {
+	want := `{"employers":[]}`
+	for _, in := range []string{
+		want,
+		"```json\n" + want + "\n```",
+		"```\n" + want + "\n```",
+		"  \n```json\n" + want + "\n```  ",
+	} {
+		if got := stripFence(in); strings.TrimSpace(got) != want {
+			t.Errorf("stripFence(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Empty text is refused before a model call rather than after. Sending an
+// empty prompt costs money to be told nothing.
+func TestExtractCareerRefusesEmptyText(t *testing.T) {
+	svc := &Service{}
+	for _, text := range []string{"", "   ", "\n\t"} {
+		if _, err := svc.ExtractCareer(context.Background(), stubExtractor{}, uuid.New(), uuid.New(), text); err == nil {
+			t.Errorf("ExtractCareer accepted %q", text)
+		}
 	}
 }
