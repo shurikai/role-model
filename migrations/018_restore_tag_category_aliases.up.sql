@@ -35,49 +35,20 @@
 -- here would grant the whole Protocols & Messaging category for one tool;
 -- that belongs in tags.aliases on the Kafka row.
 
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['ci/cd', 'ci', 'cd', 'continuous integration', 'continuous delivery',
-        'continuous deployment', 'build tooling', 'build automation',
-        'release automation', 'devops'])
-WHERE name = 'Tools & CI/CD';
-
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['observability', 'monitoring', 'instrumentation', 'telemetry',
-        'logging', 'tracing', 'distributed tracing', 'apm',
-        'production operations', 'operational readiness'])
-WHERE name = 'Observability';
-
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['automated testing', 'test automation', 'automated tests',
-        'unit testing', 'integration testing', 'testing frameworks',
-        'test coverage'])
-WHERE name = 'Testing';
-
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['data modeling', 'data modelling', 'database design', 'data systems',
-        'data stores', 'schema design', 'persistence', 'data pipelines',
-        'sql'])
-WHERE name = 'Databases';
-
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['event-driven systems', 'event driven systems', 'event-driven',
-        'event driven architecture', 'api design', 'apis', 'messaging',
-        'message brokers', 'pub/sub', 'streaming', 'rpc'])
-WHERE name = 'Protocols & Messaging';
-
-UPDATE tag_categories SET aliases = COALESCE(aliases,
-  ARRAY['system design', 'systems design', 'architecture',
-        'software architecture', 'distributed systems', 'scalability',
-        'agile', 'agile development', 'sdlc'])
-WHERE name = 'Methodologies';
-
--- Deliberately absent, same as in 012: 'iac' and 'infrastructure as code' on
--- Cloud & Infrastructure. Those name a specific practice (Terraform, Pulumi,
--- CloudFormation), not the category as a whole, and aliasing them here would
--- let a JD asking for IaC be answered by Docker and S3.
+-- ---------------------------------------------------------------------------
+-- The UPDATE statements that used to follow have moved to the seed files.
 --
--- Also absent: anything for 'backend systems', the other gap on the report
--- that surfaced this. No category is a defensible home for it — Methodologies
--- is closest, but it holds Agile, and offering Agile as evidence of backend
--- systems is the false credit this mechanism exists to avoid. Tracked as its
--- own vocabulary decision rather than smuggled in here.
+-- Migrations own structure; seeds own vocabulary. What was here was one
+-- industry's taxonomy written into the applied history of a public repo, and
+-- inherited by every user whether or not they hold those categories.
+--
+-- It was also the wrong place mechanically, which is the whole of #74: a
+-- migration cannot populate rows the seed has not created yet. Whoever creates
+-- a row populates its columns, so database/sample/001_foundation.sql and the
+-- private seed both carry this vocabulary in the same INSERT that creates the
+-- row it describes. TestSampleSeedCarriesCategoryVocabulary and
+-- TestSampleSeedCarriesCrossCategoryTerms are the guards.
+--
+-- Stripping it here changes nothing for a database that already ran it, and a
+-- fresh one gets the vocabulary from the seed a moment later.
+-- ---------------------------------------------------------------------------

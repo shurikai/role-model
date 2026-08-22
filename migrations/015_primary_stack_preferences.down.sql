@@ -3,42 +3,14 @@
 
 BEGIN;
 
-UPDATE preferences
-SET    preference_type = 'anti_pattern',
-       label           = 'expert Python as primary requirement',
-       updated_at      = now()
-WHERE  preference_type = 'primary_stack'
-  AND  label           = 'Python as a primary language';
-
-UPDATE preferences
-SET    preference_type = 'anti_pattern',
-       label           = 'production LLM / AI engineering as hard requirement',
-       updated_at      = now()
-WHERE  preference_type = 'primary_stack'
-  AND  label           = 'LLM / AI engineering as the primary job';
-
-UPDATE preferences
-SET    preference_type = 'anti_pattern',
-       updated_at      = now()
-WHERE  preference_type = 'primary_stack';
-
-UPDATE preferences
-SET    label      = 'product over platform / internal tooling',
-       updated_at = now()
-WHERE  preference_type = 'work_type' AND label = 'product engineering';
-
-UPDATE preferences
-SET    label      = 'platform / internal tooling over product',
-       updated_at = now()
-WHERE  preference_type = 'work_type' AND label = 'internal platform / developer tooling';
-
-UPDATE preferences
-SET    label      = 'greenfield over pure maintenance',
-       updated_at = now()
-WHERE  preference_type = 'work_type' AND label = 'greenfield development';
-
-ALTER TABLE preferences DROP CONSTRAINT check_preference_type;
-ALTER TABLE preferences ADD  CONSTRAINT check_preference_type
-  CHECK (preference_type IN ('domain', 'work_type', 'culture', 'anti_pattern'));
+-- ---------------------------------------------------------------------------
+-- The row rewrites that used to follow have moved to the seed files; see the
+-- note in the .up.sql. Reversing the CHECK is the whole of this migration's
+-- structural half, and the rows are the seeds' to state.
+--
+-- A database rolled back to before 015 while holding core_practice rows will
+-- fail the restored CHECK. That is correct: the constraint is telling you the
+-- data is ahead of the schema, and the seed is where to fix it.
+-- ---------------------------------------------------------------------------
 
 COMMIT;
