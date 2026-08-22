@@ -14,6 +14,7 @@ import (
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/vocabulary"
 	resumeschema "github.com/shurikai/role-model/schema"
 )
 
@@ -57,104 +58,106 @@ type resumeBodyPromptData struct {
 	PriorFeedback   string
 }
 
-// buildLengthBudget renders a seniority-informed target length as soft
-// guidance for the 2a prompt. Output length previously scaled unbounded with
-// however much background data existed per role; this gives the model an
-// explicit target to allocate bullets against by relevance instead.
-func buildLengthBudget(raw *json.RawMessage) (string, error) {
+// seniorityLevers returns the two levers a posting's seniority drives: how
+// much gets written, and at what altitude.
+//
+// They are returned together because they are siblings — one career_levels row
+// carries both columns, so a third lever is added as a third column rather
+// than as a third lookup somewhere else. They used to be two switch statements
+// over a hardcoded software ladder, and the pair had already drifted: 'mid'
+// took the short budget in one and the default branch in the other.
+//
+// Both values are the user's own text now. The account's ladder is what says
+// whether "attending", "sous", or "staff" is the top of it.
+func (s *Service) seniorityLevers(ctx context.Context, userID uuid.UUID, raw *json.RawMessage) (lengthBudget, framingGuidance string, err error) {
 	seniority := ""
 	if raw != nil {
 		var signals JDSignals
 		if err := json.Unmarshal(*raw, &signals); err != nil {
-			return "", fmt.Errorf("parse jd_signals for length budget: %w", err)
+			return "", "", fmt.Errorf("parse jd_signals for seniority levers: %w", err)
 		}
 		seniority = signals.Seniority
 	}
 
-	switch seniority {
-	case "junior", "mid":
-		return "Target 1 page (~8-10 bullets total across ALL positions and projects combined).", nil
-	case "staff", "principal", "lead":
-		return "Target 2 pages (~15-18 bullets total across ALL positions and projects combined).", nil
-	default:
-		// senior, manager, director, vp, unknown, or anything unrecognized:
-		// senior IC length is the safest general default.
-		return "Target 1-2 pages (~12-15 bullets total across ALL positions and projects combined).", nil
+	levels, err := s.q.ListCareerLevelsByUser(ctx, userID)
+	if err != nil {
+		return "", "", fmt.Errorf("list career levels: %w", err)
 	}
+
+	level := pickCareerLevel(levels, seniority)
+	if level == nil {
+		// The account has no ladder, or one with no fallback row. Signup
+		// installs both, so this means the account was made another way. The
+		// shipped neutral set keeps the prompt well-formed — an empty
+		// <length_budget> would leave two of the 2a rules pointing at nothing.
+		level = pickCareerLevel(defaultCareerLevelRows(), seniority)
+	}
+	if level == nil {
+		return "", "", fmt.Errorf("no career level for seniority %q and no fallback", seniority)
+	}
+
+	return level.LengthBudget, level.FramingGuidance, nil
 }
 
-// Framing guidance, the second thing seniority drives. Length was the first
-// and, for a long time, the only one — which meant a staff-level posting got
-// more bullets of the same altitude rather than bullets pitched at the level
-// it was hiring for. Every other rule in the 2a prompt pushes toward
-// implementation specificity ("prefer specificity over generality"), so the
-// output read as a competent senior-IC implementation report no matter who
-// the reader was.
+// pickCareerLevel resolves a posting's stated seniority against a ladder.
 //
-// The rule these strings exist to enforce is the one that is easy to get
-// backwards: ownership framing is added ON TOP of the evidence, never in
-// place of it. Trading the metric for the claim is a downgrade — the metric
-// is what makes the claim believable, and a broad ownership statement with
-// nothing behind it is exactly the shape a skeptical reader discounts.
-const (
-	framingStaff = `This role is pitched at staff level or above. A reader at this level is
-scanning for scope and accountability, not implementation detail alone.
-
-On the 2-3 most JD-relevant positions, open each bullet with what was owned,
-decided, or changed at the system or team level, then land the supporting
-evidence — the metric, the scale, the team size — in the same sentence.
-
-  Weaker: "Rebuilt the referral intake process, cutting average wait from
-    three weeks to four days."
-  Stronger: "Owned referral intake across a six-site region, cutting average
-    wait from three weeks to four days by rebuilding how referrals were
-    routed and triaged."
-
-Both sentences carry the same fact. The second also says what the candidate
-was responsible for. This holds in every field; nothing about it is specific
-to any one kind of work.
-
-Two hard limits on this:
-  - NEVER trade the evidence for the framing. A bullet that claims ownership
-    and drops the number is weaker than one that only reports the number.
-    Both together, or the number alone — never the claim alone.
-  - NEVER manufacture scope the source material does not support. "Owned",
-    "led", "set direction for" are factual claims and need backing in the
-    contribution data like any other. If the data shows the work but not the
-    ownership, write the work.`
-
-	framingDefault = `This role is pitched at senior level or below. Lead with the concrete work
-and the outcome it produced.
-
-Where the source material genuinely supports ownership or leadership scope,
-say so — but do not reach for it. A bullet claiming ownership or scope the
-contribution data does not support reads as padding, and costs more
-credibility than the framing gains.`
-)
-
-// buildFramingGuidance renders seniority-informed guidance on what altitude to
-// pitch bullets at. Sibling to buildLengthBudget, deliberately: the two levers
-// seniority drives sit next to each other and are tested the same way.
-func buildFramingGuidance(raw *json.RawMessage) (string, error) {
-	seniority := ""
-	if raw != nil {
-		var signals JDSignals
-		if err := json.Unmarshal(*raw, &signals); err != nil {
-			return "", fmt.Errorf("parse jd_signals for framing guidance: %w", err)
+// Own name before alias, the same precedence the fit-gate matcher uses and for
+// the same reason: an alias on one rung must never outrank another rung's own
+// name. A miss lands on the row flagged is_fallback, which is where "unknown"
+// — the value extraction emits when it cannot tell — is meant to land.
+//
+// The fallback is a flagged row rather than the median rank because the median
+// is not the neutral choice it looks like. On the ten-rung software ladder the
+// middle rung is staff, so deriving it would hand every unreadable posting the
+// ownership framing that framing guidance spends two rules warning against
+// reaching for. An unrecognised seniority is not evidence of a senior role.
+func pickCareerLevel(levels []db.CareerLevel, seniority string) *db.CareerLevel {
+	var fallback *db.CareerLevel
+	for i := range levels {
+		if levels[i].IsFallback {
+			fallback = &levels[i]
+			break
 		}
-		seniority = signals.Seniority
 	}
 
-	switch seniority {
-	case "staff", "principal", "lead":
-		return framingStaff, nil
-	default:
-		// junior, mid, senior, manager, director, vp, unknown, or anything
-		// unrecognized. Only staff+ gets the altitude instruction; applying
-		// it to a mid-level posting would invite exactly the inflation the
-		// staff guidance spends two rules guarding against.
-		return framingDefault, nil
+	want := strings.ToLower(strings.TrimSpace(seniority))
+	if want == "" {
+		return fallback
 	}
+
+	for i := range levels {
+		if strings.ToLower(strings.TrimSpace(levels[i].Value)) == want {
+			return &levels[i]
+		}
+	}
+	for i := range levels {
+		for _, alias := range levels[i].Aliases {
+			if strings.ToLower(strings.TrimSpace(alias)) == want {
+				return &levels[i]
+			}
+		}
+	}
+
+	return fallback
+}
+
+// defaultCareerLevelRows renders the shipped neutral ladder in the row shape
+// pickCareerLevel reads, for the one path that runs without a stored ladder.
+func defaultCareerLevelRows() []db.CareerLevel {
+	defaults := vocabulary.DefaultCareerLevels()
+	rows := make([]db.CareerLevel, 0, len(defaults))
+	for _, l := range defaults {
+		rows = append(rows, db.CareerLevel{
+			Value:           l.Value,
+			Label:           l.Label,
+			Rank:            l.Rank,
+			Aliases:         l.Aliases,
+			LengthBudget:    l.LengthBudget,
+			FramingGuidance: l.FramingGuidance,
+			IsFallback:      l.IsFallback,
+		})
+	}
+	return rows
 }
 
 // buildSkillsChecklist renders the JD's requirements as an explicit checklist
@@ -337,11 +340,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}
-	lengthBudget, err := buildLengthBudget(app.JdSignals)
-	if err != nil {
-		return nil, fmt.Errorf("generate: %w", err)
-	}
-	framingGuidance, err := buildFramingGuidance(app.JdSignals)
+	lengthBudget, framingGuidance, err := s.seniorityLevers(ctx, userID, app.JdSignals)
 	if err != nil {
 		return nil, fmt.Errorf("generate: %w", err)
 	}

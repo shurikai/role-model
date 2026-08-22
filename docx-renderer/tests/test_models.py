@@ -76,15 +76,25 @@ def test_position_ended_on_may_be_omitted_for_current_role() -> None:
     assert position.ended_on is None
 
 
-def test_unknown_industry_level_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        PositionBlock(
+def test_industry_level_accepts_any_ladder_rung() -> None:
+    """industry_level is free text, and that is deliberate.
+
+    It used to be a Literal of ten software rungs, which was one industry's
+    ladder applied to every other: a chef's "sous" and a clinician's
+    "attending" were rejected by the renderer for not being "staff". The
+    ladder is user-owned vocabulary (career_levels) on the Go side now, so the
+    document contract cannot enumerate it. Nothing in the renderer branches on
+    the value -- it is carried for provenance alongside title.
+    """
+    for rung in ("senior", "sous", "attending", "journeyman"):
+        position = PositionBlock(
             position_id="p1",
             title="Engineer",
-            industry_level="wizard",
+            industry_level=rung,
             started_on="2020-01",
             bullets=[Bullet(text="x", contribution_ids=["c1"])],
         )
+        assert position.industry_level == rung
 
 
 def test_unknown_project_role_is_rejected() -> None:

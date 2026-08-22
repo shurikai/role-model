@@ -27,6 +27,22 @@ type Application struct {
 	UpdatedAt   time.Time        `json:"updated_at"`
 }
 
+type CareerLevel struct {
+	ID              uuid.UUID `json:"id"`
+	UserID          uuid.UUID `json:"user_id"`
+	Value           string    `json:"value"`
+	Label           string    `json:"label"`
+	Rank            int32     `json:"rank"`
+	Aliases         []string  `json:"aliases"`
+	LengthBudget    string    `json:"length_budget"`
+	FramingGuidance string    `json:"framing_guidance"`
+	IsFallback      bool      `json:"is_fallback"`
+	Source          string    `json:"source"`
+	SortOrder       int32     `json:"sort_order"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 type Contribution struct {
 	ID              uuid.UUID  `json:"id"`
 	UserID          uuid.UUID  `json:"user_id"`
@@ -176,6 +192,19 @@ type Preference struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	IsHardGate     bool      `json:"is_hard_gate"`
+}
+
+type ProficiencyLevel struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Value     string    `json:"value"`
+	Label     string    `json:"label"`
+	Rank      int32     `json:"rank"`
+	Aliases   []string  `json:"aliases"`
+	Source    string    `json:"source"`
+	SortOrder int32     `json:"sort_order"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Project struct {

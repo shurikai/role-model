@@ -18,21 +18,12 @@ class PositionBlock(BaseModel):
     #: Engineer". Free text rather than an enum, because real roles are
     #: compound: "Senior Software Engineer / Architect".
     industry_role: str | None = None
-    industry_level: (
-        Literal[
-            "junior",
-            "mid",
-            "senior",
-            "staff",
-            "principal",
-            "lead",
-            "manager",
-            "director",
-            "vp",
-            "ic",
-        ]
-        | None
-    ) = None
+    #: The rung of the candidate's own career ladder this position sat on:
+    #: "senior", "sous", "attending". Free text rather than a Literal, because
+    #: the ladder is user-owned vocabulary (career_levels) and an enum here was
+    #: one industry's rungs applied to every other. The renderer does not read
+    #: it; it is carried for provenance alongside title.
+    industry_level: str | None = None
     started_on: str = Field(pattern=r"^\d{4}-\d{2}$")
     ended_on: str | None = Field(pattern=r"^\d{4}-\d{2}$", default=None)
     bullets: list[Bullet]
