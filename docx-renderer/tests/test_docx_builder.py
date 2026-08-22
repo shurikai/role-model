@@ -29,7 +29,14 @@ def document_text(doc: DocumentObject) -> str:
     return "\n".join(paragraph_texts(doc))
 
 
-SECTION_HEADINGS = ("SUMMARY", "SKILLS", "EXPERIENCE", "PROJECTS", "EDUCATION")
+SECTION_HEADINGS = (
+    "SUMMARY",
+    "SKILLS",
+    "EXPERIENCE",
+    "PROJECTS",
+    "EDUCATION",
+    "CREDENTIALS",
+)
 
 
 def section_text(doc: DocumentObject, heading: str) -> str:
@@ -154,6 +161,54 @@ def test_education_heading_tracks_whether_there_is_education(resume: Resume) -> 
     assert ("EDUCATION" in texts) == bool(resume.education)
 
 
+def test_credentials_heading_tracks_whether_there_are_credentials(
+    resume: Resume,
+) -> None:
+    texts = paragraph_texts(build_resume_document(resume))
+    assert ("CREDENTIALS" in texts) == bool(resume.credentials)
+
+
+def test_every_credential_appears(resume: Resume) -> None:
+    """Credentials were modelled everywhere and rendered nowhere.
+
+    The section existed in the schema, in Pydantic, and in the Go assembler,
+    and build_resume_document simply never called a renderer for it -- so a
+    certification that survived selection was dropped on the last step. For a
+    licensed profession the licence is the most important line on the page.
+    """
+    if not resume.credentials:
+        return
+    text = section_text(build_resume_document(resume), "CREDENTIALS")
+    for credential in resume.credentials:
+        assert credential.name in text, f"credential dropped: {credential.name}"
+        if credential.issuer:
+            assert credential.issuer in text, f"issuer dropped: {credential.issuer}"
+
+
+def test_all_optional_sections_empty_leaves_no_bare_headings(
+    minimal_resume_data: dict,
+) -> None:
+    """A section with nothing in it must not print its heading.
+
+    Both tracked fixtures carry education, so the education branch was only
+    ever exercised in the truthy direction -- and there was no guard on it to
+    exercise. minimal_resume_data is the one fixture with every optional
+    section empty, and it had never been handed to the builder at all: it was
+    used for model validation and for the HTTP endpoint, both of which are
+    happy with a bare heading.
+    """
+    resume = Resume.model_validate(minimal_resume_data)
+    assert not resume.projects
+    assert not resume.education
+    assert not resume.credentials
+
+    texts = paragraph_texts(build_resume_document(resume))
+    for heading in ("PROJECTS", "EDUCATION", "CREDENTIALS"):
+        assert heading not in texts, f"bare heading with no content: {heading}"
+    for heading in ("SUMMARY", "SKILLS", "EXPERIENCE"):
+        assert heading in texts, f"required section missing: {heading}"
+
+
 def test_no_word_heading_styles_are_used(resume: Resume) -> None:
     """Explicit formatting only.
 
@@ -171,7 +226,7 @@ def test_no_word_heading_styles_are_used(resume: Resume) -> None:
 def test_section_headings_keep_with_next(resume: Resume) -> None:
     """A heading must never strand at the foot of a page."""
     doc = build_resume_document(resume)
-    headings = {"SUMMARY", "SKILLS", "EXPERIENCE", "PROJECTS", "EDUCATION"}
+    headings = set(SECTION_HEADINGS)
     found = [p for p in doc.paragraphs if p.text in headings]
     assert found, "no section headings found"
     for p in found:

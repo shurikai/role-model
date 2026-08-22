@@ -339,7 +339,18 @@
       ]
     }
   ],
-  "credentials": [],
+  "credentials": [
+    {
+      "name": "AWS Certified Solutions Architect - Associate",
+      "issuer": "Amazon Web Services",
+      "issued_on": "2023-04",
+      "expires_on": "2026-04"
+    },
+    {
+      "name": "Certified Kubernetes Administrator",
+      "issuer": "Cloud Native Computing Foundation"
+    }
+  ],
   "generated_at": "2026-07-05T21:46:08Z",
   "application_id": "43119c2e-1678-4917-aad7-d8a032b3a8f0",
   "schema_version": "1.0",
