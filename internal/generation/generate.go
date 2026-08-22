@@ -278,6 +278,60 @@ func buildYearsExperience(experience json.RawMessage, now time.Time) (string, er
 	return fmt.Sprintf("%d years", years), nil
 }
 
+// documentSection is one entry of the manifest the document carries. It mirrors
+// $defs.resume_section — key and heading, nothing else. Provenance, sort order,
+// and hidden are how the row is administered and are no business of a renderer.
+type documentSection struct {
+	Key     string `json:"key"`
+	Heading string `json:"heading"`
+}
+
+// documentSections projects the user's manifest down to what the document
+// declares, dropping hidden rows.
+//
+// Hidden means absent, not present-and-flagged. A renderer given a flag has to
+// be trusted to honour it, and the one that did not would print a heading the
+// user had explicitly turned off; a renderer given nothing cannot.
+//
+// An account with no rows falls back to the shipped default manifest. Signup
+// installs one, so reaching that means the account was made another way — and
+// an empty manifest would otherwise render a document with an identity block
+// and nothing under it.
+func (s *Service) documentSections(ctx context.Context, userID uuid.UUID) ([]documentSection, error) {
+	rows, err := s.q.ListResumeSectionsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list resume sections: %w", err)
+	}
+	return fallbackSections(rows), nil
+}
+
+// projectSections drops hidden rows and keeps only what the document declares.
+func projectSections(rows []db.ResumeSection) []documentSection {
+	out := make([]documentSection, 0, len(rows))
+	for _, r := range rows {
+		if r.Hidden {
+			continue
+		}
+		out = append(out, documentSection{Key: r.Key, Heading: r.Heading})
+	}
+	return out
+}
+
+// fallbackSections is projectSections plus the safety net.
+func fallbackSections(rows []db.ResumeSection) []documentSection {
+	out := projectSections(rows)
+	if len(out) > 0 {
+		return out
+	}
+	for _, sec := range vocabulary.DefaultResumeSections() {
+		if sec.Hidden {
+			continue
+		}
+		out = append(out, documentSection{Key: sec.Key, Heading: sec.Heading})
+	}
+	return out
+}
+
 // buildMetaBlock assembles the document's meta block.
 //
 // It takes the full JDSignals and projects internally rather than accepting an
@@ -527,6 +581,20 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		return nil, fmt.Errorf("generate: marshal meta: %w", err)
 	}
 	doc["meta"] = metaJSON
+
+	// The section manifest is the generator's to stamp, not the model's, for
+	// the same reason meta is: it is a fact about the user's configuration
+	// rather than resume content. 2a is told not to emit one; overwriting is
+	// what makes that instruction unnecessary to trust.
+	sections, err := s.documentSections(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("generate: %w", err)
+	}
+	sectionsJSON, err := json.Marshal(sections)
+	if err != nil {
+		return nil, fmt.Errorf("generate: marshal sections: %w", err)
+	}
+	doc["sections"] = sectionsJSON
 
 	versionID := uuid.New()
 

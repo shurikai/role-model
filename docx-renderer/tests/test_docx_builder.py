@@ -272,3 +272,131 @@ def test_render_is_deterministic(resume: Resume) -> None:
     first = document_text(build_resume_document(resume))
     second = document_text(build_resume_document(resume))
     assert first == second
+
+
+# ---------------------------------------------------------------------------
+# The section manifest
+#
+# These are the tests that make the manifest real rather than decorative. The
+# resume's shape used to be fixed in three files at once -- the JSON schema's
+# required keys, this builder's fixed call sequence, and the heading strings
+# written into each renderer's body -- so renaming EDUCATION or moving
+# CREDENTIALS above EXPERIENCE was a code change in Go, Python, and a schema.
+# Each test below is one of those three things becoming a row.
+# ---------------------------------------------------------------------------
+
+
+def headings_in_order(doc: DocumentObject, candidates: set[str]) -> list[str]:
+    """The section headings actually printed, in document order."""
+    return [text for text in paragraph_texts(doc) if text in candidates]
+
+
+def test_manifest_heading_is_what_prints(minimal_resume_data: dict) -> None:
+    """The heading is the user's text, not a constant in this file.
+
+    This is the whole point of `heading` being separate from `key`: the same
+    education block prints under "EDUCATION", "EDUCATION & TRAINING", or
+    "FORMATION" depending on whose resume it is.
+    """
+    minimal_resume_data["education"] = [{"institution": "State University"}]
+    minimal_resume_data["sections"] = [
+        {"key": "education", "heading": "EDUCATION & TRAINING"}
+    ]
+
+    doc = build_resume_document(Resume.model_validate(minimal_resume_data))
+    texts = paragraph_texts(doc)
+
+    assert "EDUCATION & TRAINING" in texts
+    assert "EDUCATION" not in texts
+
+
+def test_manifest_order_is_document_order(resume_data: dict) -> None:
+    """Reordering the manifest reorders the document.
+
+    Asserted against a reversal rather than a single swap, so a renderer that
+    kept its old fixed sequence and merely relabelled cannot pass.
+    """
+    reversed_sections = list(reversed(resume_data["sections"]))
+    resume_data["sections"] = reversed_sections
+
+    doc = build_resume_document(Resume.model_validate(resume_data))
+
+    wanted = [s["heading"] for s in reversed_sections]
+    printed = headings_in_order(doc, set(wanted))
+    # Sections with no content print nothing at all, so the expected list is
+    # the manifest filtered down to what actually appeared -- order is what is
+    # under test here, not presence.
+    assert printed == [h for h in wanted if h in printed]
+    assert printed, "no sections printed at all"
+    assert printed != [h for h in SECTION_HEADINGS if h in printed]
+
+
+def test_section_absent_from_manifest_does_not_print(resume_data: dict) -> None:
+    """A hidden section reaches the renderer as an absent one.
+
+    Generation drops `hidden` rows rather than passing a flag, so this is the
+    renderer half of that contract: what is not in the manifest is not in the
+    document, even though the content block is still right there in the JSON.
+    """
+    resume_data["sections"] = [
+        s for s in resume_data["sections"] if s["key"] != "skills"
+    ]
+
+    doc = build_resume_document(Resume.model_validate(resume_data))
+
+    assert "SKILLS" not in paragraph_texts(doc)
+    # The content is still in the document object; only the section is gone.
+    assert Resume.model_validate(resume_data).skills is not None
+    # And the rest of the resume is untouched.
+    assert "EXPERIENCE" in paragraph_texts(doc)
+
+
+def test_unknown_section_key_is_skipped_not_fatal(resume_data: dict) -> None:
+    """A key this renderer does not know must not take the document down.
+
+    Otherwise adding a section type becomes a lockstep deploy: a document
+    naming PUBLICATIONS would 500 against every renderer that had not shipped
+    yet, instead of rendering everything else.
+    """
+    resume_data["sections"] = [
+        {"key": "publications", "heading": "PUBLICATIONS"},
+        *resume_data["sections"],
+    ]
+
+    doc = build_resume_document(Resume.model_validate(resume_data))
+
+    assert "PUBLICATIONS" not in paragraph_texts(doc)
+    assert "EXPERIENCE" in paragraph_texts(doc)
+
+
+def test_empty_manifest_falls_back_to_the_conventional_order(
+    resume_data: dict,
+) -> None:
+    """An empty manifest means "no manifest", not "print nothing".
+
+    A document produced before manifests existed carries no `sections` key, and
+    Pydantic defaults it to []. Reading that as "the user turned every section
+    off" would render a page with a name on it and nothing else -- a silent,
+    total data loss that still returns 200.
+    """
+    resume_data["sections"] = []
+
+    doc = build_resume_document(Resume.model_validate(resume_data))
+    texts = paragraph_texts(doc)
+
+    assert "EXPERIENCE" in texts
+    assert "SUMMARY" in texts
+
+
+def test_identity_prints_without_being_in_the_manifest(resume_data: dict) -> None:
+    """Identity is the document header, not a section.
+
+    There is no manifest row that can turn a resume's name off, and there
+    should not be one.
+    """
+    resume_data["sections"] = []
+    identity_name = resume_data["identity"]["name"]
+
+    doc = build_resume_document(Resume.model_validate(resume_data))
+
+    assert identity_name in document_text(doc)
