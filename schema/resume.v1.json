@@ -117,10 +117,7 @@
         },
         "industry_level": {
           "type": ["string", "null"],
-          "enum": [
-            "junior", "mid", "senior", "staff", "principal",
-            "lead", "manager", "director", "vp", "ic", null
-          ]
+          "description": "The rung of the candidate's own career ladder this position sat on, e.g. \"senior\", \"sous\", \"attending\". Free text: the ladder is user-owned vocabulary (career_levels), so an enum here would have been one industry's rungs imposed on every other. It was that enum, and the copy in the renderer's models disagreed with the copy in the extraction prompt about which values could ever appear."
         },
         "started_on": { "type": "string", "pattern": "^\\d{4}-\\d{2}$" },
         "ended_on":   { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}$" },

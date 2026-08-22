@@ -48,7 +48,7 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		authHandler := handlers.NewAuthHandler(deps.Queries, deps.JWTSecret)
+		authHandler := handlers.NewAuthHandler(deps.Pool, deps.Queries, deps.JWTSecret)
 		r.Post("/auth/signup", authHandler.Signup)
 		r.Post("/auth/login", authHandler.Login)
 

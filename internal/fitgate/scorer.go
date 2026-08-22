@@ -11,6 +11,7 @@ import (
 
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/vocabulary"
 )
 
 // JDSignals is the structured output of Stage 1 extraction.
@@ -323,7 +324,7 @@ func evidenceNames(evidence []SkillTerm) []string {
 // Until then the competencies reach the narrative as unscored context, so the
 // report can say what the posting asked for without claiming any of it was
 // answered.
-func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
+func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals, levels LevelScale) TechnicalFit {
 	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
 	if pointsPossible == 0 {
 		return TechnicalFit{Scored: false}
@@ -350,7 +351,7 @@ func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 			Evidence: evidenceNames(evidence),
 		}
 
-		required, signal := requiredLevelFor(entry, signals.SkillLevels)
+		required, signal := requiredLevelFor(entry, signals.SkillLevels, levels)
 		if required == "" {
 			// The JD stated no depth here. Original path, original credit.
 			pointsEarned += full
@@ -358,12 +359,12 @@ func ScoreTechnicalFit(skills []SkillTerm, signals JDSignals) TechnicalFit {
 			return true
 		}
 
-		held := strongestProficiency(evidence)
+		held := strongestProficiency(evidence, levels)
 		match.RequiredLevel = required
 		match.EvidenceLevel = held
 		match.LevelSignal = signal
 
-		if proficiencyRank(held) >= proficiencyRank(required) {
+		if levels.Rank(held) >= levels.Rank(required) {
 			pointsEarned += full
 			matches = append(matches, match)
 			return true
@@ -758,21 +759,64 @@ func clampScore(v float64) float64 {
 	return v
 }
 
-// proficiencyRank orders the three-value scale skills.proficiency and
-// jd_signals.skill_levels share. Anything unrecognised ranks 0, below novice,
-// so a typo in either source degrades to "no level established" rather than
-// silently satisfying an expert requirement.
-func proficiencyRank(level string) int {
-	switch strings.ToLower(strings.TrimSpace(level)) {
-	case "novice":
-		return 1
-	case "proficient":
-		return 2
-	case "expert":
-		return 3
-	default:
-		return 0
+// LevelScale orders the depth vocabulary skills.proficiency and
+// jd_signals.skill_levels share. It is built from the user's own
+// proficiency_levels rows, so a licence tier, a union classification, or a
+// CEFR band ranks the same way novice/proficient/expert used to — this was a
+// switch statement over three hardcoded values, which meant every scale that
+// is not software's ranked at zero and satisfied nothing.
+//
+// Keys are lowercased values and aliases together. Aliases matter on this side
+// because the JD half of the comparison is extraction's reading of a posting's
+// wording ("deep expertise in Kafka"), not a value chosen from a list.
+type LevelScale map[string]int
+
+// NewLevelScale builds a scale from a user's proficiency vocabulary.
+//
+// A value beats an alias: an alias on one band must never outrank another
+// band's own name, the same precedence the skill matcher uses.
+func NewLevelScale(rows []db.ProficiencyLevel) LevelScale {
+	scale := make(LevelScale, len(rows)*3)
+	for _, r := range rows {
+		for _, alias := range r.Aliases {
+			if key := strings.ToLower(strings.TrimSpace(alias)); key != "" {
+				scale[key] = int(r.Rank)
+			}
+		}
 	}
+	for _, r := range rows {
+		if key := strings.ToLower(strings.TrimSpace(r.Value)); key != "" {
+			scale[key] = int(r.Rank)
+		}
+	}
+	return scale
+}
+
+// defaultLevelScale is the shipped neutral scale, used when an account has no
+// proficiency vocabulary of its own. Signup installs one, so reaching this
+// means the account was created another way.
+func defaultLevelScale() LevelScale {
+	rows := vocabulary.DefaultProficiencyLevels()
+	scale := make(LevelScale, len(rows)*3)
+	for _, r := range rows {
+		for _, alias := range r.Aliases {
+			scale[strings.ToLower(alias)] = int(r.Rank)
+		}
+	}
+	for _, r := range rows {
+		scale[strings.ToLower(r.Value)] = int(r.Rank)
+	}
+	return scale
+}
+
+// Rank returns the depth ordinal for a level. Anything unrecognised ranks 0,
+// below every band, so a typo in either source degrades to "no level
+// established" rather than silently satisfying an expert requirement.
+func (s LevelScale) Rank(level string) int {
+	if len(s) == 0 {
+		s = defaultLevelScale()
+	}
+	return s[strings.ToLower(strings.TrimSpace(level))]
 }
 
 // requiredLevelFor returns the depth the JD asked for on this requirement, and
@@ -784,10 +828,10 @@ func proficiencyRank(level string) int {
 // paper over with fuzzy matching here. A miss returns an empty level, which
 // every caller reads as "the JD stated no depth for this", and scoring then
 // proceeds exactly as it did before skill levels existed.
-func requiredLevelFor(entry string, levels []generation.SkillLevel) (level, signal string) {
-	for _, sl := range levels {
+func requiredLevelFor(entry string, stated []generation.SkillLevel, levels LevelScale) (level, signal string) {
+	for _, sl := range stated {
 		if strings.EqualFold(strings.TrimSpace(sl.Requirement), strings.TrimSpace(entry)) {
-			if proficiencyRank(sl.Level) == 0 {
+			if levels.Rank(sl.Level) == 0 {
 				// A level nobody can rank cannot be compared against, so it is
 				// not a requirement — treat it as unstated rather than as
 				// unmet. Reporting a partial here would blame the profile for
@@ -811,10 +855,10 @@ func requiredLevelFor(entry string, levels []generation.SkillLevel) (level, sign
 // expert bar. That is a known consequence of category evidence being broad,
 // not an oversight, and it is visible in the report because Kind records that
 // the match was a category match in the first place.
-func strongestProficiency(evidence []SkillTerm) string {
+func strongestProficiency(evidence []SkillTerm, levels LevelScale) string {
 	best := ""
 	for _, s := range evidence {
-		if proficiencyRank(s.Proficiency) > proficiencyRank(best) {
+		if levels.Rank(s.Proficiency) > levels.Rank(best) {
 			best = s.Proficiency
 		}
 	}

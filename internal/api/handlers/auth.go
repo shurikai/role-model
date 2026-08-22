@@ -6,20 +6,23 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/shurikai/role-model/internal/auth"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/httputil"
+	"github.com/shurikai/role-model/internal/vocabulary"
 )
 
 type AuthHandler struct {
+	pool      *pgxpool.Pool
 	queries   *db.Queries
 	jwtSecret string
 }
 
-func NewAuthHandler(queries *db.Queries, jwtSecret string) *AuthHandler {
-	return &AuthHandler{queries: queries, jwtSecret: jwtSecret}
+func NewAuthHandler(pool *pgxpool.Pool, queries *db.Queries, jwtSecret string) *AuthHandler {
+	return &AuthHandler{pool: pool, queries: queries, jwtSecret: jwtSecret}
 }
 
 type authRequest struct {
@@ -60,8 +63,21 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	}
 	hashStr := string(hash)
 
+	// The account and its starting vocabulary are created together. An account
+	// with no career_levels rows still works -- the level lookup degrades to
+	// unranked guidance -- but it produces resumes written at no particular
+	// altitude, quietly, so a half-created account is worse than a failed
+	// signup the user can retry.
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create account")
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+	qtx := h.queries.WithTx(tx)
+
 	userID := uuid.New()
-	user, err := h.queries.CreateUser(r.Context(), db.CreateUserParams{
+	user, err := qtx.CreateUser(r.Context(), db.CreateUserParams{
 		ID:           userID,
 		Email:        req.Email,
 		PasswordHash: &hashStr,
@@ -69,6 +85,16 @@ func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// Most likely cause: email already exists (unique constraint).
 		httputil.WriteError(w, http.StatusConflict, "email_taken", "an account with that email already exists")
+		return
+	}
+
+	if err := vocabulary.Install(r.Context(), qtx, user.ID); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create account")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to create account")
 		return
 	}
 

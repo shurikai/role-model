@@ -158,8 +158,13 @@ skill_levels: array of objects — the depth requirement for individual skills,
     (No entry. The depth applies to one alternative only, and the posting will
     accept the other on far weaker terms.)
 
-seniority: string — one of: "junior", "mid", "senior", "staff", "principal",
-  "lead", "unknown". Infer from title and requirements if not explicit.
+seniority: string — one of: {{if .SeniorityLevels}}{{.SeniorityLevels}}, {{end}}"unknown".
+  Infer from title and requirements if not explicit. These are the rungs of the
+  candidate's own career ladder, so they are stated in the vocabulary of their
+  field rather than a general one. Choose the closest rung; do not invent a
+  level that is not on the list. Use "unknown" when the posting gives you
+  nothing to place it by — that is a real answer, not a failure, and it is
+  read as "pitch this at the usual level" downstream.
 
 domain: string — one of: "fintech", "observability", "healthcare", "e-commerce",
   "defense", "saas", "platform", "consumer", "edtech", "govtech", "unknown".

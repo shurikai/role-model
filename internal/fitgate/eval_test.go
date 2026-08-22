@@ -205,7 +205,7 @@ func TestFitEval(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			var res result
-			technical := ScoreTechnicalFit(skills, c.Signals)
+			technical := ScoreTechnicalFit(skills, c.Signals, testLevels)
 			res.technicalScore, res.technicalGaps = technical.Score, technical.Gaps
 			for _, m := range technical.Partial {
 				res.technicalPartial = append(res.technicalPartial, m.Requirement)

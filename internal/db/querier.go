@@ -20,6 +20,7 @@ type Querier interface {
 	CountTagUsage(ctx context.Context, tagID uuid.UUID) (int32, error)
 	CountTagsInCategory(ctx context.Context, arg CountTagsInCategoryParams) (int64, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
+	CreateCareerLevel(ctx context.Context, arg CreateCareerLevelParams) (CareerLevel, error)
 	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
 	CreateContributionDraft(ctx context.Context, arg CreateContributionDraftParams) (ContributionDraft, error)
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
@@ -29,6 +30,7 @@ type Querier interface {
 	CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error)
 	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
 	CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error)
+	CreateProficiencyLevel(ctx context.Context, arg CreateProficiencyLevelParams) (ProficiencyLevel, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
@@ -106,6 +108,14 @@ type Querier interface {
 	ListActiveSkillTagNamesByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListActiveSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
+	// The user's seniority ladder, weakest first.
+	//
+	// One query serves three readers: the length budget and the framing guidance
+	// the 2a prompt is given, and the enum the extraction prompt is told to choose
+	// a posting's seniority from. They read the same rows on purpose -- the six
+	// hand-synced copies this table replaced had already drifted apart, leaving
+	// three levels that the database accepted and extraction could never emit.
+	ListCareerLevelsByUser(ctx context.Context, userID uuid.UUID) ([]CareerLevel, error)
 	ListContributionDraftsByBatch(ctx context.Context, arg ListContributionDraftsByBatchParams) ([]ContributionDraft, error)
 	ListContributionsBySkill(ctx context.Context, skillID uuid.UUID) ([]uuid.UUID, error)
 	ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitReport, error)
@@ -114,6 +124,9 @@ type Querier interface {
 	ListImportBatches(ctx context.Context, userID uuid.UUID) ([]ImportBatch, error)
 	ListPreferencesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
 	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)
+	// The user's depth scale, weakest first. Read by the fit gate to compare a
+	// skill's recorded proficiency against the depth a posting asked for.
+	ListProficiencyLevelsByUser(ctx context.Context, userID uuid.UUID) ([]ProficiencyLevel, error)
 	ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error)
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)

@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/google/uuid"
+
+	"github.com/shurikai/role-model/internal/db"
 )
 
 // JDSignals is the structured output of signal extraction.
@@ -206,12 +209,42 @@ type ScreeningSummary struct {
 
 type extractPromptData struct {
 	JobDescription string
+
+	// SeniorityLevels is the rendered enum the prompt offers for `seniority`,
+	// built from the user's own career_levels rows. It was a hardcoded
+	// software ladder, which is how three of its values — manager, director,
+	// vp — came to be storable in the database and unreachable from a job
+	// description: the prompt's copy of the list never listed them.
+	SeniorityLevels string
+}
+
+// seniorityEnum renders the account's ladder as the quoted list the extraction
+// prompt offers. Empty when the account has no ladder, which the template
+// falls back on.
+func seniorityEnum(levels []db.CareerLevel) string {
+	if len(levels) == 0 {
+		return ""
+	}
+	quoted := make([]string, 0, len(levels))
+	for _, l := range levels {
+		quoted = append(quoted, `"`+l.Value+`"`)
+	}
+	return strings.Join(quoted, ", ")
 }
 
 // ExtractSignals runs JD signal extraction against the given job description text.
-func (s *Service) ExtractSignals(ctx context.Context, jdText string) (*JDSignals, error) {
+func (s *Service) ExtractSignals(ctx context.Context, userID uuid.UUID, jdText string) (*JDSignals, error) {
+	levels, err := s.q.ListCareerLevelsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list career levels: %w", err)
+	}
+	if len(levels) == 0 {
+		levels = defaultCareerLevelRows()
+	}
+
 	prompt, err := renderPrompt(jdExtractionPrompt, extractPromptData{
-		JobDescription: jdText,
+		JobDescription:  jdText,
+		SeniorityLevels: seniorityEnum(levels),
 	})
 	if err != nil {
 		return nil, err
