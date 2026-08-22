@@ -8,7 +8,14 @@ from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor, Twips
 from docx.text.paragraph import Paragraph
 
-from models import EducationEntry, EmployerBlock, Identity, ProjectEntry, Resume
+from models import (
+    CredentialEntry,
+    EducationEntry,
+    EmployerBlock,
+    Identity,
+    ProjectEntry,
+    Resume,
+)
 
 FONT_NAME = "Arial"
 ACCENT_COLOR = RGBColor(0x28, 0x01, 0x37)
@@ -47,6 +54,7 @@ def build_resume_document(resume: Resume) -> DocumentObject:
     _render_experience(doc, resume.experience)
     _render_projects(doc, resume.projects)
     _render_education(doc, resume.education)
+    _render_credentials(doc, resume.credentials)
 
     return doc
 
@@ -248,6 +256,9 @@ def _render_projects(doc: DocumentObject, projects: list[ProjectEntry]) -> None:
 
 
 def _render_education(doc: DocumentObject, education: list[EducationEntry]) -> None:
+    if not education:
+        return
+
     _section_heading(doc, "EDUCATION")
     for education_block in education:
         parts = [education_block.institution]
@@ -258,6 +269,54 @@ def _render_education(doc: DocumentObject, education: list[EducationEntry]) -> N
         if education_block.graduated:
             parts.append(education_block.graduated)
         doc.add_paragraph(" - ".join(parts))
+
+
+def _render_credentials(
+    doc: DocumentObject, credentials: list[CredentialEntry]
+) -> None:
+    """Certifications and licences.
+
+    This section was modelled end to end -- schema, Pydantic, the Go
+    assembler -- and then never rendered, so every certification the pipeline
+    selected was silently dropped on the document's last step. Neither tracked
+    fixture carried a credential, so no test could have caught it.
+
+    The heading is "CREDENTIALS" rather than "CERTIFICATIONS" because the
+    section carries licences too, and a licence is not a certification. Once
+    the section manifest lands this becomes a per-user string.
+    """
+    if not credentials:
+        return
+
+    _section_heading(doc, "CREDENTIALS")
+    for credential in credentials:
+        parts = [credential.name]
+        if credential.issuer:
+            parts.append(credential.issuer)
+        if dates := _format_credential_dates(credential):
+            parts.append(dates)
+        # " · " rather than education's " - ": certification names routinely
+        # contain a dash of their own ("... Architect - Associate",
+        # "Security+ - ce"), and the separator then disappears into the name.
+        doc.add_paragraph(" · ".join(parts))
+
+
+def _format_credential_dates(credential: CredentialEntry) -> str | None:
+    """Issue and expiry as one fragment, or None when neither is recorded.
+
+    An expiry alone is worth printing: a licence with a renewal date and no
+    recorded issue date is still a licence with a renewal date.
+    """
+    issued = format_date(credential.issued_on) if credential.issued_on else None
+    expires = format_date(credential.expires_on) if credential.expires_on else None
+
+    if issued and expires:
+        return f"{issued} – {expires}"
+    if issued:
+        return issued
+    if expires:
+        return f"expires {expires}"
+    return None
 
 
 def _format_tenure(started_on: str, ended_on: str | None) -> str:

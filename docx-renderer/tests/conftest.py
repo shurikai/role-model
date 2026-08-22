@@ -10,8 +10,15 @@ from models import Resume
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
 
 # sample_resume.json has no projects and no credentials; sample_formatted.json
-# carries two projects. Between them the optional-section branches are covered
-# in both directions, so tests that care about structure parametrize over both.
+# carries two of each. Between them the optional-section branches are covered in
+# both directions, so tests that care about structure parametrize over both.
+#
+# The credentials on sample_formatted.json were added when _render_credentials
+# was written: neither fixture had carried one, so the section could be modelled
+# end to end and never rendered without a single test going red. A fixture pair
+# whose job is covering both directions has to actually cover both.
+# minimal_resume_data below is the all-empty case, and test_docx_builder feeds
+# it to the builder -- for a long time nothing did.
 FIXTURE_NAMES = ["sample_resume.json", "sample_formatted.json"]
 
 
