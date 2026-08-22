@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import date
 
 from docx import Document
@@ -10,11 +11,9 @@ from docx.text.paragraph import Paragraph
 
 from models import (
     CredentialEntry,
-    EducationEntry,
-    EmployerBlock,
     Identity,
-    ProjectEntry,
     Resume,
+    ResumeSection,
 )
 
 FONT_NAME = "Arial"
@@ -48,13 +47,21 @@ def build_resume_document(resume: Resume) -> DocumentObject:
     _configure_page(doc)
     _configure_base_style(doc)
 
+    # Identity is not a section. It is the document header -- name, contact,
+    # headline -- always first and never in the manifest, because a resume with
+    # its name turned off is not a configuration anyone wants.
     _render_identity(doc, resume.identity)
-    _render_summary(doc, resume.summary)
-    _render_skills(doc, resume.skills)
-    _render_experience(doc, resume.experience)
-    _render_projects(doc, resume.projects)
-    _render_education(doc, resume.education)
-    _render_credentials(doc, resume.credentials)
+
+    sections = resume.sections or DEFAULT_SECTIONS
+    for section in sections:
+        render = SECTION_RENDERERS.get(section.key)
+        if render is None:
+            # A key this renderer does not know. Skipping keeps a document that
+            # names a newer section type renderable by an older renderer, minus
+            # the part it cannot draw. Failing here would make adding a section
+            # type a lockstep deploy.
+            continue
+        render(doc, resume, section.heading)
 
     return doc
 
@@ -206,21 +213,32 @@ def _render_identity(doc: DocumentObject, identity: Identity) -> None:
         contact_p.add_run(contact_line)
 
 
-def _render_summary(doc: DocumentObject, summary: str) -> None:
-    _section_heading(doc, "SUMMARY")
-    doc.add_paragraph(summary)
+def _render_summary(doc: DocumentObject, resume: Resume, heading: str) -> None:
+    if not resume.summary:
+        return
+
+    _section_heading(doc, heading)
+    doc.add_paragraph(resume.summary)
 
 
-def _render_skills(doc: DocumentObject, skills: dict[str, list[str]]) -> None:
-    _section_heading(doc, "SKILLS")
+def _render_skills(doc: DocumentObject, resume: Resume, heading: str) -> None:
+    skills = resume.skills
+    if not any(skills.values()):
+        return
+
+    _section_heading(doc, heading)
     for category, skills_list in skills.items():
         if skills_list:
             line = f"{category}: {', '.join(skills_list)}"
             _add_bullet(doc, line)
 
 
-def _render_experience(doc: DocumentObject, experience: list[EmployerBlock]) -> None:
-    _section_heading(doc, "EXPERIENCE")
+def _render_experience(doc: DocumentObject, resume: Resume, heading: str) -> None:
+    experience = resume.experience
+    if not experience:
+        return
+
+    _section_heading(doc, heading)
     for employer_block in experience:
         for position in employer_block.positions:
             tenure = _format_tenure(position.started_on, position.ended_on)
@@ -231,11 +249,12 @@ def _render_experience(doc: DocumentObject, experience: list[EmployerBlock]) -> 
                 _add_bullet(doc, bullet.text)
 
 
-def _render_projects(doc: DocumentObject, projects: list[ProjectEntry]) -> None:
+def _render_projects(doc: DocumentObject, resume: Resume, heading: str) -> None:
+    projects = resume.projects
     if not projects:
         return
 
-    _section_heading(doc, "PROJECTS")
+    _section_heading(doc, heading)
     for project in projects:
         tenure = None
         if project.started_on:
@@ -255,11 +274,12 @@ def _render_projects(doc: DocumentObject, projects: list[ProjectEntry]) -> None:
             doc.add_paragraph(link_line)
 
 
-def _render_education(doc: DocumentObject, education: list[EducationEntry]) -> None:
+def _render_education(doc: DocumentObject, resume: Resume, heading: str) -> None:
+    education = resume.education
     if not education:
         return
 
-    _section_heading(doc, "EDUCATION")
+    _section_heading(doc, heading)
     for education_block in education:
         parts = [education_block.institution]
         if education_block.degree:
@@ -271,9 +291,7 @@ def _render_education(doc: DocumentObject, education: list[EducationEntry]) -> N
         doc.add_paragraph(" - ".join(parts))
 
 
-def _render_credentials(
-    doc: DocumentObject, credentials: list[CredentialEntry]
-) -> None:
+def _render_credentials(doc: DocumentObject, resume: Resume, heading: str) -> None:
     """Certifications and licences.
 
     This section was modelled end to end -- schema, Pydantic, the Go
@@ -285,10 +303,11 @@ def _render_credentials(
     section carries licences too, and a licence is not a certification. Once
     the section manifest lands this becomes a per-user string.
     """
+    credentials = resume.credentials
     if not credentials:
         return
 
-    _section_heading(doc, "CREDENTIALS")
+    _section_heading(doc, heading)
     for credential in credentials:
         parts = [credential.name]
         if credential.issuer:
@@ -340,3 +359,34 @@ def format_date(value: str) -> str:
     """
     year, month = value.split("-")
     return date(int(year), int(month), 1).strftime("%b %Y")
+
+
+# The section dispatch table, and the fallback manifest for a document that
+# carries none.
+#
+# These sit at the bottom because they name the functions above them. That is
+# the whole mechanism: build_resume_document iterates a list of (key, heading)
+# pairs and looks each key up here, where it used to call five renderers in a
+# fixed order with the headings written into their bodies. Adding a section
+# type is now a row and an entry in this dict, not an edit to the builder.
+SECTION_RENDERERS: dict[str, Callable[[DocumentObject, Resume, str], None]] = {
+    "summary": _render_summary,
+    "skills": _render_skills,
+    "experience": _render_experience,
+    "projects": _render_projects,
+    "education": _render_education,
+    "credentials": _render_credentials,
+}
+
+# Used only when a document carries no manifest at all. An empty `sections`
+# array is far more likely to mean "produced before manifests existed" than
+# "the user turned every section off", and the second reading renders a page
+# with a name on it and nothing else.
+DEFAULT_SECTIONS = [
+    ResumeSection(key="summary", heading="SUMMARY"),
+    ResumeSection(key="skills", heading="SKILLS"),
+    ResumeSection(key="experience", heading="EXPERIENCE"),
+    ResumeSection(key="projects", heading="PROJECTS"),
+    ResumeSection(key="education", heading="EDUCATION"),
+    ResumeSection(key="credentials", heading="CREDENTIALS"),
+]

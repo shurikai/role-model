@@ -12,10 +12,7 @@
     "identity",
     "summary",
     "experience",
-    "skills",
-    "education",
-    "credentials",
-    "projects",
+    "sections",
     "meta"
   ],
   "additionalProperties": false,
@@ -89,6 +86,13 @@
     "summary": {
       "type": "string",
       "description": "Targeted prose summary generated per application."
+    },
+    "sections": {
+      "type": "array",
+      "description": "The section manifest, in print order. Assembled from the user's resume_sections rows, not written by the model. A renderer iterates this instead of calling its section renderers in a fixed order \u2014 which is what made the resume's shape a code change in three files rather than a row.",
+      "items": {
+        "$ref": "#/$defs/resume_section"
+      }
     },
     "experience": {
       "type": "array",
@@ -458,6 +462,25 @@
         },
         "prompt_version": {
           "type": "string"
+        }
+      }
+    },
+    "resume_section": {
+      "type": "object",
+      "required": [
+        "key",
+        "heading"
+      ],
+      "additionalProperties": false,
+      "description": "One printed section: which content block it renders and what heading it prints under. The array's order is the print order. Hidden sections are absent from it entirely \u2014 a renderer never learns they exist.",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The content block this section renders: summary, skills, experience, projects, education, or credentials. A renderer that does not recognise a key skips it rather than failing \u2014 a document is still a resume without one section."
+        },
+        "heading": {
+          "type": "string",
+          "description": "The printed heading, e.g. \"EDUCATION\" or \"EDUCATION & TRAINING\". Free text; this is the half the user owns."
         }
       }
     }

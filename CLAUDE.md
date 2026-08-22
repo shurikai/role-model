@@ -82,9 +82,48 @@ The presupposition lived in the vocabulary wrapped around it.
   software-specific — prominence versus presence is the same question for
   "Spanish fluency as a core requirement" as for "Python as a primary language".
 
+- **The resume's shape is a manifest, not a call sequence.** `resume_sections`
+  (migration 022) holds which content blocks print, in what order, under what
+  heading. It replaced a shape fixed in three files at once — twelve required
+  keys in the document schema, five renderer calls in a fixed order in
+  `docx_builder.py`, and the heading strings written into each renderer's body
+  — so renaming EDUCATION or moving CREDENTIALS above EXPERIENCE was a change
+  to Go, Python, and a JSON schema. See **The section manifest** below.
+
 **Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
-the fixed twelve-section resume contract, and `core_competencies` being scored
-by nothing. Those are Phases 5-6; this section covers Phases 1-4.
+`core_competencies` is scored by nothing, and the matcher's raw-substring
+direct layer over-reaches on generic vocabulary. Those are Phase 6; this
+section covers Phases 1-5.
+
+### The section manifest
+
+`resume_sections (user_id, key, heading, sort_order, hidden, source)`. `key`
+names a content block the pipeline produces; `heading` is the printed text and
+the half the user owns. Four rules hold it together:
+
+- **`key` and `source` mean different things, and `source` keeps the meaning it
+  has on the vocabulary tables** — provenance (`default | inferred | user`).
+  The plan proposed `source` for "which content feeds this section"; that would
+  have put two meanings under one column name in sibling tables, which is
+  precisely what `work_type` cost (#53). The content pointer is `key`.
+- **Hidden reaches the renderer as ABSENT, never as a flag.** Generation drops
+  hidden rows from the document's `sections` array. A renderer given a flag has
+  to be trusted to check it, and the one that forgot would print a heading the
+  user had explicitly turned off; a renderer given nothing cannot.
+- **An unknown `key` is skipped, not rejected.** Otherwise adding a section type
+  becomes a lockstep deploy — a document naming PUBLICATIONS would fail against
+  every renderer that had not shipped yet, rather than rendering everything
+  else.
+- **An empty manifest means "no manifest", not "print nothing".** Both sides
+  fall back to the conventional order. Reading an empty array as "every section
+  is off" renders a page with a name on it and nothing else — total data loss
+  that still returns 200.
+
+A section still needs a content block behind it: this makes the *shape* of a
+resume data, not its content. The cheapest route to a genuinely new section type
+is that `projects` is already a list of dated named things with a role, a
+status, links, and bullets — which is what a musician's PERFORMANCES and an
+academic's PUBLICATIONS both are.
 
 ### Level vocabularies
 
@@ -547,6 +586,13 @@ styles, and it sets `keep_with_next` on section-heading and role-header
 paragraph chains for widow/orphan protection. Bullets are deliberately left
 free to break across pages.
 
+`build_resume_document` iterates the document's `sections` manifest and looks
+each `key` up in `SECTION_RENDERERS`. Identity is not a section — it is the
+document header, always first, never in the manifest, because a resume with its
+name turned off is not a configuration anyone wants. Each section renderer
+keeps its own empty guard and returns before emitting a heading, which is the
+invariant that stopped bare headings printing over nothing.
+
 ### Prompt management
 Prompts live in /internal/generation/prompts, embedded into the binary at
 compile time via go:embed.
@@ -602,7 +648,8 @@ Rules:
 /internal/httputil               — shared HTTP helpers (breaks handlers↔middleware cycle)
 /internal/renderer               — HTTP client for the docx-renderer service
 /internal/stage0                 — LLM-assisted import (extract + enrich + review)
-/internal/vocabulary             — starting level vocabularies, installed at signup
+/internal/vocabulary             — starting level vocabularies and section manifest,
+                                   installed at signup
 /docx-renderer                   — Python service: resume JSON -> .docx
 /frontend                        — React + TypeScript + Vite UI
 /database/seed                   — real career seed SQL; a separate private git

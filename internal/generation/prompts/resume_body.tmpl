@@ -32,9 +32,14 @@ skills, projects, education, and credentials only. Do NOT include a top-level
 "summary" field in your output — the summary is written in a separate pass
 from this pass's output, and including one here will be discarded.
 
+Do NOT include a top-level "sections" field either. That is the candidate's own
+list of which sections print, in what order, under what heading; it is stamped
+after this pass and anything you write there is discarded. Write the content
+blocks and let the manifest decide what is shown.
+
 Your output must be valid JSON matching the resume schema provided, minus the
-"summary" field. Return only the JSON document with no preamble, explanation,
-or markdown formatting.
+"summary" and "sections" fields. Return only the JSON document with no
+preamble, explanation, or markdown formatting.
 
 RULES:
 - Use only information present in the provided data. Never infer, guess, or

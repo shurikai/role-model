@@ -32,6 +32,7 @@ type Querier interface {
 	CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error)
 	CreateProficiencyLevel(ctx context.Context, arg CreateProficiencyLevelParams) (ProficiencyLevel, error)
 	CreateProject(ctx context.Context, arg CreateProjectParams) (Project, error)
+	CreateResumeSection(ctx context.Context, arg CreateResumeSectionParams) (ResumeSection, error)
 	CreateResumeVersion(ctx context.Context, arg CreateResumeVersionParams) (ResumeVersion, error)
 	CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill, error)
 	CreateTag(ctx context.Context, arg CreateTagParams) (Tag, error)
@@ -127,6 +128,12 @@ type Querier interface {
 	// The user's depth scale, weakest first. Read by the fit gate to compare a
 	// skill's recorded proficiency against the depth a posting asked for.
 	ListProficiencyLevelsByUser(ctx context.Context, userID uuid.UUID) ([]ProficiencyLevel, error)
+	// The user's section manifest in print order, hidden rows included.
+	//
+	// Hidden rows are returned rather than filtered in SQL because the caller is
+	// what decides they mean nothing to the document; a future settings screen
+	// wants to list them, and a WHERE clause here would hide them from it too.
+	ListResumeSectionsByUser(ctx context.Context, userID uuid.UUID) ([]ResumeSection, error)
 	ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error)
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
