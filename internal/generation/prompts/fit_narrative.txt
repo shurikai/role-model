@@ -5,10 +5,10 @@ The narrative should:
 - Open with a direct assessment: strong fit, moderate fit, or weak fit
 - Summarize the technical alignment in one or two sentences, calling out key matched
   skills and any significant gaps. Cite the concrete skills that answered a
-  requirement, drawing them from technical_matches[].evidence — "your CI/CD
+  requirement, drawing them from capability_matches[].evidence — "your CI/CD
   experience is Jenkins, GitHub Actions, and Harness" tells the reader something
   a bare score does not. Prefer evidence over restating the requirement back.
-- Where technical_partial is non-empty, say so in its own terms. A partial match
+- Where capability_partial is non-empty, say so in its own terms. A partial match
   is real evidence with a real caveat: the profile HAS the skill, at less depth
   than the posting asked for. Name what was asked and what answers it, using the
   required_level and evidence_level on the entry ("the posting wants expert Kafka
@@ -30,12 +30,12 @@ The narrative should:
     to them.
   - preference_conflicts are preferences the JD actively signals against
     (something you dislike that the role does appear to involve). These, and
-    anti_pattern_hits below, are the only items that should be described using
+    dealbreaker_hits below, are the only items that should be described using
     conflict language ("conflicts with", "runs against", "at odds with").
-  - anti_pattern_hits are the disqualifying criteria — see anti_pattern_passed
+  - dealbreaker_hits are the disqualifying criteria — see dealbreakers_clear
     below. Treat these as a heavier finding than an ordinary conflict, and never
     describe one as merely a conflict or a dislike.
-  - If both preference_conflicts and anti_pattern_hits are empty, do not imply
+  - If both preference_conflicts and dealbreaker_hits are empty, do not imply
     any conflicts exist even if preference_gaps is long.
   - Do not rank, count, weigh, or total these lists, and do not invent a
     preference score or a "X of Y preferences met" figure. Which list an entry
@@ -57,10 +57,10 @@ Rules:
 - Return plain text only. No JSON, no markdown, no headers.
 
 Input will be provided as a JSON object with these fields:
-- anti_pattern_passed: boolean. A false value means the JD matched one or more
+- dealbreakers_clear: boolean. A false value means the JD matched one or more
   of your hard-gate preferences — the criteria you have marked as
   disqualifying rather than merely disliked. It is a summary of
-  anti_pattern_hits and is false exactly when that list is non-empty; the hits
+  dealbreaker_hits and is false exactly when that list is non-empty; the hits
   themselves are what you name.
 
   Treat a false value as a strong signal and say plainly what was matched and
@@ -70,17 +70,17 @@ Input will be provided as a JSON object with these fields:
   automatically rejected either: the decision is yours, and a gate can be
   overridden on facts the posting did not make clear. But do not soften it into
   a passing mention.
-- technical_score: number 0-100. MAY BE ABSENT ENTIRELY.
+- capability_score: number 0-100. MAY BE ABSENT ENTIRELY.
 
-  An absent technical_score means the JD named no specific technologies to
-  score against, so nothing was scored — technical_matches and technical_gaps
+  An absent capability_score means the JD named no specific technologies to
+  score against, so nothing was scored — capability_matches and capability_gaps
   are both empty for the same reason. This is an absence of evidence, not a
   finding. It is neither a strong technical fit nor a weak one.
 
   When it is absent: say plainly that the technical fit went unassessed, and
   base the recommendation on the preference and screening signals instead.
   Never describe technical coverage, never call the technical fit strong or
-  weak, and never quote or invent a number. An empty technical_gaps here means
+  weak, and never quote or invent a number. An empty capability_gaps here means
   nothing was checked, NOT that there are no gaps.
 
   Check core_competencies before you characterize the posting. A senior or
@@ -106,15 +106,15 @@ Input will be provided as a JSON object with these fields:
   background — no "the competency match is direct," no "speaks directly to
   what they're asking for," no similar language implying you assessed it.
   You did not: there is no evidence list behind this field the way there is
-  for technical_matches, and a confident verdict with nothing to cite is the
+  for capability_matches, and a confident verdict with nothing to cite is the
   same failure this field exists to prevent, just moved from "the posting is
   vague" to "the match is strong." State the competencies plainly and stop —
   something like "these were not evaluated against your history; the match
   is yours to judge," not an assessment of how well you fit them.
 
-- technical_gaps: array of strings — the JD requirements nothing in the profile
+- capability_gaps: array of strings — the JD requirements nothing in the profile
   answered. These are the JD's own phrasings, not tag names.
-- technical_matches: array of objects, one per satisfied requirement:
+- capability_matches: array of objects, one per satisfied requirement:
   - requirement: the JD's phrasing
   - kind: how it was satisfied. "direct" means a stored skill of that name.
     "alias" means a recorded synonym of one. "category" means the JD asked for
@@ -129,25 +129,25 @@ Input will be provided as a JSON object with these fields:
   A "category" match is real but broader than a "direct" one. Do not describe
   it as though the JD's exact phrase were a stored skill; say what the person
   actually has. Never call a matched requirement a gap.
-- technical_partial: array of the same objects, for requirements the profile
+- capability_partial: array of the same objects, for requirements the profile
   answers BELOW the depth the JD asked for. These always carry required_level,
   evidence_level, and level_signal.
 
   A partial match is a third verdict and reads as neither of the other two. It
-  earned half credit toward technical_score, so the score already reflects it —
+  earned half credit toward capability_score, so the score already reflects it —
   your job is to say which skill is short and by how much, not to re-penalize
-  it. An empty technical_partial is the normal case and means no posting-stated
+  it. An empty capability_partial is the normal case and means no posting-stated
   depth went unmet; it is never evidence that every skill is deep.
 - Preference fit is reported as four lists and no score. Each entry is an object
   with a label (your own wording for the preference) and a preference_type
-  (domain, work_type, culture, primary_stack, or anti_pattern) saying what kind
+  (domain, role_shape, culture, core_practice, or dealbreaker) saying what kind
   of thing it is about. Any list may be empty.
   - preference_matches: positive preferences the JD answers.
   - preference_gaps: positive preferences the JD doesn't mention — neutral,
     never conflicts.
   - preference_conflicts: negative preferences the JD actively signals. Genuine
     conflicts, but not disqualifying on their own.
-  - anti_pattern_hits: matched hard-gate preferences — the disqualifying ones.
+  - dealbreaker_hits: matched hard-gate preferences — the disqualifying ones.
     These are kept in their own list rather than mixed into
     preference_conflicts, because a disqualifier and an ordinary dislike are
     different kinds of finding and must read differently. A hit appears here
@@ -156,7 +156,8 @@ Input will be provided as a JSON object with these fields:
   There is deliberately no preference score. A single number could not be read
   back to the rows behind it, and every attempt to compute one produced
   findings that contradicted the lists. Do not reconstruct one.
-- jd_summary: brief description of the role (company, title, domain)
+- jd_summary: brief description of the role (company, title, and the posting's
+  own words for its industry when it stated one)
 - screening_summary: object of plain-language facts about the role that are not
   skills-related — location, work_arrangement, travel, industry,
   clearance_citizenship, and other_flags (an open-ended array of anything else

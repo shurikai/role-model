@@ -47,10 +47,10 @@ func (q *Queries) AssignTagToProject(ctx context.Context, arg AssignTagToProject
 const createProject = `-- name: CreateProject :one
 INSERT INTO projects (
     id, user_id, name, tagline, role, status, started_on, ended_on,
-    repo_url, live_url, writeup_url, force_include, force_exclude
+    source_url, live_url, writeup_url, force_include, force_exclude
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
+RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, source_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
 `
 
 type CreateProjectParams struct {
@@ -62,7 +62,7 @@ type CreateProjectParams struct {
 	Status       string      `json:"status"`
 	StartedOn    pgtype.Date `json:"started_on"`
 	EndedOn      pgtype.Date `json:"ended_on"`
-	RepoUrl      *string     `json:"repo_url"`
+	SourceUrl    *string     `json:"source_url"`
 	LiveUrl      *string     `json:"live_url"`
 	WriteupUrl   *string     `json:"writeup_url"`
 	ForceInclude bool        `json:"force_include"`
@@ -79,7 +79,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		arg.Status,
 		arg.StartedOn,
 		arg.EndedOn,
-		arg.RepoUrl,
+		arg.SourceUrl,
 		arg.LiveUrl,
 		arg.WriteupUrl,
 		arg.ForceInclude,
@@ -95,7 +95,7 @@ func (q *Queries) CreateProject(ctx context.Context, arg CreateProjectParams) (P
 		&i.Status,
 		&i.StartedOn,
 		&i.EndedOn,
-		&i.RepoUrl,
+		&i.SourceUrl,
 		&i.LiveUrl,
 		&i.WriteupUrl,
 		&i.ForceInclude,
@@ -188,7 +188,7 @@ func (q *Queries) GetContributionsByProject(ctx context.Context, arg GetContribu
 }
 
 const getProject = `-- name: GetProject :one
-SELECT id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at FROM projects
+SELECT id, user_id, name, tagline, role, status, started_on, ended_on, source_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at FROM projects
 WHERE id = $1 AND user_id = $2
 `
 
@@ -209,7 +209,7 @@ func (q *Queries) GetProject(ctx context.Context, arg GetProjectParams) (Project
 		&i.Status,
 		&i.StartedOn,
 		&i.EndedOn,
-		&i.RepoUrl,
+		&i.SourceUrl,
 		&i.LiveUrl,
 		&i.WriteupUrl,
 		&i.ForceInclude,
@@ -221,7 +221,7 @@ func (q *Queries) GetProject(ctx context.Context, arg GetProjectParams) (Project
 }
 
 const getProjects = `-- name: GetProjects :many
-SELECT id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at FROM projects
+SELECT id, user_id, name, tagline, role, status, started_on, ended_on, source_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at FROM projects
 WHERE user_id = $1
 ORDER BY started_on DESC NULLS FIRST
 `
@@ -244,7 +244,7 @@ func (q *Queries) GetProjects(ctx context.Context, userID uuid.UUID) ([]Project,
 			&i.Status,
 			&i.StartedOn,
 			&i.EndedOn,
-			&i.RepoUrl,
+			&i.SourceUrl,
 			&i.LiveUrl,
 			&i.WriteupUrl,
 			&i.ForceInclude,
@@ -351,14 +351,14 @@ SET name          = $3,
     status        = $6,
     started_on    = $7,
     ended_on      = $8,
-    repo_url      = $9,
+    source_url      = $9,
     live_url      = $10,
     writeup_url   = $11,
     force_include = $12,
     force_exclude = $13,
     updated_at    = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, repo_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
+RETURNING id, user_id, name, tagline, role, status, started_on, ended_on, source_url, live_url, writeup_url, force_include, force_exclude, created_at, updated_at
 `
 
 type UpdateProjectParams struct {
@@ -370,7 +370,7 @@ type UpdateProjectParams struct {
 	Status       string      `json:"status"`
 	StartedOn    pgtype.Date `json:"started_on"`
 	EndedOn      pgtype.Date `json:"ended_on"`
-	RepoUrl      *string     `json:"repo_url"`
+	SourceUrl    *string     `json:"source_url"`
 	LiveUrl      *string     `json:"live_url"`
 	WriteupUrl   *string     `json:"writeup_url"`
 	ForceInclude bool        `json:"force_include"`
@@ -387,7 +387,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		arg.Status,
 		arg.StartedOn,
 		arg.EndedOn,
-		arg.RepoUrl,
+		arg.SourceUrl,
 		arg.LiveUrl,
 		arg.WriteupUrl,
 		arg.ForceInclude,
@@ -403,7 +403,7 @@ func (q *Queries) UpdateProject(ctx context.Context, arg UpdateProjectParams) (P
 		&i.Status,
 		&i.StartedOn,
 		&i.EndedOn,
-		&i.RepoUrl,
+		&i.SourceUrl,
 		&i.LiveUrl,
 		&i.WriteupUrl,
 		&i.ForceInclude,

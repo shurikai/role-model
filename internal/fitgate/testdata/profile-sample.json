@@ -2,74 +2,350 @@
   "name": "sample",
   "source": "database/sample/007_skills_preferences.sql",
   "note": "Morgan Reyes, the fictional persona from database/sample. Mirrored here by hand so the eval harness runs offline. TestEvalProfileMatchesSampleSeed guards the mirror against drift.",
-  "note_primary_stack": "The primary_stack row exists so the fixture set exercises a label that makes a claim about PROMINENCE rather than presence. Every gate row here was a bare term (.NET, adtech, gambling, surveillance), which is exactly why the harness was blind to #68: a qualified label matched on any bare token inside it, and no fixture had one.",
-
   "skills": [
-    { "name": "Go",                        "proficiency": "expert",     "years_experience": 9.0,  "is_active": true },
-    { "name": "PostgreSQL",                "proficiency": "expert",     "years_experience": 11.0, "is_active": true },
-    { "name": "Kafka",                     "proficiency": "expert",     "years_experience": 9.5,  "is_active": true },
-    { "name": "Distributed Systems",       "proficiency": "expert",     "years_experience": 10.0, "is_active": true },
-    { "name": "AWS",                       "proficiency": "expert",     "years_experience": 9.0,  "is_active": true },
-    { "name": "Event-Driven Architecture", "proficiency": "expert",     "years_experience": 9.5,  "is_active": true },
-    { "name": "Technical Leadership",      "proficiency": "expert",     "years_experience": 8.0,  "is_active": true },
-    { "name": "Incident Response",         "proficiency": "expert",     "years_experience": 8.5,  "is_active": true },
-
-    { "name": "SQL",                       "proficiency": "proficient", "years_experience": 13.0, "is_active": true },
-    { "name": "REST",                      "proficiency": "proficient", "years_experience": 13.0, "is_active": true },
-    { "name": "Integration Testing",       "proficiency": "proficient", "years_experience": 12.0, "is_active": true },
-    { "name": "Java",                      "proficiency": "proficient", "years_experience": 6.5,  "is_active": true },
-    { "name": "Python",                    "proficiency": "proficient", "years_experience": 5.0,  "is_active": true },
-    { "name": "Kubernetes",                "proficiency": "proficient", "years_experience": 6.5,  "is_active": true },
-    { "name": "Terraform",                 "proficiency": "proficient", "years_experience": 6.0,  "is_active": true },
-    { "name": "Docker",                    "proficiency": "proficient", "years_experience": 8.0,  "is_active": true },
-    { "name": "Redis",                     "proficiency": "proficient", "years_experience": 8.0,  "is_active": true },
-    { "name": "gRPC",                      "proficiency": "proficient", "years_experience": 6.0,  "is_active": true },
-    { "name": "Mentoring",                 "proficiency": "proficient", "years_experience": 8.0,  "is_active": true },
-    { "name": "Prometheus",                "proficiency": "proficient", "years_experience": 7.0,  "is_active": true },
-    { "name": "Grafana",                   "proficiency": "proficient", "years_experience": 7.0,  "is_active": true },
-    { "name": "OpenTelemetry",             "proficiency": "proficient", "years_experience": 5.0,  "is_active": true },
-    { "name": "Load Testing",              "proficiency": "proficient", "years_experience": 6.0,  "is_active": true },
-    { "name": "Contract Testing",          "proficiency": "proficient", "years_experience": 5.0,  "is_active": true },
-    { "name": "Domain-Driven Design",      "proficiency": "proficient", "years_experience": 7.0,  "is_active": true },
-    { "name": "GitHub Actions",            "proficiency": "proficient", "years_experience": 5.5,  "is_active": true },
-    { "name": "ArgoCD",                    "proficiency": "proficient", "years_experience": 5.0,  "is_active": true },
-    { "name": "TimescaleDB",               "proficiency": "proficient", "years_experience": 4.5,  "is_active": true },
-    { "name": "EDI",                       "proficiency": "proficient", "years_experience": 6.0,  "is_active": true },
-    { "name": "chi",                       "proficiency": "proficient", "years_experience": 4.0,  "is_active": true },
-
-    { "name": "Elasticsearch",             "proficiency": "novice",     "years_experience": 3.5,  "is_active": true },
-    { "name": "TypeScript",                "proficiency": "novice",     "years_experience": 2.0,  "is_active": true },
-    { "name": "React",                     "proficiency": "novice",     "years_experience": 1.5,  "is_active": true },
-    { "name": "FastAPI",                   "proficiency": "novice",     "years_experience": 1.5,  "is_active": true },
-    { "name": "DynamoDB",                  "proficiency": "novice",     "years_experience": 1.0,  "is_active": true },
-    { "name": "WebSockets",                "proficiency": "novice",     "years_experience": 1.5,  "is_active": true },
-
-    { "name": "Spring Boot",               "proficiency": "proficient", "years_experience": 4.5,  "is_active": false },
-    { "name": "Jenkins",                   "proficiency": "proficient", "years_experience": 5.0,  "is_active": false }
+    {
+      "name": "Go",
+      "proficiency": "expert",
+      "years_experience": 9.0,
+      "is_active": true
+    },
+    {
+      "name": "PostgreSQL",
+      "proficiency": "expert",
+      "years_experience": 11.0,
+      "is_active": true
+    },
+    {
+      "name": "Kafka",
+      "proficiency": "expert",
+      "years_experience": 9.5,
+      "is_active": true
+    },
+    {
+      "name": "Distributed Systems",
+      "proficiency": "expert",
+      "years_experience": 10.0,
+      "is_active": true
+    },
+    {
+      "name": "AWS",
+      "proficiency": "expert",
+      "years_experience": 9.0,
+      "is_active": true
+    },
+    {
+      "name": "Event-Driven Architecture",
+      "proficiency": "expert",
+      "years_experience": 9.5,
+      "is_active": true
+    },
+    {
+      "name": "Technical Leadership",
+      "proficiency": "expert",
+      "years_experience": 8.0,
+      "is_active": true
+    },
+    {
+      "name": "Incident Response",
+      "proficiency": "expert",
+      "years_experience": 8.5,
+      "is_active": true
+    },
+    {
+      "name": "SQL",
+      "proficiency": "proficient",
+      "years_experience": 13.0,
+      "is_active": true
+    },
+    {
+      "name": "REST",
+      "proficiency": "proficient",
+      "years_experience": 13.0,
+      "is_active": true
+    },
+    {
+      "name": "Integration Testing",
+      "proficiency": "proficient",
+      "years_experience": 12.0,
+      "is_active": true
+    },
+    {
+      "name": "Java",
+      "proficiency": "proficient",
+      "years_experience": 6.5,
+      "is_active": true
+    },
+    {
+      "name": "Python",
+      "proficiency": "proficient",
+      "years_experience": 5.0,
+      "is_active": true
+    },
+    {
+      "name": "Kubernetes",
+      "proficiency": "proficient",
+      "years_experience": 6.5,
+      "is_active": true
+    },
+    {
+      "name": "Terraform",
+      "proficiency": "proficient",
+      "years_experience": 6.0,
+      "is_active": true
+    },
+    {
+      "name": "Docker",
+      "proficiency": "proficient",
+      "years_experience": 8.0,
+      "is_active": true
+    },
+    {
+      "name": "Redis",
+      "proficiency": "proficient",
+      "years_experience": 8.0,
+      "is_active": true
+    },
+    {
+      "name": "gRPC",
+      "proficiency": "proficient",
+      "years_experience": 6.0,
+      "is_active": true
+    },
+    {
+      "name": "Mentoring",
+      "proficiency": "proficient",
+      "years_experience": 8.0,
+      "is_active": true
+    },
+    {
+      "name": "Prometheus",
+      "proficiency": "proficient",
+      "years_experience": 7.0,
+      "is_active": true
+    },
+    {
+      "name": "Grafana",
+      "proficiency": "proficient",
+      "years_experience": 7.0,
+      "is_active": true
+    },
+    {
+      "name": "OpenTelemetry",
+      "proficiency": "proficient",
+      "years_experience": 5.0,
+      "is_active": true
+    },
+    {
+      "name": "Load Testing",
+      "proficiency": "proficient",
+      "years_experience": 6.0,
+      "is_active": true
+    },
+    {
+      "name": "Contract Testing",
+      "proficiency": "proficient",
+      "years_experience": 5.0,
+      "is_active": true
+    },
+    {
+      "name": "Domain-Driven Design",
+      "proficiency": "proficient",
+      "years_experience": 7.0,
+      "is_active": true
+    },
+    {
+      "name": "GitHub Actions",
+      "proficiency": "proficient",
+      "years_experience": 5.5,
+      "is_active": true
+    },
+    {
+      "name": "ArgoCD",
+      "proficiency": "proficient",
+      "years_experience": 5.0,
+      "is_active": true
+    },
+    {
+      "name": "TimescaleDB",
+      "proficiency": "proficient",
+      "years_experience": 4.5,
+      "is_active": true
+    },
+    {
+      "name": "EDI",
+      "proficiency": "proficient",
+      "years_experience": 6.0,
+      "is_active": true
+    },
+    {
+      "name": "chi",
+      "proficiency": "proficient",
+      "years_experience": 4.0,
+      "is_active": true
+    },
+    {
+      "name": "Elasticsearch",
+      "proficiency": "novice",
+      "years_experience": 3.5,
+      "is_active": true
+    },
+    {
+      "name": "TypeScript",
+      "proficiency": "novice",
+      "years_experience": 2.0,
+      "is_active": true
+    },
+    {
+      "name": "React",
+      "proficiency": "novice",
+      "years_experience": 1.5,
+      "is_active": true
+    },
+    {
+      "name": "FastAPI",
+      "proficiency": "novice",
+      "years_experience": 1.5,
+      "is_active": true
+    },
+    {
+      "name": "DynamoDB",
+      "proficiency": "novice",
+      "years_experience": 1.0,
+      "is_active": true
+    },
+    {
+      "name": "WebSockets",
+      "proficiency": "novice",
+      "years_experience": 1.5,
+      "is_active": true
+    },
+    {
+      "name": "Spring Boot",
+      "proficiency": "proficient",
+      "years_experience": 4.5,
+      "is_active": false
+    },
+    {
+      "name": "Jenkins",
+      "proficiency": "proficient",
+      "years_experience": 5.0,
+      "is_active": false
+    }
   ],
-
   "preferences": [
-    { "preference_type": "domain",       "label": "logistics",             "sentiment": "positive", "weight": 9 },
-    { "preference_type": "domain",       "label": "supply chain",          "sentiment": "positive", "weight": 8 },
-    { "preference_type": "domain",       "label": "developer tooling",     "sentiment": "positive", "weight": 6 },
-    { "preference_type": "work_type",    "label": "backend",               "sentiment": "positive", "weight": 9 },
-    { "preference_type": "work_type",    "label": "distributed systems",   "sentiment": "positive", "weight": 9 },
-    { "preference_type": "work_type",    "label": "platform engineering",  "sentiment": "positive", "weight": 8 },
-    { "preference_type": "culture",      "label": "remote",                "sentiment": "positive", "weight": 8 },
-    { "preference_type": "culture",      "label": "mentoring",             "sentiment": "positive", "weight": 7 },
-    { "preference_type": "culture",      "label": "blameless postmortems", "sentiment": "positive", "weight": 5 },
-
-    { "preference_type": "work_type",    "label": "frontend",              "sentiment": "negative", "weight": 6 },
-    { "preference_type": "work_type",    "label": "people management",     "sentiment": "negative", "weight": 7 },
-    { "preference_type": "culture",      "label": "on-call heavy",         "sentiment": "negative", "weight": 5 },
-    { "preference_type": "culture",      "label": "mandatory overtime",    "sentiment": "negative", "weight": 7 },
-
-    { "preference_type": "anti_pattern", "label": ".NET",                  "sentiment": "negative", "weight": 10, "is_hard_gate": true },
-
-    { "preference_type": "primary_stack", "label": "TypeScript / Node.js as a primary language", "sentiment": "negative", "weight": 10, "is_hard_gate": true },
-
-    { "preference_type": "anti_pattern", "label": "adtech",                "sentiment": "negative", "weight": 10, "is_hard_gate": true },
-    { "preference_type": "anti_pattern", "label": "gambling",              "sentiment": "negative", "weight": 10, "is_hard_gate": true },
-    { "preference_type": "anti_pattern", "label": "surveillance",          "sentiment": "negative", "weight": 10, "is_hard_gate": true }
-  ]
+    {
+      "preference_type": "domain",
+      "label": "logistics",
+      "sentiment": "positive",
+      "weight": 9
+    },
+    {
+      "preference_type": "domain",
+      "label": "supply chain",
+      "sentiment": "positive",
+      "weight": 8
+    },
+    {
+      "preference_type": "domain",
+      "label": "developer tooling",
+      "sentiment": "positive",
+      "weight": 6
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "backend",
+      "sentiment": "positive",
+      "weight": 9
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "distributed systems",
+      "sentiment": "positive",
+      "weight": 9
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "platform engineering",
+      "sentiment": "positive",
+      "weight": 8
+    },
+    {
+      "preference_type": "culture",
+      "label": "remote",
+      "sentiment": "positive",
+      "weight": 8
+    },
+    {
+      "preference_type": "culture",
+      "label": "mentoring",
+      "sentiment": "positive",
+      "weight": 7
+    },
+    {
+      "preference_type": "culture",
+      "label": "blameless postmortems",
+      "sentiment": "positive",
+      "weight": 5
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "frontend",
+      "sentiment": "negative",
+      "weight": 6
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "people management",
+      "sentiment": "negative",
+      "weight": 7
+    },
+    {
+      "preference_type": "culture",
+      "label": "on-call heavy",
+      "sentiment": "negative",
+      "weight": 5
+    },
+    {
+      "preference_type": "culture",
+      "label": "mandatory overtime",
+      "sentiment": "negative",
+      "weight": 7
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": ".NET",
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "core_practice",
+      "label": "TypeScript / Node.js as a primary language",
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": "adtech",
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": "gambling",
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": "surveillance",
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    }
+  ],
+  "note_core_practice": "The core_practice row exists so the fixture set exercises a label that makes a claim about PROMINENCE rather than presence. Every gate row here was a bare term (.NET, adtech, gambling, surveillance), which is exactly why the harness was blind to #68: a qualified label matched on any bare token inside it, and no fixture had one."
 }

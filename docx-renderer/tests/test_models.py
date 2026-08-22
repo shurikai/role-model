@@ -97,15 +97,28 @@ def test_industry_level_accepts_any_ladder_rung() -> None:
         assert position.industry_level == rung
 
 
-def test_unknown_project_role_is_rejected() -> None:
-    with pytest.raises(ValidationError):
-        ProjectEntry(
+def test_project_role_and_status_accept_any_vocabulary() -> None:
+    """role and status are free text in schema v2, and that is deliberate.
+
+    v1 enumerated open-source repository vocabulary --
+    author/maintainer/contributor/lead and active/dormant/archived -- which a
+    portfolio of buildings, cases, recipes, or performances has none of.
+    Nothing in the renderer branches on either value.
+    """
+    for role, status in (
+        ("author", "active"),
+        ("principal investigator", "published"),
+        ("head chef", "seasonal"),
+    ):
+        project = ProjectEntry(
             project_id="proj1",
             name="Thing",
-            role="owner",  # not one of author|maintainer|contributor|lead
-            status="active",
+            role=role,
+            status=status,
             bullets=[Bullet(text="x", contribution_ids=["c1"])],
         )
+        assert project.role == role
+        assert project.status == status
 
 
 def test_employer_must_have_at_least_one_position(minimal_resume_data: dict) -> None:

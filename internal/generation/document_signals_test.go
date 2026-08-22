@@ -17,7 +17,7 @@ import (
 // missing.
 var schemaAllowedKeys = []string{
 	"required_skills", "preferred_skills", "seniority",
-	"domain", "work_type", "culture_signals",
+	"industry", "work_arrangement", "culture_signals",
 }
 
 // compileJDSignalsSchema compiles the jd_signals subschema straight out of the
@@ -26,10 +26,10 @@ var schemaAllowedKeys = []string{
 func compileJDSignalsSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource("resume.v1.json", bytes.NewReader(resumeschema.ResumeV1JSON)); err != nil {
+	if err := c.AddResource("resume.v2.json", bytes.NewReader(resumeschema.ResumeV2JSON)); err != nil {
 		t.Fatalf("load schema: %v", err)
 	}
-	sch, err := c.Compile("resume.v1.json#/$defs/jd_signals")
+	sch, err := c.Compile("resume.v2.json#/$defs/jd_signals")
 	if err != nil {
 		t.Fatalf("compile jd_signals subschema: %v", err)
 	}
@@ -63,11 +63,10 @@ func TestForDocumentDropsScreeningSummary(t *testing.T) {
 		RequiredSkills:  []string{"CI/CD", "observability"},
 		PreferredSkills: []string{"RAG"},
 		Seniority:       "staff",
-		Domain:          "healthcare",
-		WorkType:        "remote",
 		CultureSignals:  []string{"remote-first"},
 		ScreeningSummary: ScreeningSummary{
 			Location: "Remote", Travel: "5%", Industry: "healthcare AI",
+			WorkArrangement: "remote", ClearanceCitizenship: "none",
 		},
 	})
 
@@ -75,6 +74,22 @@ func TestForDocumentDropsScreeningSummary(t *testing.T) {
 		t.Error("screening_summary leaked into the document projection")
 	}
 	assertKeySet(t, got)
+
+	// Two of its fields do reach the document, by name, because they replaced
+	// the domain and work_type enums that used to carry the same facts badly.
+	// The rest of the block — location, travel, clearance — is screening data
+	// and must not.
+	if got["industry"] != "healthcare AI" {
+		t.Errorf("industry = %v, want the screening summary's value", got["industry"])
+	}
+	if got["work_arrangement"] != "remote" {
+		t.Errorf("work_arrangement = %v, want the screening summary's value", got["work_arrangement"])
+	}
+	for _, leaked := range []string{"location", "travel", "clearance_citizenship", "other_flags"} {
+		if _, ok := got[leaked]; ok {
+			t.Errorf("%s leaked into the document projection", leaked)
+		}
+	}
 }
 
 // The projection invariant, exercised by the newest field to land on
@@ -90,20 +105,19 @@ func TestForDocumentDropsSkillLevels(t *testing.T) {
 	sch := compileJDSignalsSchema(t)
 
 	got := validateProjection(t, sch, JDSignals{
-		RequiredSkills:  []string{"Go", "Kafka"},
-		PreferredSkills: []string{"Redis"},
-		Seniority:       "senior",
-		Domain:          "saas",
-		WorkType:        "remote",
-		CultureSignals:  []string{"remote-first"},
+		ScreeningSummary: ScreeningSummary{Industry: "saas", WorkArrangement: "remote"},
+		RequiredSkills:   []string{"Go", "Kafka"},
+		PreferredSkills:  []string{"Redis"},
+		Seniority:        "senior",
+		CultureSignals:   []string{"remote-first"},
 		SkillLevels: []SkillLevel{
 			{Requirement: "Go", Level: "expert", Signal: "expert-level Go"},
 		},
 		CoreCompetencies: []string{"distributed systems design"},
-		PrimaryStack:     []string{"Go"},
+		CorePractice:     []string{"Go"},
 	})
 
-	for _, key := range []string{"skill_levels", "core_competencies", "primary_stack"} {
+	for _, key := range []string{"skill_levels", "core_competencies", "core_practice"} {
 		if _, ok := got[key]; ok {
 			t.Errorf("%s leaked into the document projection", key)
 		}
@@ -178,10 +192,10 @@ func TestForDocumentPrefersRequiredOverPrioritySkills(t *testing.T) {
 // every other test in this file.
 func TestBuildMetaBlockValidatesAgainstSchema(t *testing.T) {
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource("resume.v1.json", bytes.NewReader(resumeschema.ResumeV1JSON)); err != nil {
+	if err := c.AddResource("resume.v2.json", bytes.NewReader(resumeschema.ResumeV2JSON)); err != nil {
 		t.Fatalf("load schema: %v", err)
 	}
-	sch, err := c.Compile("resume.v1.json#/$defs/meta_block")
+	sch, err := c.Compile("resume.v2.json#/$defs/meta_block")
 	if err != nil {
 		t.Fatalf("compile meta_block subschema: %v", err)
 	}
@@ -194,13 +208,14 @@ func TestBuildMetaBlockValidatesAgainstSchema(t *testing.T) {
 			// Current era: the exact shape that produced a 502 in production.
 			name: "signals carrying screening_summary",
 			signals: JDSignals{
-				RequiredSkills:   []string{"CI/CD"},
-				PreferredSkills:  []string{"RAG"},
-				Seniority:        "staff",
-				Domain:           "healthcare",
-				WorkType:         "remote",
-				CultureSignals:   []string{"remote-first"},
-				ScreeningSummary: ScreeningSummary{Location: "Remote", Travel: "5%"},
+				RequiredSkills:  []string{"CI/CD"},
+				PreferredSkills: []string{"RAG"},
+				Seniority:       "staff",
+				CultureSignals:  []string{"remote-first"},
+				ScreeningSummary: ScreeningSummary{
+					Location: "Remote", Travel: "5%",
+					Industry: "healthcare", WorkArrangement: "remote",
+				},
 			},
 		},
 		{

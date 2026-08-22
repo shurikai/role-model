@@ -1,13 +1,16 @@
 {
   "meta": {
     "jd_signals": {
-      "seniority": "senior",
-      "priority_skills": [
+      "required_skills": [
         "Go",
         "distributed systems",
         "PostgreSQL"
       ],
-      "domain_vocabulary": [
+      "preferred_skills": [],
+      "seniority": "senior",
+      "industry": "freight logistics visibility platform",
+      "work_arrangement": "fully remote",
+      "culture_signals": [
         "microservices",
         "API design",
         "observability"
@@ -17,7 +20,7 @@
     "generated_at": "2026-07-05T21:46:08Z",
     "application_id": "43119c2e-1678-4917-aad7-d8a032b3a8f0",
     "prompt_version": "v1",
-    "schema_version": "1.0",
+    "schema_version": "2.0",
     "target_company": "Test Corp",
     "generation_model": "claude-sonnet-4-5-20250929"
   },
@@ -66,43 +69,53 @@
     "linkedin_url": "https://linkedin.com/in/alex-rivera-dev"
   },
   "projects": [
-      {
-          "project_id": "p0000000-0000-0000-0000-000000000001",
-          "name": "Role Model",
-          "tagline": "AI-powered resume generation platform. Go backend (chi, pgx, sqlc), PostgreSQL, two-stage Anthropic LLM pipeline with explicit guardrails for deterministic, auditable output.",
-          "role": "author",
-          "status": "active",
-          "started_on": "2026-03",
-          "ended_on": null,
-          "repo_url": "https://github.com/arivera-dev/role-model",
-          "live_url": null,
-          "writeup_url": "https://arivera-dev.example.com/posts/role-model",
-          "force_include": true,
-          "force_exclude": false,
-          "tags": ["Go", "PostgreSQL", "LLM pipelines"],
-          "bullets": []
-      },
-      {
-          "project_id": "p0000000-0000-0000-0000-000000000002",
-          "name": "dedupe",
-          "tagline": null,
-          "role": "maintainer",
-          "status": "dormant",
-          "started_on": "2025-01",
-          "ended_on": "2025-06",
-          "repo_url": null,
-          "live_url": null,
-          "writeup_url": null,
-          "force_include": false,
-          "force_exclude": false,
-          "tags": ["Go", "CLI", "Bubble Tea"],
-          "bullets": [
-              {
-                  "text": "Processed 188k+ photos for duplicate detection using a Go CLI built with Charm/Bubble Tea",
-                  "contribution_ids": ["c0000000-0000-0000-0000-0000000f0001"]
-              }
+    {
+      "project_id": "p0000000-0000-0000-0000-000000000001",
+      "name": "Role Model",
+      "tagline": "AI-powered resume generation platform. Go backend (chi, pgx, sqlc), PostgreSQL, two-stage Anthropic LLM pipeline with explicit guardrails for deterministic, auditable output.",
+      "role": "author",
+      "status": "active",
+      "started_on": "2026-03",
+      "ended_on": null,
+      "source_url": "https://github.com/arivera-dev/role-model",
+      "live_url": null,
+      "writeup_url": "https://arivera-dev.example.com/posts/role-model",
+      "force_include": true,
+      "force_exclude": false,
+      "tags": [
+        "Go",
+        "PostgreSQL",
+        "LLM pipelines"
+      ],
+      "bullets": []
+    },
+    {
+      "project_id": "p0000000-0000-0000-0000-000000000002",
+      "name": "dedupe",
+      "tagline": null,
+      "role": "maintainer",
+      "status": "dormant",
+      "started_on": "2025-01",
+      "ended_on": "2025-06",
+      "source_url": null,
+      "live_url": null,
+      "writeup_url": null,
+      "force_include": false,
+      "force_exclude": false,
+      "tags": [
+        "Go",
+        "CLI",
+        "Bubble Tea"
+      ],
+      "bullets": [
+        {
+          "text": "Processed 188k+ photos for duplicate detection using a Go CLI built with Charm/Bubble Tea",
+          "contribution_ids": [
+            "c0000000-0000-0000-0000-0000000f0001"
           ]
-      }
+        }
+      ]
+    }
   ],
   "education": [
     {
@@ -353,6 +366,6 @@
   ],
   "generated_at": "2026-07-05T21:46:08Z",
   "application_id": "43119c2e-1678-4917-aad7-d8a032b3a8f0",
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "resume_version_id": "147c7e31-0135-411a-a235-940983dba630"
 }

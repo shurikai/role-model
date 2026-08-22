@@ -42,7 +42,7 @@ type projectRequest struct {
 	Status       string  `json:"status"`
 	StartedOn    *string `json:"started_on"` // nullable date
 	EndedOn      *string `json:"ended_on"`   // nullable date
-	RepoURL      *string `json:"repo_url"`
+	SourceURL    *string `json:"source_url"`
 	LiveURL      *string `json:"live_url"`
 	WriteupURL   *string `json:"writeup_url"`
 	ForceInclude bool    `json:"force_include"`
@@ -132,7 +132,7 @@ func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:       req.Status,
 		StartedOn:    startedOn,
 		EndedOn:      endedOn,
-		RepoUrl:      req.RepoURL,
+		SourceUrl:    req.SourceURL,
 		LiveUrl:      req.LiveURL,
 		WriteupUrl:   req.WriteupURL,
 		ForceInclude: req.ForceInclude,
@@ -194,7 +194,7 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Status:       req.Status,
 		StartedOn:    startedOn,
 		EndedOn:      endedOn,
-		RepoUrl:      req.RepoURL,
+		SourceUrl:    req.SourceURL,
 		LiveUrl:      req.LiveURL,
 		WriteupUrl:   req.WriteupURL,
 		ForceInclude: req.ForceInclude,
