@@ -54,6 +54,127 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at    = now();
 
 -- ============================================================
+-- Level vocabularies
+--
+-- The seniority ladder and the depth scale are user-owned rows, not enums, so
+-- whoever creates the user creates these too. Migration 020 backfills accounts
+-- that already existed and internal/vocabulary installs a neutral set at
+-- signup; neither of those reaches a user this file invents, which is exactly
+-- the shape of the failure migration 018 was written to repair: a column
+-- populated by a migration for rows the seed had not created yet.
+--
+-- This ladder is software's because Morgan Reyes is a software engineer. It is
+-- not the default set -- a new account starts on the neutral three-band ladder
+-- and infers its real rungs during import.
+--
+-- length_budget and framing_guidance are the two levers a rung drives: how
+-- much gets written, and at what altitude. senior carries is_fallback, so a
+-- posting whose seniority reads "unknown" is written at senior length in the
+-- plain framing rather than inheriting a claim of ownership nobody made.
+--
+-- The two framing paragraphs are lifted out into a CTE so each is written
+-- once. They are ordinary column data -- a user rewriting one in place is the
+-- point of the column existing.
+-- ============================================================
+WITH framings AS (
+  SELECT
+    $ownership$This role is pitched at the top of the ladder. A reader at this level is
+scanning for scope and accountability, not implementation detail alone.
+
+On the 2-3 most JD-relevant positions, open each bullet with what was owned,
+decided, or changed at the system or team level, then land the supporting
+evidence — the metric, the scale, the team size — in the same sentence.
+
+  Weaker: "Rebuilt the referral intake process, cutting average wait from
+    three weeks to four days."
+  Stronger: "Owned referral intake across a six-site region, cutting average
+    wait from three weeks to four days by rebuilding how referrals were
+    routed and triaged."
+
+Both sentences carry the same fact. The second also says what the candidate
+was responsible for. This holds in every field; nothing about it is specific
+to any one kind of work.
+
+Two hard limits on this:
+  - NEVER trade the evidence for the framing. A bullet that claims ownership
+    and drops the number is weaker than one that only reports the number.
+    Both together, or the number alone — never the claim alone.
+  - NEVER manufacture scope the source material does not support. "Owned",
+    "led", "set direction for" are factual claims and need backing in the
+    contribution data like any other. If the data shows the work but not the
+    ownership, write the work.$ownership$ AS ownership,
+    $plain$This role is pitched below the top of the ladder. Lead with the concrete work
+and the outcome it produced.
+
+Where the source material genuinely supports ownership or leadership scope,
+say so — but do not reach for it. A bullet claiming ownership or scope the
+contribution data does not support reads as padding, and costs more
+credibility than the framing gains.$plain$ AS plain
+), rungs AS (
+  SELECT * FROM (VALUES
+    ('50000000-0000-0000-0000-000000000001'::uuid, 'junior',    'Junior',    1, ARRAY['entry level', 'entry-level', 'associate'], 'short',  'plain',     FALSE),
+    ('50000000-0000-0000-0000-000000000002'::uuid, 'mid',       'Mid-level', 2, ARRAY['mid level', 'mid-level', 'intermediate'],  'short',  'plain',     FALSE),
+    ('50000000-0000-0000-0000-000000000003'::uuid, 'senior',    'Senior',    3, ARRAY['senior level']::TEXT[],                    'medium', 'plain',     TRUE),
+    ('50000000-0000-0000-0000-000000000004'::uuid, 'lead',      'Lead',      4, ARRAY['tech lead', 'team lead']::TEXT[],          'long',   'ownership', FALSE),
+    ('50000000-0000-0000-0000-000000000005'::uuid, 'staff',     'Staff',     5, ARRAY['staff level']::TEXT[],                     'long',   'ownership', FALSE),
+    ('50000000-0000-0000-0000-000000000006'::uuid, 'principal', 'Principal', 6, ARRAY['distinguished']::TEXT[],                   'long',   'ownership', FALSE)
+  ) AS t(id, value, label, rank, aliases, budget, framing, is_fallback)
+)
+INSERT INTO career_levels (
+  id, user_id, value, label, rank, aliases,
+  length_budget, framing_guidance, is_fallback, source, sort_order
+)
+SELECT
+  r.id,
+  '5a000000-0000-0000-0000-000000000001',
+  r.value,
+  r.label,
+  r.rank,
+  r.aliases,
+  CASE r.budget
+    WHEN 'short'  THEN 'Target 1 page (~8-10 bullets total across ALL positions and projects combined).'
+    WHEN 'long'   THEN 'Target 2 pages (~15-18 bullets total across ALL positions and projects combined).'
+    ELSE               'Target 1-2 pages (~12-15 bullets total across ALL positions and projects combined).'
+  END,
+  CASE r.framing WHEN 'ownership' THEN f.ownership ELSE f.plain END,
+  r.is_fallback,
+  'default',
+  r.rank
+FROM rungs r
+CROSS JOIN framings f
+
+ON CONFLICT (id) DO UPDATE SET
+  value            = EXCLUDED.value,
+  label            = EXCLUDED.label,
+  rank             = EXCLUDED.rank,
+  aliases          = EXCLUDED.aliases,
+  length_budget    = EXCLUDED.length_budget,
+  framing_guidance = EXCLUDED.framing_guidance,
+  is_fallback      = EXCLUDED.is_fallback,
+  source           = EXCLUDED.source,
+  sort_order       = EXCLUDED.sort_order,
+  updated_at       = now();
+
+INSERT INTO proficiency_levels (
+  id, user_id, value, label, rank, aliases, source, sort_order
+) VALUES
+  ('50000000-0000-0000-0000-000000000011', '5a000000-0000-0000-0000-000000000001',
+   'novice', 'Novice', 1, ARRAY['beginner', 'familiarity', 'exposure'], 'default', 1),
+  ('50000000-0000-0000-0000-000000000012', '5a000000-0000-0000-0000-000000000001',
+   'proficient', 'Proficient', 2, ARRAY['working knowledge', 'solid'], 'default', 2),
+  ('50000000-0000-0000-0000-000000000013', '5a000000-0000-0000-0000-000000000001',
+   'expert', 'Expert', 3, ARRAY['deep expertise', 'advanced', 'mastery'], 'default', 3)
+
+ON CONFLICT (id) DO UPDATE SET
+  value      = EXCLUDED.value,
+  label      = EXCLUDED.label,
+  rank       = EXCLUDED.rank,
+  aliases    = EXCLUDED.aliases,
+  source     = EXCLUDED.source,
+  sort_order = EXCLUDED.sort_order,
+  updated_at = now();
+
+-- ============================================================
 -- Employers
 -- ============================================================
 INSERT INTO employers (id, user_id, name, industry, notes) VALUES
