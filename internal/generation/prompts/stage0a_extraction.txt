@@ -6,14 +6,15 @@ For each distinct position (employer + role combination), extract:
 - position_title: the job title as it appears in the resume
 - summary: a single sentence summarizing the role and primary responsibility
 - full_description: a paragraph describing the work in detail, preserving any
-  specific technologies, outcomes, or scale context mentioned in the source text
+  specific tools, methods, outcomes, or scale context mentioned in the source text
 - outcomes: measurable results or achievements, if present; null if none stated
-- scale_context: team size, user counts, data volumes, or other scale signals,
+- scale_context: the size or scope of the work — people, money, volume, area,
+  duration, caseload, audience, or any other figure that establishes magnitude,
   if present; null if none stated
 
 Rules:
 - Extract only what is explicitly stated. Do not infer, embellish, or invent
-  specific numbers, technologies, or outcomes not present in the source text.
+  specific numbers, tools, or outcomes not present in the source text.
 - If a field has no basis in the source text, set it to null.
 - Preserve specific numbers and metrics exactly as written.
 - Return ONLY a valid JSON array. No preamble, no explanation, no markdown fences.
@@ -22,7 +23,7 @@ Example output shape:
 [
   {
     "employer_name": "Acme Corp",
-    "position_title": "Senior Software Engineer",
+    "position_title": "Operations Manager",
     "summary": "...",
     "full_description": "...",
     "outcomes": "...",

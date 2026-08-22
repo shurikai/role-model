@@ -29,7 +29,7 @@ The narrative should:
     "misses" or "conflicts with" these — the JD is silent on them, not opposed
     to them.
   - preference_conflicts are preferences the JD actively signals against
-    (something Jason dislikes that the role does appear to involve). These, and
+    (something you dislike that the role does appear to involve). These, and
     anti_pattern_hits below, are the only items that should be described using
     conflict language ("conflicts with", "runs against", "at odds with").
   - anti_pattern_hits are the disqualifying criteria — see anti_pattern_passed
@@ -58,7 +58,7 @@ Rules:
 
 Input will be provided as a JSON object with these fields:
 - anti_pattern_passed: boolean. A false value means the JD matched one or more
-  of Jason's hard-gate preferences — the criteria he has marked as
+  of your hard-gate preferences — the criteria you have marked as
   disqualifying rather than merely disliked. It is a summary of
   anti_pattern_hits and is false exactly when that list is non-empty; the hits
   themselves are what you name.
@@ -67,7 +67,7 @@ Input will be provided as a JSON object with these fields:
   why it matters. A hard-gate hit is not offset by a long preference_matches
   list — a role can be excluded and otherwise excellent at the same time, and
   both halves belong in the narrative. Do not describe the role as
-  automatically rejected either: the decision is Jason's, and a gate can be
+  automatically rejected either: the decision is yours, and a gate can be
   overridden on facts the posting did not make clear. But do not soften it into
   a passing mention.
 - technical_score: number 0-100. MAY BE ABSENT ENTIRELY.
@@ -102,7 +102,7 @@ Input will be provided as a JSON object with these fields:
   technologies.
 
   This includes verdict language, not just match claims. Never characterize
-  the overall strength of the fit between these competencies and Jason's
+  the overall strength of the fit between these competencies and your
   background — no "the competency match is direct," no "speaks directly to
   what they're asking for," no similar language implying you assessed it.
   You did not: there is no evidence list behind this field the way there is
@@ -110,7 +110,7 @@ Input will be provided as a JSON object with these fields:
   same failure this field exists to prevent, just moved from "the posting is
   vague" to "the match is strong." State the competencies plainly and stop —
   something like "these were not evaluated against your history; the match
-  is the user's judgment to make," not an assessment of how well he fits them.
+  is yours to judge," not an assessment of how well you fit them.
 
 - technical_gaps: array of strings — the JD requirements nothing in the profile
   answered. These are the JD's own phrasings, not tag names.
@@ -139,7 +139,7 @@ Input will be provided as a JSON object with these fields:
   it. An empty technical_partial is the normal case and means no posting-stated
   depth went unmet; it is never evidence that every skill is deep.
 - Preference fit is reported as four lists and no score. Each entry is an object
-  with a label (Jason's own wording for the preference) and a preference_type
+  with a label (your own wording for the preference) and a preference_type
   (domain, work_type, culture, primary_stack, or anti_pattern) saying what kind
   of thing it is about. Any list may be empty.
   - preference_matches: positive preferences the JD answers.

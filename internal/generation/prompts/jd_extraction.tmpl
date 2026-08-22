@@ -13,13 +13,15 @@ provided job description and return them as a single JSON object.
 
 Return ONLY a valid JSON object with these fields:
 
-required_skills: array of strings — technologies, tools, languages, frameworks, or
-  platforms the JD states are required, must-have, or core to the role. Use the
-  canonical name as it appears in the JD (e.g. "Go", "Kubernetes", "PostgreSQL").
-  Empty array if none stated.
+required_skills: array of strings — the named, checkable requirements the JD
+  states are required, must-have, or core to the role: tools, methods, systems,
+  certifications, licences, spoken languages, materials, or technologies. Use the
+  canonical name as it appears in the JD (e.g. "Go", "Kubernetes", "PostgreSQL",
+  "ACLS", "ServSafe", "AutoCAD", "Spanish"). Empty array if none stated.
 
-preferred_skills: array of strings — technologies or skills the JD states are
-  preferred, nice-to-have, a plus, or desired but not required. Empty array if none.
+preferred_skills: array of strings — the same kind of named requirement, where the
+  JD states it is preferred, nice-to-have, a plus, or desired but not required.
+  Empty array if none.
 
 core_competencies: array of strings — the capability-level requirements the JD
   states in prose rather than as named technology. These are the things the
@@ -27,7 +29,9 @@ core_competencies: array of strings — the capability-level requirements the JD
   phrase, e.g. "distributed systems design", "monolith decomposition",
   "payment and ledger systems", "production on-call ownership", "technical
   leadership of a new team", "mentoring senior engineers", "API design for
-  internal platform consumers". Empty array if none.
+  internal platform consumers", "triage under surge conditions", "multi-site
+  inventory control", "curriculum design for mixed-ability groups". Empty array
+  if none.
 
   This field exists because senior and staff postings routinely describe the
   job entirely in capability terms and name no concrete technology at all. For
@@ -36,13 +40,13 @@ core_competencies: array of strings — the capability-level requirements the JD
   actually asks for.
 
   Rules for core_competencies:
-  - Do NOT restate a named technology as a competency. If the JD says
+  - Do NOT restate a named requirement as a competency. If the JD says
     "Kubernetes", that is a skill and belongs in required_skills; it does not
     also become "container orchestration" here. Only describe a capability
     here when the JD describes it WITHOUT naming a tool for it.
   - Do NOT put generic soft skills here ("communication", "teamwork",
-    "collaboration", "attention to detail"). A competency is an engineering
-    capability with a shape someone could show evidence of having done.
+    "collaboration", "attention to detail"). A competency is a capability with
+    a shape someone could show evidence of having done.
     Leadership scope IS in scope when the JD makes it a job requirement —
     "leads a newly formed team", "sets technical direction across teams" —
     because that is a demonstrable responsibility, not a personality trait.
@@ -236,8 +240,13 @@ Rules:
     "Terraform modules" -> "Terraform"
   The exception is a name where the noun is genuinely part of it — "GitHub
   Actions", "Spring Boot", "Google Cloud Platform" — which stays whole.
-- Do not include soft skills (communication, teamwork) in required_skills or
-  preferred_skills — only technical skills and tools.
+- A requirement belongs in required_skills or preferred_skills only if it is
+  NAMEABLE and CHECKABLE — something a reader could point at on a resume and
+  verify. "Kubernetes", "ACLS certification", "HACCP", "Epic", and
+  "Spanish/English bilingual" all qualify. Unfalsifiable dispositions do not:
+  leave "communication", "teamwork", "attention to detail", and "self-starter"
+  out of both lists. The test is verifiability, NOT whether the requirement is
+  technical — a non-technical role's requirements are still requirements.
 - When the JD offers several technologies as interchangeable ways to satisfy
   ONE requirement, emit ONE entry joining them with " | " (space, pipe, space)
   instead of one entry per technology. The test is whether the JD is offering
