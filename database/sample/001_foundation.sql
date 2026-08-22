@@ -143,8 +143,11 @@ SELECT
 FROM rungs r
 CROSS JOIN framings f
 
-ON CONFLICT (id) DO UPDATE SET
-  value            = EXCLUDED.value,
+-- Conflict target is (user_id, value), not (id): migration 020 backfills any
+-- account that exists when it runs, with UUIDs of its own, so a seed re-run
+-- after a migrate-down/up cycle would otherwise try to insert duplicates of
+-- rows already present under different ids.
+ON CONFLICT (user_id, value) DO UPDATE SET
   label            = EXCLUDED.label,
   rank             = EXCLUDED.rank,
   aliases          = EXCLUDED.aliases,
@@ -165,8 +168,7 @@ INSERT INTO proficiency_levels (
   ('50000000-0000-0000-0000-000000000013', '5a000000-0000-0000-0000-000000000001',
    'expert', 'Expert', 3, ARRAY['deep expertise', 'advanced', 'mastery'], 'default', 3)
 
-ON CONFLICT (id) DO UPDATE SET
-  value      = EXCLUDED.value,
+ON CONFLICT (user_id, value) DO UPDATE SET
   label      = EXCLUDED.label,
   rank       = EXCLUDED.rank,
   aliases    = EXCLUDED.aliases,
