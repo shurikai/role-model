@@ -10,7 +10,7 @@ Each flag has:
 
 Flag types:
 - inference: something stated as fact that may have been inferred rather than
-  explicitly sourced (e.g. a technology implied but not named)
+  explicitly sourced (e.g. a tool or method implied but not named)
 - gap: a field that is null or thin where more detail would strengthen the entry
 - suggestion: a concrete improvement that could make the entry more compelling
   without inventing new facts
