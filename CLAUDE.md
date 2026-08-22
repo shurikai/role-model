@@ -24,6 +24,44 @@ client that calls it. Note that internal/renderer was deleted once as dead
 code and later reintroduced with an actual consumer — the current package is
 the client, not the old renderer implementation.
 
+## Career neutrality
+
+This system is being made usable by someone whose career is nothing like the one
+it was built around. The data model was always close to neutral — employers,
+positions, contributions, tags, skills, and preferences describe any working life.
+The presupposition lived in the vocabulary wrapped around it.
+
+**Rules that hold now:**
+
+- **No prompt names a user.** `fit_narrative.txt` addressed "Jason" by name and
+  assumed his pronouns; it is second person throughout. A prompt that needs to
+  refer to the person says "you".
+- **The persona is field-neutral.** `resume_body.tmpl` and `resume_summary.tmpl`
+  opened with "expert technical resume writer specializing in senior and
+  staff-level software engineering roles", and everything downstream pattern-
+  matched to software regardless of input. Do not reintroduce a field into the
+  persona line. The candidate's field is whatever the provided data says it is.
+- **`required_skills` / `preferred_skills` are gated on NAMEABLE and CHECKABLE,
+  not on being technical.** The old rule — "only technical skills and tools" —
+  meant a posting whose requirements were clinical, interpersonal, or
+  pedagogical extracted three empty arrays, which silently disables the 2a
+  relevance apparatus *and* makes `ScoreTechnicalFit` return `Scored: false`.
+  "Communication" is still excluded, because it is unfalsifiable; "ACLS",
+  "ServSafe", "Epic", and "Spanish/English bilingual" are requirements.
+- **A competency is a capability, not an *engineering* capability.** Same reason.
+- **Worked examples in a prompt must not all come from one field.** The examples
+  are what the model calibrates on. Where a rule is field-agnostic, show it in
+  two fields — that is why the specificity rule now carries both a p99-latency
+  bullet and a triage-time bullet, and why `framingStaff` no longer uses a
+  cruise-API bullet from the private seed set.
+
+**Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
+the seniority ladder (six hand-synced copies, two divergent), the `domain` enum,
+`work_type` meaning two different things, the `novice|proficient|expert` scale,
+`primary_stack`, the `technical_*` / `anti_pattern_*` column names, the fixed
+twelve-section resume contract, and `core_competencies` being scored by nothing.
+Those are Phases 3-6; this section covers Phase 1 only.
+
 ## Stack
 - **Language:** Go
 - **Router:** chi
