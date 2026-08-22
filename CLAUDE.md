@@ -90,10 +90,17 @@ The presupposition lived in the vocabulary wrapped around it.
   — so renaming EDUCATION or moving CREDENTIALS above EXPERIENCE was a change
   to Go, Python, and a JSON schema. See **The section manifest** below.
 
+- **The matcher no longer assumes technology-name morphology.** The direct
+  layer is whole-word like the other two (#75), `tokenize` folds regular
+  plurals, `core_competencies` is scored as a third input (#72), and preference
+  labels carry an `aliases` column (migration 023) — which turned out to be the
+  one mechanism three of the four fit-gate known gaps were missing.
+
 **Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
-`core_competencies` is scored by nothing, and the matcher's raw-substring
-direct layer over-reaches on generic vocabulary. Those are Phase 6; this
-section covers Phases 1-5.
+Stage 0 drafts contributions only and `ApproveDraft` requires a `position_id`
+that already exists, so a non-engineer cannot use the import at all without
+first creating employers and positions by hand. That is Phase 8, and Phase 9 is
+proving it with a second career. This section covers Phases 1-6.
 
 ### The section manifest
 
@@ -355,15 +362,19 @@ record of it.
 **Technical matching runs in three layers, strongest first**, and the layer
 that won is recorded on every match as `kind` (`direct` | `alias` | `category`):
 
-1. **direct** — the JD term against the skill's own name. This is the only
-   layer that keeps the raw-substring direction, so a JD asking for "SQL" is
-   answered by "PostgreSQL". That direction is unanchored and over-reaches
-   ("API" is answered by Anthropic API and FastAPI; "systems" by Distributed
-   systems), and because direct outranks alias it also **shadows more precise
-   vocabulary** — there is no way to say "this term means REST" for a term that
-   sits inside another skill's name. Nothing here stems either, so a bare plural
-   clears all three layers. Both are #75; do not work around them by widening
-   the substring rule.
+1. **direct** — the JD term against the skill's own name. **Whole-word, like
+   the other two.** It kept a raw-substring direction until #75, justified by
+   one case — "SQL" ⊂ "PostgreSQL" — which it paid for three ways: it
+   over-reached ("API" answered by Anthropic API and FastAPI, "systems" by
+   Distributed systems, and on ordinary English "art" by "charting" and "care"
+   by "Medicare"); it **shadowed more precise vocabulary**, because direct
+   outranks alias and a term sitting inside another skill's name could never be
+   given one; and measured against the whole eval corpus the only requirement
+   it reached that whole-word matching did not was a JD term "Go" answered by
+   the skill "ArgoCD". PostgreSQL and MySQL carry `sql` in `tags.aliases` now,
+   so the case that justified it is answered by the alias layer — on the
+   specific skill, rather than by a letter coincidence. **Do not reintroduce a
+   substring direction; add an alias.**
 2. **alias** — against `tags.aliases`. That column had been populated since
    migration 001 and read by nothing, so "Golang" scored a gap against a
    stored "Go" and "RESTful APIs" against "REST".
@@ -376,11 +387,17 @@ that won is recorded on every match as `kind` (`direct` | `alias` | `category`):
 
 Two rules hold this together:
 
-- **Aliases and category vocabulary are whole-word matched, never substring.**
-  Only a skill's own name keeps the substring direction. A category alias is a
-  sentence fragment, and substring-matching one made a JD requiring "RAG" match
-  the Testing category — "rag" sits inside "test cove*rag*e" — offering JUnit
-  as evidence of retrieval-augmented generation.
+- **Everything is whole-word matched, and regular plurals fold.** A category
+  alias is a sentence fragment, and substring-matching one made a JD requiring
+  "RAG" match the Testing category — "rag" sits inside "test cove*rag*e" —
+  offering JUnit as evidence of retrieval-augmented generation. `tokenize`
+  folds a trailing "s" on tokens of four characters or more that do not end in
+  "ss", so "APIs" answers "API" and "patient assessments" answers "patient
+  assessment". It is applied to both sides, so it only ever widens: a pair that
+  matched before folding still matches after. It is not a stemmer and must not
+  become one — "Redis" folds to "redi" and that is fine, because both sides do
+  and nothing else folds there. Irregulars ("criteria"/"criterion") are alias
+  data, not string logic.
 - **A category alias must name a capability, not a technology.** Putting
   "kafka" on Protocols & Messaging would grant the whole category for one tool.
   The converse also bites: bare "frameworks" is deliberately not an alias of

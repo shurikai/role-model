@@ -132,6 +132,24 @@ const (
 	MatchCategory MatchKind = "category"
 )
 
+// MatchOrigin records WHICH LIST the requirement came from. It is a third axis
+// alongside Kind (how the evidence was found) and the level fields (whether the
+// evidence clears the bar stated for it).
+//
+// The plan for this called for a fourth MatchKind value, "competency". That
+// would have collapsed two questions into one enum for the third time in this
+// codebase — the same mistake as folding partial into Kind, and the same one
+// work_type made by naming two different things. A competency can be answered
+// directly, by alias, or by category, exactly as a named skill can, and a
+// reader wants both facts.
+type MatchOrigin string
+
+const (
+	OriginRequired   MatchOrigin = "required"
+	OriginPreferred  MatchOrigin = "preferred"
+	OriginCompetency MatchOrigin = "competency"
+)
+
 // SkillMatch is one satisfied requirement and the evidence behind it.
 //
 // # Kind and level are two different axes, and collapsing them loses one
@@ -158,6 +176,11 @@ type SkillMatch struct {
 	Category    string    `json:"category,omitempty"`
 	Evidence    []string  `json:"evidence"`
 
+	// Origin is which list the requirement came from. Empty on matches
+	// recorded before it existed, which reads as "a named skill" — the only
+	// thing that was scored then.
+	Origin MatchOrigin `json:"origin,omitempty"`
+
 	// RequiredLevel is the depth the JD asked for, empty when it asked for
 	// none. EvidenceLevel is the strongest proficiency behind the match, and
 	// is populated only alongside RequiredLevel — absent a stated requirement
@@ -182,7 +205,7 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 	// Strongest: the skill's own name answers the requirement.
 	for _, alt := range alts {
 		for _, s := range skills {
-			if matchesAny([]string{s.Name}, alt) {
+			if matchesTerm([]string{s.Name}, alt) {
 				evidence = appendUnique(evidence, s)
 			}
 		}
@@ -194,7 +217,7 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 	// Next: a recorded synonym of the skill answers it.
 	for _, alt := range alts {
 		for _, s := range skills {
-			if matchesPhrase(s.Aliases, alt) {
+			if matchesTerm(s.Aliases, alt) {
 				evidence = appendUnique(evidence, s)
 			}
 		}
@@ -213,7 +236,7 @@ func satisfies(skills []SkillTerm, entry string) (kind MatchKind, category strin
 			if s.Category == "" {
 				continue
 			}
-			if !matchesPhrase(append([]string{s.Category}, s.CategoryAliases...), alt) {
+			if !matchesTerm(append([]string{s.Category}, s.CategoryAliases...), alt) {
 				continue
 			}
 			category = s.Category
@@ -315,17 +338,43 @@ func evidenceNames(evidence []SkillTerm) []string {
 // representation. Scored is what separates them, and returning a struct is
 // what makes the confusion unrepresentable rather than merely discouraged.
 //
-// This case is common, not rare. Stage 1 extracts core_competencies for
-// exactly the postings that trip it, but nothing here reads them — scoring
-// input is RequiredSkills and PreferredSkills only, and a capability-worded
-// staff JD stating ten requirements scores none of them. See #72; whether
-// competencies should score at all is a design decision, not an oversight.
+// It is much rarer than it was. core_competencies now scores as a third input
+// (below), so a posting has to name no requirement of any shape to reach it.
 //
-// Until then the competencies reach the narrative as unscored context, so the
-// report can say what the posting asked for without claiming any of it was
-// answered.
+// # Competencies are the third scored input
+//
+// core_competencies holds the capability-level asks a posting states in prose —
+// "decomposing a legacy service", "production ownership of services", "triage
+// under surge conditions". Nothing scored them, which was a degradation for a
+// staff software posting and total failure for a competency-shaped career: a
+// nursing, teaching, or trades JD may name no "skill" at all, so every
+// evaluation returned Scored: false with an empty gap list, every time (#72).
+//
+// They score at preferred weight through the same three layers, and three
+// rules hold it together:
+//
+//   - **pointsPossible grows to include them.** Unlike the partial-match rule,
+//     these are genuine additional asks: a posting requiring "production
+//     ownership" is asking for something, and a profile that answers none of it
+//     should not score as though the posting were silent.
+//   - **A competency already restated as a skill is not counted twice.**
+//     jd_extraction.tmpl forbids the duplication, and a prompt is a request —
+//     dedupeCompetencies backs it in Go the way collapseSubsumed backs the
+//     deduplication rule it mirrors.
+//   - **An unanswered competency is not a gap.** Gaps are the JD's named
+//     requirements, and a competency is prose. Reporting "production ownership
+//     of services" among the technical gaps reads as a missing tool. It costs
+//     its point and is otherwise silent, which is exactly how an unmet
+//     preferred skill behaves.
+//
+// Matched competencies carry Origin: competency so a reader can tell "answered
+// a named requirement" from "answered a stated capability" — a distinction the
+// narrative needs and Kind cannot carry, because a competency can be answered
+// directly, by alias, or by category like anything else.
 func ScoreCapabilityFit(skills []SkillTerm, signals JDSignals, levels LevelScale) CapabilityFit {
-	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills))
+	competencies := dedupeCompetencies(signals.CoreCompetencies, signals.RequiredSkills, signals.PreferredSkills)
+
+	pointsPossible := float64(len(signals.RequiredSkills)*2 + len(signals.PreferredSkills) + len(competencies))
 	if pointsPossible == 0 {
 		return CapabilityFit{Scored: false}
 	}
@@ -341,14 +390,14 @@ func ScoreCapabilityFit(skills []SkillTerm, signals JDSignals, levels LevelScale
 	// anything answered it at all. Full points when it is satisfied at or
 	// above any level the JD asked for, half when it is satisfied but short of
 	// that level.
-	score := func(entry string, full float64) (matched bool) {
+	score := func(entry string, full float64, origin MatchOrigin) (matched bool) {
 		kind, category, evidence, ok := satisfies(skills, entry)
 		if !ok {
 			return false
 		}
 		match := SkillMatch{
 			Requirement: entry, Kind: kind, Category: category,
-			Evidence: evidenceNames(evidence),
+			Evidence: evidenceNames(evidence), Origin: origin,
 		}
 
 		required, signal := requiredLevelFor(entry, signals.SkillLevels, levels)
@@ -377,12 +426,17 @@ func ScoreCapabilityFit(skills []SkillTerm, signals JDSignals, levels LevelScale
 	for _, req := range signals.RequiredSkills {
 		// A gap records the JD's phrasing and nothing else, level stated or
 		// not. Level only means something once presence is established.
-		if !score(req, 2) {
+		if !score(req, 2, OriginRequired) {
 			gaps = append(gaps, req)
 		}
 	}
 	for _, pref := range signals.PreferredSkills {
-		score(pref, 1)
+		score(pref, 1, OriginPreferred)
+	}
+	for _, comp := range competencies {
+		// Deliberately not appended to gaps when unmatched — see the doc
+		// comment. It costs its point and says nothing, like a preferred skill.
+		score(comp, 1, OriginCompetency)
 	}
 
 	return CapabilityFit{
@@ -392,6 +446,40 @@ func ScoreCapabilityFit(skills []SkillTerm, signals JDSignals, levels LevelScale
 		Matches: matches,
 		Partial: partial,
 	}
+}
+
+// dedupeCompetencies drops competencies the posting already stated as a named
+// skill, so one requirement is not scored twice.
+//
+// jd_extraction.tmpl asks for exactly this ("do not duplicate required_skills")
+// and a prompt is a request. This is the Go backstop, the same relationship
+// collapseSubsumed has to the deduplication rule it mirrors: extraction noise
+// here should be harmless rather than merely unlikely.
+//
+// The comparison goes through the same whole-word phrase matcher the scoring
+// does, in both directions, so "production ownership of services" is dropped
+// against a required "production ownership" and vice versa. A competency that
+// merely shares a word with a skill survives — "observability" against "Splunk"
+// is two different asks, and dropping it would silently discount the posting.
+func dedupeCompetencies(competencies []string, skillLists ...[]string) []string {
+	var named []string
+	for _, list := range skillLists {
+		for _, entry := range list {
+			named = append(named, splitAlternatives(entry)...)
+		}
+	}
+
+	out := make([]string, 0, len(competencies))
+	for _, comp := range competencies {
+		if strings.TrimSpace(comp) == "" {
+			continue
+		}
+		if matchesSignal(comp, named) {
+			continue
+		}
+		out = append(out, comp)
+	}
+	return out
 }
 
 // CapabilityFit is the outcome of technical scoring.
@@ -463,7 +551,7 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (
 	matches []db.Preference, gaps []db.Preference, conflicts []db.Preference, gateHits []db.Preference,
 ) {
 	for _, p := range prefs {
-		matched := matchesSignal(p.Label, prefFieldsFor(p.PreferenceType, signals))
+		matched := preferenceMatches(p, prefFieldsFor(p.PreferenceType, signals))
 
 		if p.IsHardGate {
 			if matched {
@@ -636,6 +724,30 @@ func prefFieldsFor(prefType string, signals JDSignals) []string {
 	}
 }
 
+// preferenceMatches reports whether a preference row answers any of the fields
+// it is routed at, by its label or by any of its aliases.
+//
+// Aliases are matching vocabulary only. They never reach the narrative — the
+// projection hands the model label and type and nothing else, so a row that
+// fired through "programmatic advertising" is still described to the reader as
+// "adtech", in the user's own words. That separation is deliberate: the label
+// is what the user said, the aliases are how a posting might say it, and
+// showing the second would read as the system putting words in their mouth.
+func preferenceMatches(p db.Preference, fields []string) bool {
+	if matchesSignal(p.Label, fields) {
+		return true
+	}
+	for _, alias := range p.Aliases {
+		if strings.TrimSpace(alias) == "" {
+			continue
+		}
+		if matchesSignal(alias, fields) {
+			return true
+		}
+	}
+	return false
+}
+
 // matchesSignal reports whether label matches any of fields on word
 // boundaries, in either direction — label containing field, or field
 // containing label. Fields are typically short canonical tokens (e.g.
@@ -659,11 +771,59 @@ func matchesSignal(label string, fields []string) bool {
 }
 
 // tokenize splits s into lowercase word tokens, discarding punctuation and
-// separators. "TypeScript / Node.js" becomes ["typescript", "node", "js"].
+// separators, and folds regular plurals. "TypeScript / Node.js" becomes
+// ["typescript", "node", "js"]; "patient assessments" becomes ["patient",
+// "assessment"].
 func tokenize(s string) []string {
-	return strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+	raw := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
+	out := make([]string, 0, len(raw))
+	for _, t := range raw {
+		out = append(out, foldPlural(t))
+	}
+	return out
+}
+
+// foldPlural strips one trailing "s" from a regular plural. It is not a
+// stemmer and must not become one.
+//
+// The gap it closes is that the same idea is routinely written both ways, and
+// a bare plural used to clear all three matching layers: "API" against "APIs",
+// "patient assessment" against "patient assessments", "case management"
+// against "cases managed". On technology names that was a documented
+// annoyance; on the vocabulary of a career built out of ordinary English
+// nouns it is most of the corpus.
+//
+// Two properties make this safe rather than clever:
+//
+//   - It is applied to BOTH sides, inside tokenize, so it cannot introduce an
+//     asymmetry. Any pair that matches today still folds to the same tokens
+//     and still matches — the fold only ever widens, never breaks.
+//   - It declines where a trailing "s" is reliably not a plural: tokens under
+//     four characters (AWS, OS, iOS, CSS, DDS, DIS — the acronyms where the S
+//     is part of the name) and tokens ending in "ss" (Harness, business,
+//     process). Both keep their "s" on both sides.
+//
+// It deliberately does NOT try to be right about the rest. "Redis" folds to
+// "redi" and "Kubernetes" to "kubernete", which look wrong and are harmless:
+// both sides fold identically, so each still matches itself, and neither
+// collides with another term. Distinguishing "APIs" (a plural) from "Redis"
+// (not one) needs a vocabulary, not a longer suffix list — and a vocabulary is
+// what tags.aliases already is. The blast radius of over-folding is two
+// different words folding to the same token, which
+// TestPluralFoldDoesNotCollapseUnrelatedTerms is the guard for.
+//
+// English irregulars are out of scope for the same reason:
+// "criteria"/"criterion" and "analyses"/"analysis" are alias data.
+func foldPlural(token string) string {
+	if len(token) < 4 || !strings.HasSuffix(token, "s") {
+		return token
+	}
+	if strings.HasSuffix(token, "ss") {
+		return token
+	}
+	return token[:len(token)-1]
 }
 
 // containsPhrase reports whether needle appears as a contiguous run of whole
@@ -684,62 +844,42 @@ func containsPhrase(needle, haystack string) bool {
 	return false
 }
 
-// matchesAny reports whether any name in skillNames answers the JD term tag.
-// Two directions count, and they are deliberately asymmetric:
+// matchesTerm reports whether any of terms answers the JD term tag, in either
+// direction, on whole-word boundaries.
 //
-//   - tag as a case-insensitive substring of the skill name, the original
-//     behavior: a JD asking for "SQL" is answered by "PostgreSQL".
-//   - the skill name as a whole-word phrase inside tag: a JD asking for
-//     "REST APIs" is answered by the stored skill "REST".
+// # There used to be a raw-substring direction, and it is gone
 //
-// Only one direction may be a raw substring. Reversing "SQL" ⊂ "PostgreSQL"
-// unguarded is what makes a stored "Go" satisfy a JD's "Google Cloud" or
-// "MongoDB", so the second direction is word-boundary matched instead. That
-// still bridges the case that matters — a short canonical skill name sitting
-// inside a longer JD phrase — without inventing matches from shared letters.
+// The skill's own name was matched as a case-insensitive substring of the JD
+// term, justified by one case: a JD asking for "SQL" is answered by
+// "PostgreSQL". That direction bought that case and paid for it three ways.
 //
-// Neither direction bridges a morphological difference on its own: "REST" and
-// "RESTful APIs" share no whole word and neither contains the other. That
-// gap is now closed by data rather than by string logic — the caller passes
-// each skill's recorded aliases through here too, and the REST tag carries
-// 'restful'. Canonicalization upstream in jd_extraction.tmpl is still the
-// first line of defence; aliases are what keep a stored ten-year skill from
-// reading as a gap when the JD spells it differently anyway.
+// It over-reached. "API" was answered by Anthropic API and FastAPI, "systems"
+// by Distributed systems, and — measured against the eval corpus before this
+// change — the only requirement it actually reached that whole-word matching
+// did not was a JD term "Go" answered by the skill "ArgoCD". One real match,
+// zero of them correct.
+//
+// It shadowed more precise vocabulary. Because the direct layer outranks the
+// alias layer, a term sitting inside another skill's name could never be given
+// an alias: there was no way to say "this term means REST" for a term that
+// happens to be a substring of something else.
+//
+// And it did not survive a career it was not written for. On generic
+// vocabulary the same rule makes a JD requiring "art" match a stored
+// "charting", "care" match "Medicare", and "rad" match "gradation" — the exact
+// nonsense containsPhrase was written to prevent, reintroduced by the one
+// direction that skipped it. That is #75.
+//
+// What replaces it is data, which is what CLAUDE.md already says the answer is
+// here: PostgreSQL and MySQL carry 'sql' in tags.aliases, so the case that
+// justified the substring direction is answered by the alias layer, on the
+// specific skill rather than by a letter coincidence.
 //
 // The terms slice is whatever the caller wants weighed against tag: a single
 // skill name, one skill's aliases, or a category name plus its competency
 // vocabulary. Keeping the primitive dumb is deliberate — the ranking of those
 // three lives in satisfies, where it can be read in one place.
-func matchesAny(terms []string, tag string) bool {
-	needle := strings.ToLower(tag)
-	for _, term := range terms {
-		if term == "" {
-			continue
-		}
-		if strings.Contains(strings.ToLower(term), needle) {
-			return true
-		}
-		if containsPhrase(term, tag) {
-			return true
-		}
-	}
-	return false
-}
-
-// matchesPhrase is matchesAny without the raw-substring direction: a term
-// counts only where it appears as a run of whole words inside the JD phrase.
-//
-// It exists because the substring direction does not survive contact with
-// multi-word terms. It is safe for a skill name — a JD asking for "SQL" is
-// genuinely answered by "PostgreSQL" — but a category alias is a sentence
-// fragment, and letting a JD term match any letters inside one produced
-// exactly the nonsense you would predict: a JD requiring "RAG" matched the
-// Testing category, because "rag" sits inside "test cove(rag)e", and reported
-// TDD and JUnit as evidence of retrieval-augmented generation.
-//
-// Aliases and category vocabulary go through here. Only the skill's own name
-// keeps both directions.
-func matchesPhrase(terms []string, tag string) bool {
+func matchesTerm(terms []string, tag string) bool {
 	for _, term := range terms {
 		if term == "" {
 			continue

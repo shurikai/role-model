@@ -1,0 +1,27 @@
+-- Preference labels get the vocabulary column tags have had since migration 001.
+--
+-- A preference label is the user's own wording; a JD's signal fields are the
+-- posting's. Matching them is a whole-word phrase comparison, so the two have
+-- to agree lexically or the row is silent. Three of the fit gate's four known
+-- gaps turned out to be that one missing mechanism rather than three separate
+-- defects:
+--
+--   #48  'adtech' does not fire on an adtech JD, because the industry reads
+--        "programmatic advertising technology, demand-side platform" and
+--        'adtech' is not a whole-word run inside it.
+--   #53  'supply chain' is reported as an unmet gap on a freight logistics
+--        posting, because the industry says "freight logistics visibility
+--        platform" and never those two words.
+--   #45  'on-call heavy' and 'mandatory overtime' miss a JD advertising
+--        "24/7 on-call rotation" and "extended hours".
+--
+-- Every one of these is "named differently", which is exactly what
+-- tags.aliases exists to fix on the skills side, and the routing work of #53
+-- and migration 021 has already eliminated the alternative explanation: the
+-- fields ARE being read now.
+--
+-- Deliberately NOT a similarity score or a stemmer. The matcher stays a
+-- whole-word phrase comparison and the vocabulary stays data, for the same
+-- reason category aliases are data: a threshold nobody can read back to the
+-- rows that produced it is how the preference score died.
+ALTER TABLE preferences ADD COLUMN aliases TEXT[];

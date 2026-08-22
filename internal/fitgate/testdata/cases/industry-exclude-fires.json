@@ -1,8 +1,5 @@
 {
-  "name": "known-gap-adtech-exclude-cannot-fire",
-  "status": "known_gap",
-  "issue": "#48",
-  "reason": "ROUTING FIXED BY MIGRATION 021, VOCABULARY STILL MISSING. The 'adtech' hard exclude does not fire on an adtech JD. It used to be a routing gap: the dealbreaker branch read a closed domain enum with no adtech value, and the industry survived only in screening_summary.industry, which that branch never read. The enum is gone and the branch reads the industry now -- so the remaining failure is purely lexical. The industry string is 'programmatic advertising technology, demand-side platform', and matchesSignal needs a contiguous whole-word run: 'adtech' is not one inside it, in either direction. This is the same class of miss as REST against 'RESTful APIs', which tags solved with an aliases column. Preference labels have no such column, and that is now what #48 is about for this fixture -- not routing. database/sample/README.md still claims this fixture 'fails the gate outright on the adtech hard exclude'; it does not.",
+  "name": "industry-exclude-fires",
   "jd_fixture": "tests/fixtures/sample-hard-exclude-jd.md",
   "description": "Same signals as hard-exclude.json, asserting the gate behavior that fixture was written to demonstrate.",
   "signals": {
@@ -45,5 +42,6 @@
         "adtech"
       ]
     }
-  }
+  },
+  "comment": "CLOSED. Was #48. The 'adtech' hard exclude fires on an adtech JD. It took two fixes in sequence and neither was sufficient alone: migration 021 deleted the domain enum and gave the dealbreaker branch screening_summary.industry, which is where an industry is actually named; migration 023 gave preference labels an aliases column, because the industry reads 'programmatic advertising technology, demand-side platform' and 'adtech' is not a whole-word run inside it. Routing found the field; vocabulary read it. What remains of #48 is location and clearance, which no preference type reads."
 }

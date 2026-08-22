@@ -14,7 +14,7 @@ import (
 const createPreference = `-- name: CreatePreference :one
 INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate
+RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases
 `
 
 type CreatePreferenceParams struct {
@@ -54,6 +54,7 @@ func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferencePara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.IsHardGate,
+		&i.Aliases,
 	)
 	return i, err
 }
@@ -74,7 +75,7 @@ func (q *Queries) DeletePreference(ctx context.Context, arg DeletePreferencePara
 }
 
 const getPreference = `-- name: GetPreference :one
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases FROM preferences
 WHERE id = $1 AND user_id = $2
 `
 
@@ -98,12 +99,13 @@ func (q *Queries) GetPreference(ctx context.Context, arg GetPreferenceParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.IsHardGate,
+		&i.Aliases,
 	)
 	return i, err
 }
 
 const listHardGatesByUser = `-- name: ListHardGatesByUser :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases FROM preferences
 WHERE user_id = $1 AND is_hard_gate
 ORDER BY preference_type, created_at
 `
@@ -129,6 +131,7 @@ func (q *Queries) ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.IsHardGate,
+			&i.Aliases,
 		); err != nil {
 			return nil, err
 		}
@@ -141,7 +144,7 @@ func (q *Queries) ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]
 }
 
 const listPreferencesByUser = `-- name: ListPreferencesByUser :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases FROM preferences
 WHERE user_id = $1
 ORDER BY preference_type, created_at
 `
@@ -167,6 +170,7 @@ func (q *Queries) ListPreferencesByUser(ctx context.Context, userID uuid.UUID) (
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.IsHardGate,
+			&i.Aliases,
 		); err != nil {
 			return nil, err
 		}
@@ -179,7 +183,7 @@ func (q *Queries) ListPreferencesByUser(ctx context.Context, userID uuid.UUID) (
 }
 
 const listPreferencesByUserAndType = `-- name: ListPreferencesByUserAndType :many
-SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate FROM preferences
+SELECT id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases FROM preferences
 WHERE user_id = $1 AND preference_type = $2
 ORDER BY created_at
 `
@@ -210,6 +214,7 @@ func (q *Queries) ListPreferencesByUserAndType(ctx context.Context, arg ListPref
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.IsHardGate,
+			&i.Aliases,
 		); err != nil {
 			return nil, err
 		}
@@ -232,7 +237,7 @@ SET preference_type = $3,
     notes           = $9,
     updated_at      = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate
+RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases
 `
 
 type UpdatePreferenceParams struct {
@@ -272,6 +277,7 @@ func (q *Queries) UpdatePreference(ctx context.Context, arg UpdatePreferencePara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.IsHardGate,
+		&i.Aliases,
 	)
 	return i, err
 }
