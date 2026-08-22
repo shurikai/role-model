@@ -288,14 +288,14 @@ func buildYearsExperience(experience json.RawMessage, now time.Time) (string, er
 // unbypassable is worth more than a test asserting nobody bypassed it.
 func buildMetaBlock(applicationID uuid.UUID, companyName, roleTitle, generationModel string, signals JDSignals) map[string]any {
 	return map[string]any{
-		"schema_version":   "1.0",
+		"schema_version":   "2.0",
 		"generated_at":     time.Now().UTC().Format(time.RFC3339),
 		"application_id":   applicationID.String(),
 		"target_company":   companyName,
 		"target_role":      roleTitle,
 		"jd_signals":       signals.forDocument(),
 		"generation_model": generationModel,
-		// schema/resume.v1.json requires this field and forbids additional
+		// schema/resume.v2.json requires this field and forbids additional
 		// ones, so the portable document carries the coarse pipeline version
 		// only. Per-prompt content hashes live in generation_params on the
 		// resume_versions row, which is unconstrained JSONB.
@@ -402,7 +402,7 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 		Projects:        string(projectsJSON),
 		Education:       string(educationJSON),
 		Credentials:     string(credentialsJSON),
-		ResumeSchema:    string(resumeschema.ResumeV1JSON),
+		ResumeSchema:    string(resumeschema.ResumeV2JSON),
 		PriorFeedback:   "",
 	})
 	if err != nil {
@@ -606,10 +606,10 @@ func (s *Service) Generate(ctx context.Context, applicationID, userID uuid.UUID)
 
 func validateResume(doc json.RawMessage) error {
 	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("resume.v1.json", bytes.NewReader(resumeschema.ResumeV1JSON)); err != nil {
+	if err := compiler.AddResource("resume.v2.json", bytes.NewReader(resumeschema.ResumeV2JSON)); err != nil {
 		return fmt.Errorf("load schema: %w", err)
 	}
-	sch, err := compiler.Compile("resume.v1.json")
+	sch, err := compiler.Compile("resume.v2.json")
 	if err != nil {
 		return fmt.Errorf("compile schema: %w", err)
 	}

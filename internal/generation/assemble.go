@@ -226,7 +226,7 @@ func (s *Service) assembleProjects(ctx context.Context, userID uuid.UUID) ([]Pro
 			Tagline:       p.Tagline,
 			Role:          p.Role,
 			Status:        p.Status,
-			RepoURL:       p.RepoUrl,
+			SourceURL:     p.SourceUrl,
 			LiveURL:       p.LiveUrl,
 			WriteupURL:    p.WriteupUrl,
 			ForceInclude:  p.ForceInclude,

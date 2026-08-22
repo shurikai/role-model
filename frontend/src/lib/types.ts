@@ -46,8 +46,14 @@ export interface JdSignals {
   required_skills: string[];
   preferred_skills: string[];
   seniority: string;
-  domain: string;
-  work_type: string;
+  // The posting's own words for its industry and its working arrangement.
+  // These replaced two closed enums, `domain` and `work_type`, which were
+  // recording a fraction of what the posting said: four unrelated companies
+  // all extracted as domain "saas", and "remote" stood in for "fully remote
+  // with occasional office visits". Absent on signals extracted before the
+  // change.
+  industry?: string;
+  work_arrangement?: string;
   culture_signals: string[];
   // The capability-level asks a posting states in prose. A senior or staff
   // posting routinely names no technology at all, leaving both skill lists
@@ -128,17 +134,17 @@ export interface FitReport {
   id: string;
   user_id: string;
   application_id: string;
-  anti_pattern_passed: boolean;
-  anti_pattern_hits: PreferenceEntry[] | null;
-  technical_score: number | null;
-  technical_gaps: string[] | null;
+  dealbreakers_clear: boolean;
+  dealbreaker_hits: PreferenceEntry[] | null;
+  capability_score: number | null;
+  capability_gaps: string[] | null;
   // Requirements answered below the depth the posting asked for. Null on
   // reports predating the column, and on the many postings that state no
   // depth at all.
-  technical_partial: SkillMatch[] | null;
+  capability_partial: SkillMatch[] | null;
   // Preference fit is a hit list, not a score: which preferences the JD
   // answers, which it is silent on, and which it runs against. Hard-gate
-  // matches stay in anti_pattern_hits and are not repeated in conflicts.
+  // matches stay in dealbreaker_hits and are not repeated in conflicts.
   preference_matches: PreferenceListEntry[] | null;
   preference_gaps: PreferenceListEntry[] | null;
   preference_conflicts: PreferenceListEntry[] | null;

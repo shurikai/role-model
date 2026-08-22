@@ -23,7 +23,7 @@ WHERE id = $1 AND user_id = $2;
 -- name: CreateProject :one
 INSERT INTO projects (
     id, user_id, name, tagline, role, status, started_on, ended_on,
-    repo_url, live_url, writeup_url, force_include, force_exclude
+    source_url, live_url, writeup_url, force_include, force_exclude
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
@@ -36,7 +36,7 @@ SET name          = $3,
     status        = $6,
     started_on    = $7,
     ended_on      = $8,
-    repo_url      = $9,
+    source_url      = $9,
     live_url      = $10,
     writeup_url   = $11,
     force_include = $12,

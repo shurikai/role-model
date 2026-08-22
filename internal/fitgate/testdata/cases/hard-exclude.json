@@ -2,7 +2,6 @@
   "name": "hard-exclude",
   "jd_fixture": "tests/fixtures/sample-hard-exclude-jd.md",
   "description": "Senior Backend Engineer, real-time bidding at an adtech DSP. Deliberately a near-perfect technical match -- Go, Kafka, PostgreSQL, Redis, AWS, Kubernetes, remote, IC track, blameless postmortems -- so that the gate is the only thing standing between the persona and a role they will not take. A gate that only fires on obviously bad roles proves nothing.",
-
   "signals": {
     "required_skills": [
       "Go",
@@ -18,8 +17,6 @@
       "Terraform"
     ],
     "seniority": "senior",
-    "domain": "saas",
-    "work_type": "remote",
     "culture_signals": [
       "remote-first",
       "annual company gathering",
@@ -39,14 +36,20 @@
       ]
     }
   },
-
   "expect": {
-    "technical_score": {
+    "capability_score": {
       "comment": "The point of this fixture: technically excellent, and it must still not be recommended.",
       "min": 85
     },
-    "technical_gaps": {
-      "must_exclude": ["Go", "Kafka", "PostgreSQL", "Redis", "AWS", "Kubernetes"]
+    "capability_gaps": {
+      "must_exclude": [
+        "Go",
+        "Kafka",
+        "PostgreSQL",
+        "Redis",
+        "AWS",
+        "Kubernetes"
+      ]
     }
   }
 }

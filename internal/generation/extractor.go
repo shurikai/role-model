@@ -27,17 +27,22 @@ type JDSignals struct {
 	// but uselessly empty. Every consumer then degrades at once and silently:
 	// the 2a requirement checklist renders "(none listed)" twice, so the
 	// prompt's whole skill-relevance apparatus has nothing to filter against
-	// and falls back to emitting the tag inventory; and ScoreTechnicalFit
+	// and falls back to emitting the tag inventory; and ScoreCapabilityFit
 	// scores a vacuous 100 against an empty requirement list.
 	//
 	// Deliberately NOT part of the document projection. Adding a field here
 	// must not change what the document emits — see documentJDSignals.
 	CoreCompetencies []string `json:"core_competencies"`
 
-	// PrimaryStack holds the technologies the posting frames the role as being
-	// BUILT ON — the languages and platforms the work is actually done in, as
-	// opposed to RequiredSkills, which records only that a technology is asked
-	// for somewhere.
+	// CorePractice holds what the posting frames the role as being PRACTISED
+	// IN day to day — the tools, methods, or materials the person will
+	// actually work with — as opposed to RequiredSkills, which records only
+	// that something is asked for somewhere.
+	//
+	// It was named PrimaryStack, and a stack is software's word for it. The
+	// distinction it carries is not software-specific: "Spanish fluency as a
+	// core requirement" and "Epic as the charting system" are prominence
+	// claims in exactly the way "Python as a primary language" is.
 	//
 	// The distinction is not cosmetic. Several preference rows make a claim
 	// about prominence rather than presence ("Python as a primary language",
@@ -58,7 +63,7 @@ type JDSignals struct {
 	// Deliberately NOT part of the document projection, same as
 	// CoreCompetencies. Adding a field here must not change what the document
 	// emits — see documentJDSignals.
-	PrimaryStack []string `json:"primary_stack"`
+	CorePractice []string `json:"core_practice"`
 
 	// SkillLevels records a depth requirement for individual entries in
 	// RequiredSkills or PreferredSkills, and only where the posting states one.
@@ -79,14 +84,31 @@ type JDSignals struct {
 	// gate compares ordinals with no translation layer in between.
 	//
 	// Deliberately NOT part of the document projection, same as
-	// CoreCompetencies and PrimaryStack. Adding a field here must not change
+	// CoreCompetencies and CorePractice. Adding a field here must not change
 	// what the document emits — see documentJDSignals.
 	SkillLevels []SkillLevel `json:"skill_levels"`
 
-	// Role classification
+	// Role classification.
+	//
+	// Seniority is the only closed-ish field left here, and it is closed
+	// against the user's own career_levels rows rather than a fixed list.
+	//
+	// Domain and WorkType used to sit beside it as enums --
+	// fintech|observability|healthcare|... and remote|hybrid|onsite|unknown --
+	// and both were deleted rather than renamed. Each had a free-text field in
+	// ScreeningSummary answering the same question without the truncation, and
+	// the enum was losing information to it in every stored row: four postings
+	// in four different industries all extracted as domain "saas" while their
+	// industry strings read "B2B business intelligence", "sales data", "web
+	// marketing platform", and "AI-powered marketing cloud". "platform" and
+	// "observability" were never industries at all. work_type fared no better:
+	// "remote" against an arrangement of "fully remote with occasional office
+	// visits or offsites as agreed with manager".
+	//
+	// Read ScreeningSummary.Industry and ScreeningSummary.WorkArrangement
+	// instead. Do not reintroduce a classification enum beside a free-text
+	// field that already answers the question.
 	Seniority string `json:"seniority"`
-	Domain    string `json:"domain"`
-	WorkType  string `json:"work_type"`
 
 	// Culture and preference signals
 	CultureSignals []string `json:"culture_signals"`
@@ -122,7 +144,7 @@ type SkillLevel struct {
 }
 
 // documentJDSignals is the jd_signals projection embedded in the resume
-// document's meta block. It mirrors $defs.jd_signals in schema/resume.v1.json
+// document's meta block. It mirrors $defs.jd_signals in schema/resume.v2.json
 // exactly — those six fields, no others.
 //
 // It exists because the document schema is a strict contract
@@ -141,9 +163,16 @@ type documentJDSignals struct {
 	RequiredSkills  []string `json:"required_skills"`
 	PreferredSkills []string `json:"preferred_skills"`
 	Seniority       string   `json:"seniority"`
-	Domain          string   `json:"domain"`
-	WorkType        string   `json:"work_type"`
-	CultureSignals  []string `json:"culture_signals"`
+
+	// Industry and WorkArrangement replace the domain and work_type enums
+	// one for one, and are read out of ScreeningSummary because that is where
+	// the free-text versions already lived. The document carries the same two
+	// facts it always did; it no longer carries them truncated to a fixed
+	// list. This is a v2-only shape — see schema/resume.v2.json.
+	Industry        string `json:"industry"`
+	WorkArrangement string `json:"work_arrangement"`
+
+	CultureSignals []string `json:"culture_signals"`
 }
 
 // forDocument projects the signals down to what the document schema declares.
@@ -161,8 +190,8 @@ func (s JDSignals) forDocument() documentJDSignals {
 		RequiredSkills:  nonNilStrings(required),
 		PreferredSkills: nonNilStrings(s.PreferredSkills),
 		Seniority:       s.Seniority,
-		Domain:          s.Domain,
-		WorkType:        s.WorkType,
+		Industry:        s.ScreeningSummary.Industry,
+		WorkArrangement: s.ScreeningSummary.WorkArrangement,
 		CultureSignals:  nonNilStrings(s.CultureSignals),
 	}
 }

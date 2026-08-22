@@ -39,9 +39,11 @@ func TestGenerate(t *testing.T) {
 		"required_skills": ["Go", "distributed systems", "PostgreSQL"],
 		"preferred_skills": [],
 		"seniority": "senior",
-		"domain": "fintech",
-		"work_type": "remote",
-		"culture_signals": ["microservices", "API design", "observability"]
+		"culture_signals": ["microservices", "API design", "observability"],
+		"screening_summary": {
+			"industry": "payments infrastructure",
+			"work_arrangement": "fully remote"
+		}
 	}`)
 
 	app, err := queries.CreateApplication(ctx, db.CreateApplicationParams{

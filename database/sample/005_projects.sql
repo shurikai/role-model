@@ -11,7 +11,7 @@ BEGIN;
 
 INSERT INTO projects (
   id, user_id, name, tagline, role, status,
-  started_on, ended_on, repo_url, live_url, writeup_url,
+  started_on, ended_on, source_url, live_url, writeup_url,
   force_include, force_exclude
 ) VALUES
   ('5d000000-0000-0000-0000-000000000001', '5a000000-0000-0000-0000-000000000001',
@@ -51,7 +51,7 @@ ON CONFLICT (id) DO UPDATE SET
   status        = EXCLUDED.status,
   started_on    = EXCLUDED.started_on,
   ended_on      = EXCLUDED.ended_on,
-  repo_url      = EXCLUDED.repo_url,
+  source_url      = EXCLUDED.source_url,
   live_url      = EXCLUDED.live_url,
   writeup_url   = EXCLUDED.writeup_url,
   force_include = EXCLUDED.force_include,

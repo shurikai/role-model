@@ -15,31 +15,31 @@ import (
 
 const createFitReport = `-- name: CreateFitReport :one
 INSERT INTO fit_reports (
-    id, user_id, application_id, anti_pattern_passed, anti_pattern_hits,
-    technical_score, technical_gaps, preference_gaps, narrative,
-    preference_conflicts, screening_summary, technical_matches, preference_matches,
-    technical_partial
+    id, user_id, application_id, dealbreakers_clear, dealbreaker_hits,
+    capability_score, capability_gaps, preference_gaps, narrative,
+    preference_conflicts, screening_summary, capability_matches, preference_matches,
+    capability_partial
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
 )
-RETURNING id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches, preference_matches, technical_partial
+RETURNING id, user_id, application_id, dealbreakers_clear, dealbreaker_hits, capability_score, capability_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, capability_matches, preference_matches, capability_partial
 `
 
 type CreateFitReportParams struct {
 	ID                  uuid.UUID        `json:"id"`
 	UserID              uuid.UUID        `json:"user_id"`
 	ApplicationID       *uuid.UUID       `json:"application_id"`
-	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
-	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
-	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
-	TechnicalGaps       *json.RawMessage `json:"technical_gaps"`
+	DealbreakersClear   bool             `json:"dealbreakers_clear"`
+	DealbreakerHits     *json.RawMessage `json:"dealbreaker_hits"`
+	CapabilityScore     pgtype.Numeric   `json:"capability_score"`
+	CapabilityGaps      *json.RawMessage `json:"capability_gaps"`
 	PreferenceGaps      *json.RawMessage `json:"preference_gaps"`
 	Narrative           *string          `json:"narrative"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
-	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
+	CapabilityMatches   *json.RawMessage `json:"capability_matches"`
 	PreferenceMatches   *json.RawMessage `json:"preference_matches"`
-	TechnicalPartial    *json.RawMessage `json:"technical_partial"`
+	CapabilityPartial   *json.RawMessage `json:"capability_partial"`
 }
 
 func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams) (FitReport, error) {
@@ -47,41 +47,41 @@ func (q *Queries) CreateFitReport(ctx context.Context, arg CreateFitReportParams
 		arg.ID,
 		arg.UserID,
 		arg.ApplicationID,
-		arg.AntiPatternPassed,
-		arg.AntiPatternHits,
-		arg.TechnicalScore,
-		arg.TechnicalGaps,
+		arg.DealbreakersClear,
+		arg.DealbreakerHits,
+		arg.CapabilityScore,
+		arg.CapabilityGaps,
 		arg.PreferenceGaps,
 		arg.Narrative,
 		arg.PreferenceConflicts,
 		arg.ScreeningSummary,
-		arg.TechnicalMatches,
+		arg.CapabilityMatches,
 		arg.PreferenceMatches,
-		arg.TechnicalPartial,
+		arg.CapabilityPartial,
 	)
 	var i FitReport
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.ApplicationID,
-		&i.AntiPatternPassed,
-		&i.AntiPatternHits,
-		&i.TechnicalScore,
-		&i.TechnicalGaps,
+		&i.DealbreakersClear,
+		&i.DealbreakerHits,
+		&i.CapabilityScore,
+		&i.CapabilityGaps,
 		&i.PreferenceGaps,
 		&i.Narrative,
 		&i.CreatedAt,
 		&i.PreferenceConflicts,
 		&i.ScreeningSummary,
-		&i.TechnicalMatches,
+		&i.CapabilityMatches,
 		&i.PreferenceMatches,
-		&i.TechnicalPartial,
+		&i.CapabilityPartial,
 	)
 	return i, err
 }
 
 const getFitReport = `-- name: GetFitReport :one
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches, preference_matches, technical_partial FROM fit_reports
+SELECT id, user_id, application_id, dealbreakers_clear, dealbreaker_hits, capability_score, capability_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, capability_matches, preference_matches, capability_partial FROM fit_reports
 WHERE id = $1 AND user_id = $2
 `
 
@@ -97,24 +97,24 @@ func (q *Queries) GetFitReport(ctx context.Context, arg GetFitReportParams) (Fit
 		&i.ID,
 		&i.UserID,
 		&i.ApplicationID,
-		&i.AntiPatternPassed,
-		&i.AntiPatternHits,
-		&i.TechnicalScore,
-		&i.TechnicalGaps,
+		&i.DealbreakersClear,
+		&i.DealbreakerHits,
+		&i.CapabilityScore,
+		&i.CapabilityGaps,
 		&i.PreferenceGaps,
 		&i.Narrative,
 		&i.CreatedAt,
 		&i.PreferenceConflicts,
 		&i.ScreeningSummary,
-		&i.TechnicalMatches,
+		&i.CapabilityMatches,
 		&i.PreferenceMatches,
-		&i.TechnicalPartial,
+		&i.CapabilityPartial,
 	)
 	return i, err
 }
 
 const listFitReports = `-- name: ListFitReports :many
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches, preference_matches, technical_partial FROM fit_reports
+SELECT id, user_id, application_id, dealbreakers_clear, dealbreaker_hits, capability_score, capability_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, capability_matches, preference_matches, capability_partial FROM fit_reports
 WHERE user_id = $1
 ORDER BY created_at DESC
 `
@@ -132,18 +132,18 @@ func (q *Queries) ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitRe
 			&i.ID,
 			&i.UserID,
 			&i.ApplicationID,
-			&i.AntiPatternPassed,
-			&i.AntiPatternHits,
-			&i.TechnicalScore,
-			&i.TechnicalGaps,
+			&i.DealbreakersClear,
+			&i.DealbreakerHits,
+			&i.CapabilityScore,
+			&i.CapabilityGaps,
 			&i.PreferenceGaps,
 			&i.Narrative,
 			&i.CreatedAt,
 			&i.PreferenceConflicts,
 			&i.ScreeningSummary,
-			&i.TechnicalMatches,
+			&i.CapabilityMatches,
 			&i.PreferenceMatches,
-			&i.TechnicalPartial,
+			&i.CapabilityPartial,
 		); err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func (q *Queries) ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitRe
 }
 
 const listFitReportsByApplication = `-- name: ListFitReportsByApplication :many
-SELECT id, user_id, application_id, anti_pattern_passed, anti_pattern_hits, technical_score, technical_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, technical_matches, preference_matches, technical_partial FROM fit_reports
+SELECT id, user_id, application_id, dealbreakers_clear, dealbreaker_hits, capability_score, capability_gaps, preference_gaps, narrative, created_at, preference_conflicts, screening_summary, capability_matches, preference_matches, capability_partial FROM fit_reports
 WHERE application_id = $1 AND user_id = $2
 ORDER BY created_at DESC
 `
@@ -179,18 +179,18 @@ func (q *Queries) ListFitReportsByApplication(ctx context.Context, arg ListFitRe
 			&i.ID,
 			&i.UserID,
 			&i.ApplicationID,
-			&i.AntiPatternPassed,
-			&i.AntiPatternHits,
-			&i.TechnicalScore,
-			&i.TechnicalGaps,
+			&i.DealbreakersClear,
+			&i.DealbreakerHits,
+			&i.CapabilityScore,
+			&i.CapabilityGaps,
 			&i.PreferenceGaps,
 			&i.Narrative,
 			&i.CreatedAt,
 			&i.PreferenceConflicts,
 			&i.ScreeningSummary,
-			&i.TechnicalMatches,
+			&i.CapabilityMatches,
 			&i.PreferenceMatches,
-			&i.TechnicalPartial,
+			&i.CapabilityPartial,
 		); err != nil {
 			return nil, err
 		}
