@@ -207,3 +207,69 @@ func TestResolveBatchIsAllOrNothing(t *testing.T) {
 		}
 	}
 }
+
+// The whole loop, from a canned extraction to rows: plan, stage, resolve. This
+// is what makes entity_drafts a path rather than a table — Phase 8 shipped the
+// substrate and the resolver, and nothing populated it but a test.
+func TestPlanStageResolveRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL required for intake integration tests")
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	defer pool.Close()
+
+	q := db.New(pool)
+	svc := NewService(pool, q)
+
+	userID := uuid.New()
+	if _, err := q.CreateUser(ctx, db.CreateUserParams{
+		ID: userID, Email: "roundtrip-" + userID.String() + "@test.local",
+	}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	batch, err := q.CreateImportBatch(ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: userID, RawText: "pasted career text", Status: "review",
+	})
+	if err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+
+	var x CareerExtraction
+	if err := json.Unmarshal([]byte(clinicalExtraction), &x); err != nil {
+		t.Fatalf("parse canned extraction: %v", err)
+	}
+	planned, err := PlanDrafts(x)
+	if err != nil {
+		t.Fatalf("PlanDrafts: %v", err)
+	}
+	if _, err := svc.StageDrafts(ctx, userID, batch.ID, planned); err != nil {
+		t.Fatalf("StageDrafts: %v", err)
+	}
+
+	result, err := svc.ResolveBatch(ctx, userID, batch.ID)
+	if err != nil {
+		t.Fatalf("ResolveBatch: %v (unresolved: %v)", err, result.Unresolved)
+	}
+	if len(result.Resolved) != len(planned) {
+		t.Fatalf("resolved %d of %d drafts", len(result.Resolved), len(planned))
+	}
+
+	// An account that had nothing now has a career, and none of it is software.
+	employers, _ := q.GetEmployers(ctx, userID)
+	if len(employers) != 2 {
+		t.Errorf("employers = %d, want 2", len(employers))
+	}
+	cats, _ := q.ListTagCategories(ctx, userID)
+	if len(cats) != 3 {
+		t.Errorf("categories = %v, want Clinical, Certifications, Charting Systems", cats)
+	}
+	skills, _ := q.ListActiveSkillsByUser(ctx, userID)
+	if len(skills) != 2 {
+		t.Errorf("skills = %d, want 2", len(skills))
+	}
+}

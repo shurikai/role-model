@@ -1,0 +1,98 @@
+You are reading someone's own account of their working life — a resume, a
+career narrative, a set of notes, a transcript of them talking about their
+jobs. Your task is to turn it into structured drafts a human will review.
+
+The field is whatever the text says it is. Nursing, carpentry, teaching,
+litigation, kitchen work, software. Do not assume an industry, a job family, or
+a vocabulary the text does not establish, and do not translate what they did
+into the language of some other field.
+
+Return ONE JSON object with these four arrays and nothing else. No preamble, no
+explanation, no markdown fence.
+
+{
+  "employers": [
+    {
+      "ref": "e1",
+      "name": "the organisation as they name it",
+      "industry": "plain-language description of what it does, or null"
+    }
+  ],
+  "positions": [
+    {
+      "ref": "p1",
+      "employer_ref": "e1",
+      "title": "the title as held, verbatim",
+      "industry_role": "what this job is called in the wider field, or null",
+      "industry_level": "the rung of their ladder, or null",
+      "location": "or null",
+      "started_on": "YYYY-MM",
+      "ended_on": "YYYY-MM, or null if current",
+      "context_narrative": "what the role was, in a sentence or two, or null"
+    }
+  ],
+  "contributions": [
+    {
+      "position_ref": "p1",
+      "summary": "one line naming what was done",
+      "full_description": "the whole of what the text says about it",
+      "outcomes": "what changed as a result, or null",
+      "scale_context": "the size or scope — people, money, volume, area, duration, caseload, audience, or any other figure that establishes magnitude, or null",
+      "tags": [{"category": "a grouping name", "name": "the specific thing"}]
+    }
+  ],
+  "skills": [
+    {
+      "category": "a grouping name",
+      "tag": "the specific thing",
+      "proficiency": "one of the depth values below",
+      "years_experience": 8.5
+    }
+  ]
+}
+
+RULES
+
+- "ref" is a label local to this response, used only so a position can name its
+  employer and a contribution can name its position. Invent them freely; they
+  are discarded once the drafts are written.
+
+- EVERY position must carry an employer_ref that appears in employers, and every
+  contribution a position_ref that appears in positions. A draft naming a parent
+  that does not exist cannot be resolved and will be reported back as an error
+  rather than quietly dropped. If the text describes work you cannot attach to a
+  job, leave it out and say nothing — a human will notice the omission far more
+  easily than a wrong attachment.
+
+- Self-employment, freelance work, military service, locum work and unpaid
+  placements are employers. Create one named the way the person names it.
+
+- Categories are groupings the PERSON would recognise, not ones you import from
+  another field. A nurse's might be "Clinical", "Charting Systems",
+  "Certifications"; a chef's "Stations", "Cuisines", "Equipment". Use as few as
+  the material supports. A category you invent for one item is noise.
+
+- A tag is a specific nameable thing: "ACLS", "Epic", "sous vide", "Rule 26
+  disclosures", "PostgreSQL". Not a quality ("hard-working"), not a
+  responsibility ("patient care") — those belong in the contribution text.
+
+- Claim a skill only where the text supports it. A skill is an assertion the
+  person is making about themselves, and one you invented is one they will have
+  to find and delete.
+
+- proficiency is one of: {{.ProficiencyValues}}. Choose from what the text says
+  about depth and duration, not from how impressive the work sounds.
+
+- years_experience is a number or null. Null is correct where the text does not
+  say; do not compute a figure from dates you are not sure about.
+
+- Dates are YYYY-MM. Where the text gives only a year, use "-01" and let the
+  reviewer correct it.
+
+- Copy the person's own words for titles and organisation names. The reviewer is
+  checking your work against their memory, and a paraphrase makes that harder
+  for no gain.
+
+<career_text>
+{{.CareerText}}
+</career_text>
