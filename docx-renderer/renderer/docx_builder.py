@@ -249,7 +249,7 @@ def _render_projects(doc: DocumentObject, projects: list[ProjectEntry]) -> None:
         for bullet in project.bullets:
             _add_bullet(doc, bullet.text)
 
-        links = [project.writeup_url, project.repo_url, project.live_url]
+        links = [project.writeup_url, project.source_url, project.live_url]
         link_line = " · ".join(link for link in links if link)
         if link_line:
             doc.add_paragraph(link_line)

@@ -354,6 +354,15 @@ weighted positive or negative; `is_hard_gate` (the GATE column below) marks the
 rows that additionally cap the preference score when matched. The eight former
 hard excludes were backfilled to weight 10.
 
+> **Stale snapshot, kept for the reasoning around it.** The table below
+> predates two changes. Migration 015 retyped the prominence-claiming rows
+> (Python, TypeScript/Node, Ruby/Rails, Angular) off `anti_pattern`, and
+> migration 021 renamed the types themselves: `work_type` → `role_shape`,
+> `anti_pattern` → `dealbreaker`, `primary_stack` → `core_practice`. Gates no
+> longer "cap the preference score" either — migration 016 deleted the score.
+> `014_preferences.sql` and `021_preference_reconciliation.sql` in the seed repo
+> remain the source of truth for the rows.
+
 | Type | Sentiment | Weight | Gate | Label |
 |---|---|---|---|---|
 | domain | positive | 9 | | distributed systems |

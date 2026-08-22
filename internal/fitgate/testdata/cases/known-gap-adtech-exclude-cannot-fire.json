@@ -2,7 +2,7 @@
   "name": "known-gap-adtech-exclude-cannot-fire",
   "status": "known_gap",
   "issue": "#48",
-  "reason": "The 'adtech' hard exclude cannot fire on an adtech JD. prefFieldsFor routes an anti_pattern preference at domain, work_type, culture_signals, and required_skills -- and 'adtech' appears in none of them, because `domain` is a closed enum with no adtech value and the industry is only ever named in screening_summary.industry. #53 gave the DOMAIN branch that field; the anti_pattern branch still does not read it, and this row is typed anti_pattern. That points at two possible fixes and they are different: retype the row to domain (a sample-data change, and arguably right -- adtech is an industry, not an anti-pattern), or give anti_pattern the screening fields (#48 proper, which also wants location and clearance). database/sample/README.md claims this fixture 'fails the gate outright on the adtech hard exclude'; it does not. This is the hard-exclude fixture's entire reason for existing, so it is the highest-value gap in the set.",
+  "reason": "ROUTING FIXED BY MIGRATION 021, VOCABULARY STILL MISSING. The 'adtech' hard exclude does not fire on an adtech JD. It used to be a routing gap: the dealbreaker branch read a closed domain enum with no adtech value, and the industry survived only in screening_summary.industry, which that branch never read. The enum is gone and the branch reads the industry now -- so the remaining failure is purely lexical. The industry string is 'programmatic advertising technology, demand-side platform', and matchesSignal needs a contiguous whole-word run: 'adtech' is not one inside it, in either direction. This is the same class of miss as REST against 'RESTful APIs', which tags solved with an aliases column. Preference labels have no such column, and that is now what #48 is about for this fixture -- not routing. database/sample/README.md still claims this fixture 'fails the gate outright on the adtech hard exclude'; it does not.",
   "jd_fixture": "tests/fixtures/sample-hard-exclude-jd.md",
   "description": "Same signals as hard-exclude.json, asserting the gate behavior that fixture was written to demonstrate.",
   "signals": {
@@ -20,8 +20,6 @@
       "Terraform"
     ],
     "seniority": "senior",
-    "domain": "saas",
-    "work_type": "remote",
     "culture_signals": [
       "remote-first",
       "annual company gathering",

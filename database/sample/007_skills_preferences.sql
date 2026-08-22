@@ -90,10 +90,11 @@ ON CONFLICT (id) DO UPDATE SET
 -- ============================================================
 -- Preferences
 --
--- Matching in internal/fitgate is a case-insensitive substring check in
--- BOTH directions against the JD's domain, work_type, seniority, and
--- culture_signals fields, so labels are kept short enough to match a
--- canonical JD token.
+-- Matching in internal/fitgate is a case-insensitive whole-word check in BOTH
+-- directions, against whichever signal fields the row's preference_type routes
+-- to -- screening_summary.industry for domain, culture_signals and
+-- core_competencies for role_shape, and so on. Labels are kept short enough to
+-- match the wording a posting actually uses.
 --
 -- Every row carries a weight. A hard exclude is a heavy negative that also
 -- sets is_hard_gate: it costs its weight like any negative and additionally
@@ -116,15 +117,15 @@ INSERT INTO preferences (
    'Secondary interest, from the platform team years.'),
 
   ('56000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'backend', 'positive', 9, FALSE, 'permanent',
+   'role_shape', 'backend', 'positive', 9, FALSE, 'permanent',
    'Core of the career and where the persona is strongest.'),
 
   ('56000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'distributed systems', 'positive', 9, FALSE, NULL,
+   'role_shape', 'distributed systems', 'positive', 9, FALSE, NULL,
    'The problems the persona finds most interesting.'),
 
   ('56000000-0000-0000-0000-000000000006', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'platform engineering', 'positive', 8, FALSE, NULL,
+   'role_shape', 'platform engineering', 'positive', 8, FALSE, NULL,
    'Founded one platform team and would do it again.'),
 
   ('56000000-0000-0000-0000-000000000007', '5a000000-0000-0000-0000-000000000001',
@@ -141,11 +142,11 @@ INSERT INTO preferences (
 
   -- ---------- negative ----------
   ('56000000-0000-0000-0000-000000000020', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'frontend', 'negative', 6, FALSE, NULL,
+   'role_shape', 'frontend', 'negative', 6, FALSE, NULL,
    'Can do it, does not want it as the majority of the role. See the novice React and TypeScript entries in skills.'),
 
   ('56000000-0000-0000-0000-000000000021', '5a000000-0000-0000-0000-000000000001',
-   'work_type', 'people management', 'negative', 7, FALSE, NULL,
+   'role_shape', 'people management', 'negative', 7, FALSE, NULL,
    'Chose the IC track deliberately at the staff level and intends to stay on it.'),
 
   ('56000000-0000-0000-0000-000000000022', '5a000000-0000-0000-0000-000000000001',
@@ -161,30 +162,30 @@ INSERT INTO preferences (
   -- industry is not currently matchable (see #48) -- so without this row no
   -- fixture could exercise a gate firing end to end.
   ('56000000-0000-0000-0000-000000000043', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', '.NET', 'negative', 10, TRUE, NULL,
+   'dealbreaker', '.NET', 'negative', 10, TRUE, NULL,
    'Will not move to the Microsoft stack. Go/Java/Python is the career direction.'),
 
   -- The one prominence-shaped gate. Every other row here objects to a
   -- technology or industry being present at all; this one objects only to
-  -- TypeScript being what the role is BUILT ON, which is a different question
-  -- and is why it is typed primary_stack. The persona is a novice at
+  -- TypeScript being what the role is PRACTISED IN, which is a different question
+  -- and is why it is typed core_practice. The persona is a novice at
   -- TypeScript and React and would still take a backend role that touches
   -- them. Without a row of this shape no fixture exercises the distinction
   -- #68 turns on.
   ('56000000-0000-0000-0000-000000000044', '5a000000-0000-0000-0000-000000000001',
-   'primary_stack', 'TypeScript / Node.js as a primary language', 'negative', 10, TRUE, NULL,
+   'core_practice', 'TypeScript / Node.js as a primary language', 'negative', 10, TRUE, NULL,
    'Backend is the career direction. A TypeScript-primary role is a different job, not a stretch assignment.'),
 
   ('56000000-0000-0000-0000-000000000040', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'adtech', 'negative', 10, TRUE, NULL,
+   'dealbreaker', 'adtech', 'negative', 10, TRUE, NULL,
    'Will not work on advertising technology.'),
 
   ('56000000-0000-0000-0000-000000000041', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'gambling', 'negative', 10, TRUE, NULL,
+   'dealbreaker', 'gambling', 'negative', 10, TRUE, NULL,
    'Will not work on gambling or sports betting.'),
 
   ('56000000-0000-0000-0000-000000000042', '5a000000-0000-0000-0000-000000000001',
-   'anti_pattern', 'surveillance', 'negative', 10, TRUE, NULL,
+   'dealbreaker', 'surveillance', 'negative', 10, TRUE, NULL,
    'Will not work on consumer surveillance products.')
 
 ON CONFLICT (id) DO UPDATE SET

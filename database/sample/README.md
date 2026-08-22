@@ -117,16 +117,21 @@ weak-match      40.0   26.6  pass
 
 Technical scoring behaves as designed. Two things do not:
 
-- **The gate cannot see a JD's industry**, so the adtech role is
-  indistinguishable from the freight role — 93.8 against 94.4, both passing.
-  `domain` is a closed enum with no adtech value, and the industry survives only
-  in `screening_summary.industry`, which no scoring path reads (#48).
-- **Preference matching is capped by the same enums.** Seven of the nine
-  positive preferences describe things `domain` / `work_type` / `seniority` /
-  `culture_signals` cannot express, so even the ideal JD scores 40.4. Worse, an
-  unmatched *negative* preference earns its weight — so the weak-match JD is
-  credited for avoiding the frontend focus, heavy on-call, and extended hours it
-  openly advertises (#45).
+- **The `adtech` gate still does not fire on the adtech role**, so it stays
+  indistinguishable from the freight role. This used to be a routing gap —
+  `domain` was a closed enum with no adtech value, and the industry survived
+  only in `screening_summary.industry`, which the gate never read. Migration 021
+  deleted the enum and the gate reads the industry now, so what remains is
+  lexical: `adtech` is not a whole-word run inside "programmatic advertising
+  technology, demand-side platform", in either direction. Preference labels have
+  no aliases column, which is what tags use to bridge exactly this (#48).
+- **Preference matching is limited by the same lexical rule.** Several positive
+  preferences are the persona's phrasing for something the JD says differently
+  ("supply chain" against "freight logistics visibility platform"), and
+  `containsPhrase` requires a contiguous whole-word run. An unmatched *negative*
+  no longer earns a bonus — the score it earned is gone — but the silence is
+  not: the weak-match JD's frontend focus, heavy on-call, and extended hours are
+  reported nowhere (#45).
 
 These are code defects, not fixture defects. The fixtures are doing their job by
 exposing them, and each is held by a `known_gap` case in the eval harness that

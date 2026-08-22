@@ -56,30 +56,30 @@ core_competencies: array of strings — the capability-level requirements the JD
     ("async-first", "high ownership"); a competency describes what the person
     must be able to do ("owns services in production").
 
-primary_stack: array of strings — the technologies the posting frames the role
-  as being BUILT ON: the languages and platforms the person will actually work
-  in day to day. This is a strict subset of required_skills, and it answers a
-  different question. required_skills asks "does the JD ask for this at all";
-  primary_stack asks "is this what the role is made of".
+core_practice: array of strings — what the posting frames the role as being
+  PRACTISED IN: the tools, methods, systems, or materials the person will
+  actually work with day to day. This is a strict subset of required_skills,
+  and it answers a different question. required_skills asks "does the JD ask
+  for this at all"; core_practice asks "is this what the role is made of".
 
-  Rules for primary_stack:
-  - Not everything required is primary. A tool named once in a nice-to-have
-    bullet, a data store touched at the edges, or a CI system the team happens
-    to use is required, not primary. Typically 2-6 entries.
+  Rules for core_practice:
+  - Not everything required is central. Something named once in a nice-to-have
+    bullet, touched at the edges, or that the team happens to use is required,
+    not central. Typically 2-6 entries.
   - Preserve substitutability. When the JD offers a choice — "Java and/or
-    Python", "Go or Rust" — that is ONE entry joined with " | ", exactly as in
-    required_skills. A technology the posting offers a substitute for is not
-    something the role is built on, and collapsing the choice into separate
-    entries asserts a requirement the JD did not make.
+    Python", "Spanish or Portuguese" — that is ONE entry joined with " | ",
+    exactly as in required_skills. Something the posting offers a substitute
+    for is not what the role is practised in, and collapsing the choice into
+    separate entries asserts a requirement the JD did not make.
   - Deduplicate across the whole posting, and let the STRICTEST statement of
-    the requirement govern. Postings routinely state the same stack twice: once
-    in the must-have qualifications and again in a "Core Technical Stack" or
-    "Tech you'll use" list. If a technology appears in a choice in one place and
-    bare in another, emit the choice and nothing else. Never emit both
-    "Java | Python" and a separate "Python".
-  - Empty array if the JD does not make it clear what the role is built on.
-    An empty primary_stack is a correct answer for a posting that lists
-    technologies without saying which ones the job centres on.
+    the requirement govern. Postings routinely state the same set twice: once
+    in the must-have qualifications and again in a "Core Technical Stack",
+    "Tools you'll use", or "What you'll work with" list. If something appears
+    in a choice in one place and bare in another, emit the choice and nothing
+    else. Never emit both "Java | Python" and a separate "Python".
+  - Empty array if the JD does not make it clear what the role centres on. An
+    empty core_practice is a correct answer for a posting that lists tools
+    without saying which ones the job is actually about.
 
 skill_levels: array of objects — the depth requirement for individual skills,
   and ONLY for the skills where the posting states one. Each object is:
@@ -166,12 +166,6 @@ seniority: string — one of: {{if .SeniorityLevels}}{{.SeniorityLevels}}, {{end
   nothing to place it by — that is a real answer, not a failure, and it is
   read as "pitch this at the usual level" downstream.
 
-domain: string — one of: "fintech", "observability", "healthcare", "e-commerce",
-  "defense", "saas", "platform", "consumer", "edtech", "govtech", "unknown".
-  Choose the closest match. Use "unknown" if domain is not determinable.
-
-work_type: string — one of: "remote", "hybrid", "onsite", "unknown".
-
 culture_signals: array of strings — short phrases describing work culture, team
   structure, or work style signals present in the JD. Examples: "async-first",
   "small team", "high ownership", "fast-paced startup", "on-call required",
@@ -195,9 +189,11 @@ screening_summary: object — the plain-language facts a human scans a job posti
     "occasional customer site visits". Use "not mentioned" if absent.
 
   industry: string — plain-language description of what the company or team
-    actually works on. NOT constrained to the fixed `domain` list above — write
-    what is true, e.g. "defense/autonomous systems", "themed entertainment",
-    "developer telemetry SaaS", "freight logistics".
+    actually works on. Not a category from a fixed list — write what is true,
+    e.g. "defense/autonomous systems", "themed entertainment", "developer
+    telemetry SaaS", "freight logistics", "county public health", "fine
+    dining". This is the only place the posting's field is recorded, and it is
+    read by the fit gate, so a vague answer here costs a real match.
 
   clearance_citizenship: string — clearance, citizenship, work authorization,
     or residency requirements as stated. e.g. "U.S. citizenship + active TS/SCI
@@ -284,13 +280,11 @@ Example output shape:
     "high-cardinality time series storage",
     "production on-call ownership"
   ],
-  "primary_stack": ["Go", "Kubernetes"],
+  "core_practice": ["Go", "Kubernetes"],
   "skill_levels": [
     {"requirement": "Go", "level": "expert", "signal": "expert-level Go"}
   ],
   "seniority": "senior",
-  "domain": "observability",
-  "work_type": "remote",
   "culture_signals": ["small team", "high ownership", "async-first"],
   "screening_summary": {
     "location": "Remote, US",
@@ -337,12 +331,12 @@ ownership of services", "setting technical direction", "mentoring engineers"]
 {{.JobDescription}}
 </job_description>
 
-Example of primary_stack against a posting that states its stack twice:
+Example of core_practice against a posting that states its stack twice:
 Input: must-have qualifications say "Proficiency in Java and/or Python"; a
 later "Core Technical Stack" section lists "Java and Python, Apache Kafka, GCP
 (BigQuery, GKE, Vertex AI), Snowflake and Starburst/Trino, Terraform, Scrapy,
 proxy management systems, Apache Airflow".
--> primary_stack is ["Java | Python", "Apache Kafka", "GCP", "Kubernetes"]
+-> core_practice is ["Java | Python", "Apache Kafka", "GCP", "Kubernetes"]
 The language requirement stays ONE entry because the must-have section offers
 the two as substitutes, and the bare "Java and Python" in the stack listing does
 not override that — the stricter statement governs. Snowflake, Terraform,

@@ -40,11 +40,11 @@ sql:
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "contribution_drafts.flags"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
-          - column: "fit_reports.anti_pattern_hits"
+          - column: "fit_reports.dealbreaker_hits"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
-          - column: "fit_reports.technical_gaps"
+          - column: "fit_reports.capability_gaps"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
-          - column: "fit_reports.technical_matches"
+          - column: "fit_reports.capability_matches"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.preference_gaps"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
@@ -52,7 +52,7 @@ sql:
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.preference_matches"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
-          - column: "fit_reports.technical_partial"
+          - column: "fit_reports.capability_partial"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.screening_summary"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}

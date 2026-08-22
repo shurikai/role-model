@@ -63,7 +63,7 @@ func labelsOf(prefs []db.Preference) []string {
 
 // gateHitLabels runs the scorer and reports which hard-gate rows matched.
 // The gate is no longer a separate pass — this is how RunFitEvaluation
-// derives anti_pattern_passed, so the tests exercise the same path.
+// derives dealbreakers_clear, so the tests exercise the same path.
 func gateHitLabels(prefs []db.Preference, signals JDSignals) (passed bool, labels []string) {
 	_, _, _, hits := ScorePreferenceFit(prefs, signals)
 	return len(hits) == 0, labelsOf(hits)
@@ -84,38 +84,38 @@ func TestHardGateMatching(t *testing.T) {
 			// here, and while the gate was blocking that killed the
 			// application outright with a nonsense explanation.
 			name:       "staff seniority does not trip the consulting exclude",
-			pref:       hardGate(consultingLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", WorkType: "remote", Seniority: "staff"},
+			pref:       hardGate(consultingLabel, "dealbreaker"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas", WorkArrangement: "remote"}, Seniority: "staff"},
 			wantPassed: true,
 		},
 		{
 			name:       "genuine consulting culture signal still trips it",
-			pref:       hardGate(consultingLabel, "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", CultureSignals: []string{"IT consulting / staff augmentation model"}},
+			pref:       hardGate(consultingLabel, "dealbreaker"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CultureSignals: []string{"IT consulting / staff augmentation model"}},
 			wantPassed: false,
 		},
 		{
 			name:       "defense domain still trips the domain exclude",
 			pref:       hardGate(defenseLabel, "domain"),
-			signals:    JDSignals{Domain: "defense", Seniority: "principal"},
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "defense"}, Seniority: "principal"},
 			wantPassed: false,
 		},
 		{
 			// A domain exclude must not reach into the skills arrays.
 			name:       "domain exclude ignores skills",
 			pref:       hardGate(defenseLabel, "domain"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"defense"}},
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"defense"}},
 			wantPassed: true,
 		},
 		{
 			// Task 2: skills-shaped excludes could never fire before, because
 			// nothing in the gate read the skills arrays at all. They fire
-			// now, but against primary_stack rather than required_skills — the
+			// now, but against core_practice rather than required_skills — the
 			// label claims Python is what the role is BUILT ON, and only
-			// primary_stack answers that question.
+			// core_practice answers that question.
 			name:       "a python-primary role trips the python exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Python", "Django"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Python", "Django"}},
 			wantPassed: false,
 		},
 		{
@@ -124,8 +124,8 @@ func TestHardGateMatching(t *testing.T) {
 			// routing this required skill alone tripped a hard gate about
 			// EXPERT Python as a PRIMARY requirement.
 			name:       "python as a required skill only does not trip the python exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"Python", "Django"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"Python", "Django"}},
 			wantPassed: true,
 		},
 		{
@@ -133,8 +133,8 @@ func TestHardGateMatching(t *testing.T) {
 			// requirement, so it must not trip a hard exclude — see
 			// prefFieldsFor.
 			name:       "python preferred skill does not trip the python exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PreferredSkills: []string{"Python"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, PreferredSkills: []string{"Python"}},
 			wantPassed: true,
 		},
 		{
@@ -142,11 +142,11 @@ func TestHardGateMatching(t *testing.T) {
 			// bullet, and that was enough to disqualify the role with a
 			// narrative asserting a requirement the JD never stated.
 			name: "angular as a preferred skill only does not trip the angular exclude",
-			pref: hardGate(angularLabel, "primary_stack"),
+			pref: hardGate(angularLabel, "core_practice"),
 			signals: JDSignals{
-				Domain:          "fintech",
-				RequiredSkills:  []string{"Java", "Spring Boot"},
-				PreferredSkills: []string{"React", "Angular"},
+				ScreeningSummary: generation.ScreeningSummary{Industry: "fintech"},
+				RequiredSkills:   []string{"Java", "Spring Boot"},
+				PreferredSkills:  []string{"React", "Angular"},
 			},
 			wantPassed: true,
 		},
@@ -154,67 +154,64 @@ func TestHardGateMatching(t *testing.T) {
 			// The other half: routing away from required_skills must not
 			// disable the row. A posting built co-equally on Angular still
 			// trips it.
-			name: "angular in the primary stack still trips the angular exclude",
-			pref: hardGate(angularLabel, "primary_stack"),
-			signals: JDSignals{
-				Domain:       "fintech",
-				PrimaryStack: []string{"Java", "Angular"},
-			},
+			name:       "angular in the primary stack still trips the angular exclude",
+			pref:       hardGate(angularLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "fintech"}, CorePractice: []string{"Java", "Angular"}},
 			wantPassed: false,
 		},
 		{
 			// #68, the OR-group half. This case previously asserted the
 			// OPPOSITE, on the reasoning that an exclude should reach a single
 			// option buried in a group. That reasoning is right for
-			// anti_pattern and wrong here: a group means the posting offers
+			// dealbreaker and wrong here: a group means the posting offers
 			// substitutes, and a language you can be excused from is not what
 			// the role is built on. "Proficiency in Java and/or Python" is the
 			// posting that made this concrete.
 			name:       "an or-group in the primary stack does not trip an exclude on one member",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Java | Python | Go"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Java | Python | Go"}},
 			wantPassed: true,
 		},
 		{
 			// The converse, so the rule above is a distinction and not a
 			// blanket disarm: no substitute is offered, so the claim stands.
 			name:       "an ungrouped primary language still trips an exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Python"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Python"}},
 			wantPassed: false,
 		},
 		{
 			// Extraction restating a grouped choice as a bare entry must not
 			// reopen #68. collapseSubsumed drops the restatement.
 			name:       "a bare restatement of a grouped member does not trip an exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Java | Python", "Python", "Java"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Java | Python", "Python", "Java"}},
 			wantPassed: true,
 		},
 		{
 			name:       "typescript in the primary stack trips the typescript exclude",
-			pref:       hardGate(typescriptLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"TypeScript"}},
+			pref:       hardGate(typescriptLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"TypeScript"}},
 			wantPassed: false,
 		},
 		{
 			name:       "unrelated stack does not trip a skills exclude",
-			pref:       hardGate(pythonLabel, "primary_stack"),
-			signals:    JDSignals{Domain: "saas", PrimaryStack: []string{"Go", "Kubernetes"}},
+			pref:       hardGate(pythonLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Go", "Kubernetes"}},
 			wantPassed: true,
 		},
 		{
 			// A bare-label exclude keeps presence semantics and stays on
-			// anti_pattern. Splitting the types must not disarm these.
+			// dealbreaker. Splitting the types must not disarm these.
 			name:       "a bare technology exclude still fires on a required skill",
-			pref:       hardGate("C# / .NET", "anti_pattern"),
-			signals:    JDSignals{Domain: "saas", RequiredSkills: []string{"C#", "Azure"}},
+			pref:       hardGate("C# / .NET", "dealbreaker"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"C#", "Azure"}},
 			wantPassed: false,
 		},
 		{
 			name:       "culture exclude matches a culture signal",
 			pref:       hardGate(cultureLabel, "culture"),
-			signals:    JDSignals{Domain: "saas", CultureSignals: []string{"Big Four consulting culture"}},
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CultureSignals: []string{"Big Four consulting culture"}},
 			wantPassed: false,
 		},
 		{
@@ -222,7 +219,7 @@ func TestHardGateMatching(t *testing.T) {
 			// gate: it costs its weight and nothing more.
 			name:       "a plain negative preference is not a gate hit",
 			pref:       db.Preference{ID: uuid.New(), Label: defenseLabel, PreferenceType: "domain", Sentiment: "negative", Weight: 6},
-			signals:    JDSignals{Domain: "defense"},
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "defense"}},
 			wantPassed: true,
 		},
 	}
@@ -255,8 +252,8 @@ func TestPreferenceReporting(t *testing.T) {
 		// kinds of finding, and the narrative has to be able to say which it
 		// is looking at. A gate hit used to be copied into both, which is
 		// meaningful only when a single score is collapsing them anyway.
-		prefs := []db.Preference{hardGate(pythonLabel, "anti_pattern")}
-		signals := JDSignals{Domain: "saas", RequiredSkills: []string{"Python"}}
+		prefs := []db.Preference{hardGate(pythonLabel, "dealbreaker")}
+		signals := JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"Python"}}
 
 		_, _, conflicts, hits := ScorePreferenceFit(prefs, signals)
 		if !slices.Contains(labelsOf(hits), pythonLabel) {
@@ -272,12 +269,12 @@ func TestPreferenceReporting(t *testing.T) {
 		// The mirror property. Avoiding a stated dislike is the ideal outcome
 		// and there is nothing to say about it — this is the behavior that,
 		// under the old average, silently paid out a bonus instead.
-		signals := JDSignals{Domain: "observability", RequiredSkills: []string{"Go"}}
+		signals := JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "observability"}, RequiredSkills: []string{"Go"}}
 
 		bare := []db.Preference{positive("observability", 8)}
 		withGates := append(append([]db.Preference{}, bare...),
-			hardGate(pythonLabel, "anti_pattern"),
-			hardGate(typescriptLabel, "anti_pattern"),
+			hardGate(pythonLabel, "dealbreaker"),
+			hardGate(typescriptLabel, "dealbreaker"),
 		)
 
 		wantM, wantG, wantC, wantH := ScorePreferenceFit(bare, signals)
@@ -306,10 +303,10 @@ func TestPreferenceReporting(t *testing.T) {
 		// The hazard: the old gate returned on its first hit. Reusing that
 		// loop would report one label no matter how many matched.
 		prefs := []db.Preference{
-			hardGate(pythonLabel, "anti_pattern"),
-			hardGate(typescriptLabel, "anti_pattern"),
+			hardGate(pythonLabel, "dealbreaker"),
+			hardGate(typescriptLabel, "dealbreaker"),
 		}
-		signals := JDSignals{Domain: "saas", RequiredSkills: []string{"Python", "TypeScript"}}
+		signals := JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"Python", "TypeScript"}}
 
 		_, _, _, hits := ScorePreferenceFit(prefs, signals)
 		if len(hits) != 2 {
@@ -328,10 +325,10 @@ func TestPreferenceReporting(t *testing.T) {
 		prefs := []db.Preference{
 			positive("distributed systems", 9),
 			positive("observability", 8),
-			hardGate(pythonLabel, "anti_pattern"),
+			hardGate(pythonLabel, "dealbreaker"),
 		}
 		// Nothing positive matches, and the gate does.
-		signals := JDSignals{Domain: "saas", RequiredSkills: []string{"Python"}}
+		signals := JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"Python"}}
 
 		matches, gaps, _, hits := ScorePreferenceFit(prefs, signals)
 		if len(hits) != 1 {
@@ -358,7 +355,7 @@ func TestPreferenceReporting(t *testing.T) {
 		}
 		matches, gaps, _, _ := ScorePreferenceFit(
 			[]db.Preference{remote},
-			JDSignals{Domain: "observability", WorkType: "remote"},
+			JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "observability", WorkArrangement: "remote"}},
 		)
 		if slices.Contains(labelsOf(gaps), remote.Label) {
 			t.Errorf("remote-first reported as a gap on a remote JD")
@@ -372,22 +369,18 @@ func TestPreferenceReporting(t *testing.T) {
 		// #49: ScorePreferenceFit matched against domain/work_type/culture
 		// only, so this row could never fire — and because an unmatched
 		// negative earned its weight, it paid out a bonus on every JD instead.
-		// The field it fires against changed with #68 (primary_stack, not
+		// The field it fires against changed with #68 (core_practice, not
 		// required_skills); the property under test did not. What changed here
 		// is only how the miss shows up: as an empty conflicts list rather
 		// than as a score that failed to drop.
 		jenkins := db.Preference{
 			ID: uuid.New(), Label: "Jenkins administration as primary responsibility",
-			PreferenceType: "primary_stack", Sentiment: "negative", Weight: 8,
+			PreferenceType: "core_practice", Sentiment: "negative", Weight: 8,
 		}
 		prefs := []db.Preference{jenkins}
 
-		_, _, hitConflicts, _ := ScorePreferenceFit(prefs, JDSignals{
-			Domain: "platform", PrimaryStack: []string{"Jenkins", "Groovy"},
-		})
-		_, _, cleanConflicts, _ := ScorePreferenceFit(prefs, JDSignals{
-			Domain: "observability", PrimaryStack: []string{"Go", "Kafka"},
-		})
+		_, _, hitConflicts, _ := ScorePreferenceFit(prefs, JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "platform"}, CorePractice: []string{"Jenkins", "Groovy"}})
+		_, _, cleanConflicts, _ := ScorePreferenceFit(prefs, JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "observability"}, CorePractice: []string{"Go", "Kafka"}})
 
 		if !slices.Contains(labelsOf(hitConflicts), jenkins.Label) {
 			t.Errorf("conflicts = %v, want the Jenkins label", labelsOf(hitConflicts))
@@ -409,7 +402,7 @@ func TestPreferenceReporting(t *testing.T) {
 		}
 		matches, gaps, conflicts, hits := ScorePreferenceFit(
 			[]db.Preference{disliked},
-			JDSignals{Domain: "observability", WorkType: "remote"},
+			JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "observability", WorkArrangement: "remote"}},
 		)
 		for name, got := range map[string][]db.Preference{
 			"matches": matches, "gaps": gaps, "conflicts": conflicts, "gateHits": hits,
@@ -500,24 +493,21 @@ func TestPreferenceRoutingReachesProseSignals(t *testing.T) {
 			// signals.WorkType is remote|hybrid|onsite|unknown. No work_type
 			// label can ever appear in it; the role shape is in culture_signals.
 			name:    "a work_type preference reads culture signals",
-			pref:    positive("small team, high ownership", "work_type", 9),
-			signals: JDSignals{WorkType: "remote", CultureSignals: []string{"small team", "high ownership"}},
+			pref:    positive("small team, high ownership", "role_shape", 9),
+			signals: JDSignals{ScreeningSummary: generation.ScreeningSummary{WorkArrangement: "remote"}, CultureSignals: []string{"small team", "high ownership"}},
 		},
 		{
-			name: "a work_type preference reads core competencies",
-			pref: positive("greenfield development", "work_type", 6),
-			signals: JDSignals{
-				WorkType:         "remote",
-				CoreCompetencies: []string{"greenfield development of a new ingest service"},
-			},
+			name:    "a role_shape preference reads core competencies",
+			pref:    positive("greenfield development", "role_shape", 6),
+			signals: JDSignals{ScreeningSummary: generation.ScreeningSummary{WorkArrangement: "remote"}, CoreCompetencies: []string{"greenfield development of a new ingest service"}},
 		},
 		{
-			// The enum has no logistics value, so extraction correctly says
-			// "saas" and the real industry survives only in screening_summary.
+			// The case that killed the domain enum. It had no logistics value,
+			// so extraction answered "saas" and the real industry survived
+			// only in screening_summary — which is now the only field there is.
 			name: "a domain preference reads the screening summary industry",
 			pref: positive("logistics", "domain", 9),
 			signals: JDSignals{
-				Domain: "saas",
 				ScreeningSummary: generation.ScreeningSummary{
 					Industry: "freight logistics visibility platform",
 				},
@@ -526,27 +516,21 @@ func TestPreferenceRoutingReachesProseSignals(t *testing.T) {
 		{
 			// "observability" was reported as an unmet gap on a posting that
 			// required observability work outright.
-			name: "a domain preference reads core competencies",
-			pref: positive("observability", "domain", 7),
-			signals: JDSignals{
-				Domain:           "healthcare",
-				CoreCompetencies: []string{"observability and incident response for production services"},
-			},
+			name:    "a domain preference reads core competencies",
+			pref:    positive("observability", "domain", 7),
+			signals: JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "healthcare"}, CoreCompetencies: []string{"observability and incident response for production services"}},
 		},
 		{
-			name: "a culture preference reads core competencies",
-			pref: positive("mentoring", "culture", 7),
-			signals: JDSignals{
-				WorkType:         "remote",
-				CoreCompetencies: []string{"mentoring senior engineers"},
-			},
+			name:    "a culture preference reads core competencies",
+			pref:    positive("mentoring", "culture", 7),
+			signals: JDSignals{ScreeningSummary: generation.ScreeningSummary{WorkArrangement: "remote"}, CoreCompetencies: []string{"mentoring senior engineers"}},
 		},
 		{
 			// The widening must not make everything match. A JD that genuinely
 			// says nothing about a preference still reports it as a gap.
 			name:    "a silent JD still reports the preference as a gap",
 			pref:    positive("logistics", "domain", 9),
-			signals: JDSignals{Domain: "healthcare", CoreCompetencies: []string{"claims adjudication"}},
+			signals: JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "healthcare"}, CoreCompetencies: []string{"claims adjudication"}},
 			wantGap: true,
 		},
 	}
@@ -570,15 +554,12 @@ func TestPreferenceRoutingReachesProseSignals(t *testing.T) {
 // from "Y over X" — the fix is disjoint labels, not a smarter matcher.
 func TestOppositeWorkTypePreferencesDoNotBothMatch(t *testing.T) {
 	prefs := []db.Preference{
-		{ID: uuid.New(), Label: "product engineering", PreferenceType: "work_type",
+		{ID: uuid.New(), Label: "product engineering", PreferenceType: "role_shape",
 			Sentiment: "positive", Weight: 8},
-		{ID: uuid.New(), Label: "internal platform / developer tooling", PreferenceType: "work_type",
+		{ID: uuid.New(), Label: "internal platform / developer tooling", PreferenceType: "role_shape",
 			Sentiment: "negative", Weight: 5},
 	}
-	signals := JDSignals{
-		WorkType:       "remote",
-		CultureSignals: []string{"internal platform / developer tooling"},
-	}
+	signals := JDSignals{ScreeningSummary: generation.ScreeningSummary{WorkArrangement: "remote"}, CultureSignals: []string{"internal platform / developer tooling"}}
 
 	_, gaps, conflicts, _ := ScorePreferenceFit(prefs, signals)
 
@@ -714,7 +695,7 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals, testLevels)
+			fit := ScoreCapabilityFit(nameOnlySkills(tt.skillNames), tt.signals, testLevels)
 			score := fit.Score
 			gaps := fit.Gaps
 			if score != tt.wantScore {
@@ -810,7 +791,7 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required}, testLevels)
+			fit := ScoreCapabilityFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required}, testLevels)
 			gaps := fit.Gaps
 			if !slices.Equal(gaps, tt.wantGaps) {
 				t.Errorf("gaps = %q, want %q", gaps, tt.wantGaps)
@@ -829,7 +810,7 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 // closes it. Canonicalization in jd_extraction.tmpl remains the first line of
 // defence; aliases are the recovery path when it does not fire.
 func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) {
-	fit := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
+	fit := ScoreCapabilityFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
 	gaps := fit.Gaps
 	if len(gaps) == 0 {
 		t.Error("matchesAny appears to bridge RESTful->REST on the name alone now; " +
@@ -845,7 +826,7 @@ func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) 
 func TestScoreTechnicalFitBridgesAdjectivalFormsViaAliases(t *testing.T) {
 	skills := []SkillTerm{{Name: "REST", Aliases: []string{"rest api", "restful"}}}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
+	fit := ScoreCapabilityFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
 	score := fit.Score
 	gaps := fit.Gaps
 	matches := fit.Matches
@@ -896,7 +877,7 @@ func TestScoreTechnicalFitCompetencyWordedJD(t *testing.T) {
 		PreferredSkills: []string{"IaC", "multi-agent", "RAG"},
 	}
 
-	fit := ScoreTechnicalFit(competencySkills, signals, testLevels)
+	fit := ScoreCapabilityFit(competencySkills, signals, testLevels)
 	score := fit.Score
 	gaps := fit.Gaps
 	matches := fit.Matches
@@ -947,7 +928,7 @@ func TestScoreTechnicalFitCategoryRequiresAnActiveSkill(t *testing.T) {
 		{Name: "Jenkins", Category: "Tools & CI/CD", CategoryAliases: []string{"ci/cd"}},
 	}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{
+	fit := ScoreCapabilityFit(skills, JDSignals{
 		RequiredSkills: []string{"observability", "CI/CD"},
 	},
 		testLevels)
@@ -970,7 +951,7 @@ func TestScoreTechnicalFitPrefersDirectMatchOverCategory(t *testing.T) {
 		{Name: "REST", Category: "Protocols & Messaging", CategoryAliases: []string{"kafka", "messaging"}},
 	}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}}, testLevels)
+	fit := ScoreCapabilityFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}}, testLevels)
 	matches := fit.Matches
 	if len(matches) != 1 {
 		t.Fatalf("matches = %+v, want one", matches)
@@ -993,7 +974,7 @@ func TestScoreTechnicalFitCategoryDoesNotMatchOnSubstrings(t *testing.T) {
 		{Name: "JUnit", Category: "Testing", CategoryAliases: []string{"automated testing", "test coverage"}},
 	}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}}, testLevels)
+	fit := ScoreCapabilityFit(skills, JDSignals{RequiredSkills: []string{"RAG"}}, testLevels)
 	gaps := fit.Gaps
 	matches := fit.Matches
 	if len(matches) != 0 {
@@ -1040,7 +1021,7 @@ func TestSplitAlternatives(t *testing.T) {
 func TestScoreTechnicalFitUnscoredWhenJDStatesNoRequirements(t *testing.T) {
 	skills := nameOnlySkills([]string{"Java", "Spring Boot", "PostgreSQL"})
 
-	fit := ScoreTechnicalFit(skills, JDSignals{}, testLevels)
+	fit := ScoreCapabilityFit(skills, JDSignals{}, testLevels)
 
 	if fit.Scored {
 		t.Fatal("Scored = true, want false — the JD stated nothing to score")
@@ -1056,7 +1037,7 @@ func TestScoreTechnicalFitUnscoredWhenJDStatesNoRequirements(t *testing.T) {
 // A profile that answers nothing must stay distinguishable from a JD that
 // asked nothing: same zero score, opposite Scored.
 func TestScoreTechnicalFitScoredWhenNothingMatches(t *testing.T) {
-	fit := ScoreTechnicalFit(nameOnlySkills([]string{"Java"}), JDSignals{
+	fit := ScoreCapabilityFit(nameOnlySkills([]string{"Java"}), JDSignals{
 		RequiredSkills: []string{"Erlang", "Elixir"},
 	},
 		testLevels)
@@ -1084,7 +1065,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 	}
 
 	t.Run("evidence above the required level earns full credit", func(t *testing.T) {
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "expert")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
 			testLevels,
@@ -1110,7 +1091,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 	t.Run("evidence at exactly the required level earns full credit", func(t *testing.T) {
 		// The boundary. A >= comparison written as > would file every exact
 		// match as partial, which is the most likely way to get this wrong.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "proficient")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
 			testLevels,
@@ -1124,7 +1105,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 	})
 
 	t.Run("evidence below the required level earns half credit and lands in Partial", func(t *testing.T) {
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "novice")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "expert")}},
 			testLevels,
@@ -1156,7 +1137,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 	t.Run("a preferred skill below level earns half of one point", func(t *testing.T) {
 		// Two required entries matched cleanly (4 points) plus a preferred one
 		// at half (0.5) out of a possible 5.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Go", "expert"), skill("PostgreSQL", "expert"), skill("Kafka", "novice")},
 			JDSignals{
 				RequiredSkills:  []string{"Go", "PostgreSQL"},
@@ -1178,7 +1159,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		// Level only means something once presence is established. A gap must
 		// keep the JD's phrasing and say nothing about depth, or "you do not
 		// have this" and "you have this but not deeply enough" blur together.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Go", "expert")},
 			JDSignals{
 				RequiredSkills: []string{"Go", "Erlang"},
@@ -1197,7 +1178,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 	t.Run("the strongest evidence answers the bar", func(t *testing.T) {
 		// A category match's evidence is every skill in the category, so this
 		// is where "highest wins" is most visible: one expert carries it.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{
 				{Name: "Splunk", Proficiency: "novice", Category: "Observability"},
 				{Name: "Dynatrace", Proficiency: "expert", Category: "Observability"},
@@ -1221,7 +1202,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		// applies to the group as a whole, and requirement reproduces the
 		// entry verbatim including the " | ". A lookup that split the group
 		// apart, or matched one alternative, would miss it entirely.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "novice")},
 			JDSignals{
 				RequiredSkills: []string{"Kafka | Kinesis"},
@@ -1243,7 +1224,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		// This is the Go-side consequence if one leaks through anyway: it does
 		// not match the entry, so the requirement scores as though unstated.
 		// Failing safe matters more here than rescuing the signal.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "novice")},
 			JDSignals{
 				RequiredSkills: []string{"Kafka | Kinesis"},
@@ -1263,7 +1244,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		// Garbage from extraction must not manufacture a partial. Blaming the
 		// profile for a bad level string would be a defect reported as a
 		// finding about the person.
-		fit := ScoreTechnicalFit(
+		fit := ScoreCapabilityFit(
 			[]SkillTerm{skill("Kafka", "novice")},
 			JDSignals{
 				RequiredSkills: []string{"Kafka"},
@@ -1295,7 +1276,7 @@ func TestNoSkillLevelsMeansNoBehaviorChange(t *testing.T) {
 		PreferredSkills: []string{"PostgreSQL"},
 	}
 
-	fit := ScoreTechnicalFit(skills, signals, testLevels)
+	fit := ScoreCapabilityFit(skills, signals, testLevels)
 
 	// 2 of 3 required matched (4 points) plus the preferred (1) out of 7.
 	if want := 5.0 / 7 * 100; fit.Score != want {

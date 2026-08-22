@@ -278,12 +278,12 @@ export function ApplicationDetail() {
               {application.jd_signals.seniority}
             </p>
             <p>
-              <span className="font-medium">Domain:</span>{" "}
-              {application.jd_signals.domain}
+              <span className="font-medium">Industry:</span>{" "}
+              {application.jd_signals.industry || "—"}
             </p>
             <p>
-              <span className="font-medium">Work type:</span>{" "}
-              {application.jd_signals.work_type}
+              <span className="font-medium">Work arrangement:</span>{" "}
+              {application.jd_signals.work_arrangement || "—"}
             </p>
             <div>
               <span className="font-medium">Required skills:</span>{" "}
@@ -348,36 +348,36 @@ export function ApplicationDetail() {
                 A standing "passed" badge would be noise now that nothing is
                 gated on it, and "failed" would overstate a keyword match.
               */}
-              {latestFitReport.anti_pattern_hits &&
-                latestFitReport.anti_pattern_hits.length > 0 && (
+              {latestFitReport.dealbreaker_hits &&
+                latestFitReport.dealbreaker_hits.length > 0 && (
                   <div className="rounded border border-amber-300 bg-amber-50 p-3">
                     <p className="font-medium text-amber-900">
-                      Anti-pattern flag
+                      Dealbreaker flag
                     </p>
                     <p className="text-xs text-amber-800">
                       Matched against your hard-exclude preferences.
                       Informational — it does not block generation.
                     </p>
                     <ul className="mt-1 list-inside list-disc text-amber-900">
-                      {latestFitReport.anti_pattern_hits.map((hit) => (
+                      {latestFitReport.dealbreaker_hits.map((hit) => (
                         <li key={hit.id}>{hit.label}</li>
                       ))}
                     </ul>
                   </div>
                 )}
               <p>
-                <span className="font-medium">Technical score:</span>{" "}
-                {latestFitReport.technical_score === null
+                <span className="font-medium">Capability score:</span>{" "}
+                {latestFitReport.capability_score === null
                   ? "—"
-                  : `${latestFitReport.technical_score}/100`}
+                  : `${latestFitReport.capability_score}/100`}
               </p>
-              <PartialMatchList entries={latestFitReport.technical_partial} />
-              {latestFitReport.technical_gaps &&
-                latestFitReport.technical_gaps.length > 0 && (
+              <PartialMatchList entries={latestFitReport.capability_partial} />
+              {latestFitReport.capability_gaps &&
+                latestFitReport.capability_gaps.length > 0 && (
                   <div>
-                    <span className="font-medium">Technical gaps:</span>
+                    <span className="font-medium">Capability gaps:</span>
                     <ul className="ml-4 list-disc text-gray-700">
-                      {latestFitReport.technical_gaps.map((gap) => (
+                      {latestFitReport.capability_gaps.map((gap) => (
                         <li key={gap}>{gap}</li>
                       ))}
                     </ul>
