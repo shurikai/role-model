@@ -45,7 +45,7 @@ The presupposition lived in the vocabulary wrapped around it.
   not on being technical.** The old rule — "only technical skills and tools" —
   meant a posting whose requirements were clinical, interpersonal, or
   pedagogical extracted three empty arrays, which silently disables the 2a
-  relevance apparatus *and* makes `ScoreTechnicalFit` return `Scored: false`.
+  relevance apparatus *and* makes `ScoreCapabilityFit` return `Scored: false`.
   "Communication" is still excluded, because it is unfalsifiable; "ACLS",
   "ServSafe", "Epic", and "Spanish/English bilingual" are requirements.
 - **A competency is a capability, not an *engineering* capability.** Same reason.
@@ -63,11 +63,28 @@ The presupposition lived in the vocabulary wrapped around it.
   three DB-valid values were unreachable from a job description. See
   **Level vocabularies** below for the rules that hold now.
 
+- **No signal field is a closed classification any more.** Migration 021 deleted
+  `jd_signals.domain` and `jd_signals.work_type` rather than renaming them. Each
+  had a free-text field in `screening_summary` answering the same question
+  without the truncation, and the enum was losing to it in every stored row:
+  four postings in four unrelated industries all extracted as `saas` while their
+  `industry` strings read "B2B business intelligence", "sales data", "web
+  marketing platform" and "AI-powered marketing cloud"; `work_type: "remote"`
+  stood in for "fully remote with occasional office visits or offsites as agreed
+  with manager". Read `screening_summary.industry` and
+  `screening_summary.work_arrangement`. **Do not reintroduce a classification
+  enum beside a free-text field that already answers the question.**
+- **The vocabulary is named for what it does, not for one industry's word for
+  it.** `primary_stack` → `core_practice`, `anti_pattern` → `dealbreaker`,
+  `preference_type 'work_type'` → `'role_shape'`, `technical_*` →
+  `capability_*`, `projects.repo_url` → `source_url`, and `projects.role` /
+  `projects.status` lost their CHECKs. The distinctions these carry are not
+  software-specific — prominence versus presence is the same question for
+  "Spanish fluency as a core requirement" as for "Python as a primary language".
+
 **Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
-the `domain` enum, `work_type` meaning two different things, `primary_stack`,
-the `technical_*` / `anti_pattern_*` column names, the fixed twelve-section
-resume contract, and `core_competencies` being scored by nothing. Those are
-Phases 4-6; this section covers Phases 1-3.
+the fixed twelve-section resume contract, and `core_competencies` being scored
+by nothing. Those are Phases 5-6; this section covers Phases 1-4.
 
 ### Level vocabularies
 
@@ -133,18 +150,20 @@ them as a third column rather than as a third lookup somewhere else.
 ### LLM pipeline
 1. **JD signal extraction (Stage 1)** — takes raw job description text, returns
    structured jd_signals JSON: required/preferred skills, core competencies,
-   seniority, domain, work type, culture signals, and a screening summary.
+   core practice, skill levels, seniority, culture signals, and a screening
+   summary carrying the posting's own words for its industry and working
+   arrangement.
 
    **A JD's requirements arrive in two shapes, and both are extracted.**
-   `required_skills`/`preferred_skills` hold named technology. `core_competencies`
-   holds the capability-level asks a posting states in prose — "decomposing a
+   `required_skills`/`preferred_skills` hold named, checkable requirements.
+   `core_competencies` holds the capability-level asks a posting states in prose — "decomposing a
    legacy service", "production ownership of services", "setting technical
    direction". Senior and staff postings routinely name no technology at all,
    which left both skill lists correctly but uselessly empty and degraded every
    consumer at once and silently: the 2a requirement checklist rendered
    "(none listed)" twice, disabling the prompt's entire skill-relevance
    apparatus so it fell back to emitting the whole tag inventory, while
-   `ScoreTechnicalFit` reported a vacuous 100 against nothing.
+   `ScoreCapabilityFit` reported a vacuous 100 against nothing.
 
    The two lists stay separate because they are **satisfied** differently. A
    required skill can be answered by a Skills entry; a competency can only be
@@ -152,15 +171,15 @@ them as a third column rather than as a third lookup somewhere else.
    resume listing "setting technical direction" among its technologies reads
    as padding and displaces a real skill.
 
-   A third shape sits alongside them: `primary_stack`, the technologies the
-   posting frames the role as being **built on**. It is a strict subset of
+   A third shape sits alongside them: `core_practice`, what the posting frames
+   the role as being **practised in**. It is a strict subset of
    `required_skills` and answers a different question — not "does the JD ask for
    this" but "is this what the role is made of" — and it exists because the fit
    gate had preference rows making claims about prominence with nothing to check
    them against. Interchangeable alternatives keep the `" | "` grouping, and
    there the grouping is load-bearing rather than a convenience.
 
-   Neither `core_competencies` nor `primary_stack` is in the document
+   Neither `core_competencies` nor `core_practice` is in the document
    projection. Per the intermediate-JSON rule below, adding a field to
    `JDSignals` must not change what the document emits.
 2. **Resume generation (Stage 2)** — split into two calls:
@@ -228,7 +247,7 @@ as high technical / poor preference, not as one muddled number. Do not introduce
 a blended score.
 
 **They are also shaped differently, and that is not an inconsistency to tidy
-up.** `ScoreTechnicalFit` returns a score, because coverage of stated
+up.** `ScoreCapabilityFit` returns a score, because coverage of stated
 requirements genuinely is a ratio — matched over asked-for. `ScorePreferenceFit`
 returns **four lists and no number at all**: `matches` (positives the JD
 answers), `gaps` (positives it is silent on), `conflicts` (matched negatives),
@@ -267,7 +286,7 @@ the model the numbers invites it straight back into ranking rows arithmetically.
 Which list an entry arrived in is the whole of its severity.
 
 **A technical score can be absent, and absent is not zero and not 100.**
-`ScoreTechnicalFit` returns a `TechnicalFit` whose `Scored` field is false when
+`ScoreCapabilityFit` returns a `CapabilityFit` whose `Scored` field is false when
 the JD stated no technical requirements at all. It used to return a bare 100
 there — a perfect score with no matches and no evidence, which the narrative
 then wrote confident coverage prose around. "This profile answers none of the
@@ -276,7 +295,7 @@ findings and must not share a representation; that is why it is a struct field
 rather than a sentinel value. When `Scored` is false the report stores SQL NULL
 (the UI already renders that as "—") and the narrative input omits the score
 entirely, which the prompt reads as "nothing was assessed". An empty
-`technical_gaps` in that state means nothing was checked, not that there are no
+`capability_gaps` in that state means nothing was checked, not that there are no
 gaps.
 
 **Preferences carry severity and gate behavior separately.** `sentiment` is
@@ -291,7 +310,7 @@ holds. Do not read it back into the backend to build a ranking.
 
 Gating does **not** block. A tripped JD is still evaluated, still narrated,
 still generated; the trip is a named finding in `gateHits`, and
-`anti_pattern_passed` is derived from that list rather than being the only
+`dealbreakers_clear` is derived from that list rather than being the only
 record of it.
 
 **Technical matching runs in three layers, strongest first**, and the layer
@@ -382,7 +401,7 @@ years of Go"), on the same scale as `skills.proficiency` — the user's own
 `proficiency_levels` rows, read through `LevelScale`. Where a
 requirement carries one and the strongest proficiency behind its evidence falls
 below it, the requirement earns half credit and is filed in
-`TechnicalFit.Partial` / `fit_reports.technical_partial`.
+`CapabilityFit.Partial` / `fit_reports.capability_partial`.
 
 Four rules hold this together:
 
@@ -402,7 +421,7 @@ Four rules hold this together:
 
 `SkillMatch.RequiredLevel` / `EvidenceLevel` are empty when no level was
 assessed — deliberately not a `LevelMet bool`, for the same reason
-`TechnicalFit.Scored` is not a sentinel score. A false would read as "the bar
+`CapabilityFit.Scored` is not a sentinel score. A false would read as "the bar
 was missed" while meaning "no bar was set". Carrying both levels also makes the
 comparison auditable rather than a verdict to trust, and `LevelSignal` quotes
 the JD wording it was read from.
@@ -415,19 +434,19 @@ signal is the safe direction; asserting a bar the posting never held anyone to
 is not.
 
 **One matcher.** `prefFieldsFor` routes every preference by `preference_type`;
-there is no second matcher for the gate, and `anti_pattern` is the only branch
+there is no second matcher for the gate, and `dealbreaker` is the only branch
 that reads `required_skills`. The previous split (a broad `signalFields` for
 scoring, a routed `gateFieldsFor` for the gate) is what hid #49: scoring never
 saw the skills arrays, so a technology-shaped negative could not fire and,
 because an unmatched negative earns its weight, paid out a bonus instead.
 
 **Prominence is a separate signal from presence, and the types encode which one
-a row is about.** `jd_signals.primary_stack` holds what the posting says the role
+a row is about.** `jd_signals.core_practice` holds what the posting says the role
 is *built on*; `required_skills` holds only that a technology is asked for. A
 preference whose label claims prominence — "Python as a primary language",
-"Angular as co-equal frontend requirement" — is typed `primary_stack` and routed
+"Angular as co-equal frontend requirement" — is typed `core_practice` and routed
 at that field. A preference where presence *is* the objection — "C# / .NET",
-"crypto / blockchain" — stays `anti_pattern` and keeps `required_skills`.
+"crypto / blockchain" — stays `dealbreaker` and keeps `required_skills`.
 
 Routing the first kind at `required_skills` is what made #68: the qualifier had
 nothing to be checked against, so it was inert text, and `matchesSignal`'s
@@ -435,16 +454,16 @@ field-inside-label direction matched the bare token instead — `"Python"` is a
 whole word inside `"expert Python as primary requirement"`. Every posting naming
 Python as a required skill tripped a hard gate, capped at `hardGateCeiling`, and
 was narrated as gating on expert Python. Do not add a prominence-claiming label
-under `anti_pattern`; the qualifier will read as documentation and behave as
+under `dealbreaker`; the qualifier will read as documentation and behave as
 nothing.
 
-Two rules specific to `primary_stack`:
+Two rules specific to `core_practice`:
 
 - **Alternatives are never split there**, which is the one place it differs from
-  `anti_pattern`. A `" | "` group means the posting offers substitutes, and a
+  `dealbreaker`. A `" | "` group means the posting offers substitutes, and a
   technology you can be excused from is not what the role is built on. Splitting
   `"Java | Python"` back apart is how a JD reading "Proficiency in Java and/or
-  Python" tripped the Python gate. `anti_pattern` still splits, correctly: it
+  Python" tripped the Python gate. `dealbreaker` still splits, correctly: it
   asks whether the JD demands the technology at all.
 - **`collapseSubsumed` runs first.** Postings state their stack twice — a choice
   in the must-haves, a flat list under "Core Technical Stack" — and an entry
@@ -452,20 +471,22 @@ Two rules specific to `primary_stack`:
   and is dropped. `jd_extraction.tmpl` asks for the same deduplication, but a
   prompt is a request; this makes extraction noise harmless rather than unlikely.
 
-**A preference is matched against the fields it is *about*, and enum fields alone
-are rarely enough.** `signals.WorkType` is `remote|hybrid|onsite|unknown` and
-`signals.Domain` is one closed-enum value, so labels routed at those alone were
-not merely unlikely to match — roughly 50 of 139 possible weight could not match
-any JD, ever (#53). `work_type` and `culture` therefore also read
-`culture_signals` and `core_competencies`; `domain` reads `core_competencies` and
-`screening_summary.industry`.
+**A preference is matched against the fields it is *about*, and a closed field
+could not carry most of them.** `signals.WorkType` was
+`remote|hybrid|onsite|unknown` and `signals.Domain` was one enum value, so
+labels routed at those alone were not merely unlikely to match — roughly 50 of
+139 possible weight could not match any JD, ever (#53). Both enums are gone
+(migration 021). `role_shape` reads `culture_signals` and `core_competencies`;
+`culture` reads `screening_summary.work_arrangement` alongside them; `domain`
+reads `screening_summary.industry` and `core_competencies`.
 
-`screening_summary.industry` is the only screening field any preference reads,
-and only `domain` reads it. The extraction prompt defines it as free-text
-industry explicitly *not* constrained to the `domain` enum, so it answers the
-same question without the truncation — a freight-visibility platform extracts as
-`saas` while the industry says "freight logistics visibility platform". Location,
-clearance, and `other_flags` are still read by nothing; that is #48.
+`industry` and `work_arrangement` are the only screening fields any preference
+reads. They answer what the enums answered, without the truncation — a
+freight-visibility platform used to extract as `saas` while the industry said
+"freight logistics visibility platform", and reading the enum reported
+"logistics", the strongest positive in the profile, as an unmet gap on the JD it
+matched best. Location, clearance, and `other_flags` are still read by nothing;
+that is #48.
 
 A consequence worth knowing before adding rows: **two labels that tokenize to the
 same bag of words will both match the same JD.** `matchesSignal` compares token
@@ -482,7 +503,7 @@ negative on the language — and additive weights produce the conditional
 behavior on their own. Do not add a parent/implies relation to `preferences`.
 
 ### Intermediate resume JSON
-Generation produces a structured JSON document (see /schema/resume.v1.json)
+Generation produces a structured JSON document (see /schema/resume.v2.json)
 that is the contract between the generation pipeline and the renderer.
 The renderer never touches the database. The JSON document is self-contained.
 
@@ -501,9 +522,17 @@ document emits.** If the document should carry something new, the schema
 declares it first and the projection follows — never the reverse. The same
 reasoning applies to any future blob the document embeds.
 
-`screening_summary` is deliberately absent from the document. It is screening
-data (location, travel, clearance, comp), not resume content; the renderer has
-no use for it, and it is already persisted on `fit_reports.screening_summary`.
+The `screening_summary` **block** is deliberately absent from the document. It
+is screening data (location, travel, clearance, comp), not resume content; the
+renderer has no use for it, and it is already persisted on
+`fit_reports.screening_summary`.
+
+Two of its fields do reach the document, by name: `industry` and
+`work_arrangement`, which replaced the `domain` and `work_type` enums one for
+one when migration 021 deleted them. The document carries the same two facts it
+always did, untruncated. That is a projection choice, not the block leaking —
+`TestForDocumentDropsScreeningSummary` asserts both halves, that those two
+arrive and that location, travel, clearance, and `other_flags` do not.
 
 ### Renderer
 Built. `docx-renderer/` is a small Python service (FastAPI + python-docx)
@@ -554,7 +583,7 @@ Rules:
   names the *call sequence* (currently the 2a/2b split), which no individual
   file's content captures. Bump it when the shape of the pipeline changes, not
   when prompt text changes.
-- `schema/resume.v1.json` requires a `prompt_version` field in the document
+- `schema/resume.v2.json` requires a `prompt_version` field in the document
   `meta` block and sets `additionalProperties: false`, so the portable document
   carries `pipelineVersion` only. Per-prompt hashes live in generation_params
   on the DB row. Putting them in the document would require a schema v2 and a
@@ -588,7 +617,7 @@ Rules:
 
 ## Key Files
 - /CLAUDE.md                 — project instructions and conventions (this file)
-- /schema/resume.v1.json     — intermediate resume JSON schema (source of truth)
+- /schema/resume.v2.json     — intermediate resume JSON schema (source of truth)
 - /migrations/               — database migrations (source of truth for schema)
 - /internal/generation/prompts/ — LLM prompt templates
 
@@ -744,7 +773,7 @@ pg_format or sqlfluff.
   `years_experience` populated on most rows.
 
   **Partly resolved as of migration 017.** `ListActiveSkillMatchTermsByUser`
-  now selects `s.proficiency`, and `ScoreTechnicalFit` compares it against
+  now selects `s.proficiency`, and `ScoreCapabilityFit` compares it against
   `jd_signals.skill_levels` — see the partial-match rules in the Fit gate
   section. What that closes is the *JD-side* half: a posting that asks for
   expert Kafka no longer scores a novice Kafka as a clean match.

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -34,7 +35,7 @@ func NewService(q *db.Queries, client *generation.Client) *Service {
 }
 
 // RunFitEvaluation loads an application's JD signals and the user's skills
-// and preferences, scores technical and preference fit, and persists the
+// and preferences, scores capability and preference fit, and persists the
 // result as a new fit_reports row.
 //
 // Every evaluation produces a complete report. Hard-gate preferences are
@@ -90,14 +91,14 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 
 	var (
 		wg                               sync.WaitGroup
-		technical                        TechnicalFit
+		capability                       CapabilityFit
 		prefMatches, prefGaps, prefConfl []db.Preference
 		gateHits                         []db.Preference
 	)
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		technical = ScoreTechnicalFit(skills, signals, levels)
+		capability = ScoreCapabilityFit(skills, signals, levels)
 	}()
 	go func() {
 		defer wg.Done()
@@ -115,29 +116,29 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	// gets a narrative, and still generates. The trip is reported by name in
 	// gateHits rather than priced into a number, so this boolean is a summary
 	// of that list and never the only record of it.
-	gatePassed := len(gateHits) == 0
+	dealbreakersClear := len(gateHits) == 0
 	gateHitsJSON, err := marshalRawNonEmpty(gateHits)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal anti-pattern hits: %w", err)
 	}
 
 	narrative, err := s.generateNarrative(
-		ctx, app, signals, gatePassed, technical, prefMatches, prefGaps, prefConfl, gateHits)
+		ctx, app, signals, dealbreakersClear, capability, prefMatches, prefGaps, prefConfl, gateHits)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: generate narrative: %w", err)
 	}
 
-	technicalGapsJSON, err := marshalRawNonEmpty(technical.Gaps)
+	capabilityGapsJSON, err := marshalRawNonEmpty(capability.Gaps)
 	if err != nil {
-		return nil, fmt.Errorf("fit evaluation: marshal technical gaps: %w", err)
+		return nil, fmt.Errorf("fit evaluation: marshal capability gaps: %w", err)
 	}
-	technicalMatchesJSON, err := marshalRawNonEmpty(technical.Matches)
+	capabilityMatchesJSON, err := marshalRawNonEmpty(capability.Matches)
 	if err != nil {
-		return nil, fmt.Errorf("fit evaluation: marshal technical matches: %w", err)
+		return nil, fmt.Errorf("fit evaluation: marshal capability matches: %w", err)
 	}
-	technicalPartialJSON, err := marshalRawNonEmpty(technical.Partial)
+	capabilityPartialJSON, err := marshalRawNonEmpty(capability.Partial)
 	if err != nil {
-		return nil, fmt.Errorf("fit evaluation: marshal technical partial matches: %w", err)
+		return nil, fmt.Errorf("fit evaluation: marshal capability partial matches: %w", err)
 	}
 	prefMatchesJSON, err := marshalRawNonEmpty(prefMatches)
 	if err != nil {
@@ -156,12 +157,12 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		ID:                  uuid.New(),
 		UserID:              userID,
 		ApplicationID:       &applicationID,
-		AntiPatternPassed:   gatePassed,
-		AntiPatternHits:     gateHitsJSON,
-		TechnicalScore:      technicalScoreColumn(technical),
-		TechnicalGaps:       technicalGapsJSON,
-		TechnicalMatches:    technicalMatchesJSON,
-		TechnicalPartial:    technicalPartialJSON,
+		DealbreakersClear:   dealbreakersClear,
+		DealbreakerHits:     gateHitsJSON,
+		CapabilityScore:     capabilityScoreColumn(capability),
+		CapabilityGaps:      capabilityGapsJSON,
+		CapabilityMatches:   capabilityMatchesJSON,
+		CapabilityPartial:   capabilityPartialJSON,
 		PreferenceMatches:   prefMatchesJSON,
 		PreferenceGaps:      prefGapsJSON,
 		PreferenceConflicts: prefConflictsJSON,
@@ -175,18 +176,18 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 }
 
 type narrativeInput struct {
-	AntiPatternPassed bool `json:"anti_pattern_passed"`
-	// Absent when the JD stated no technical requirements. The narrative
+	DealbreakersClear bool `json:"dealbreakers_clear"`
+	// Absent when the JD stated no capability requirements. The narrative
 	// prompt reads an absent score as "nothing was assessed" — emitting 0
 	// instead would read as "covers nothing", the opposite finding.
-	TechnicalScore   *float64     `json:"technical_score,omitempty"`
-	TechnicalGaps    []string     `json:"technical_gaps"`
-	TechnicalMatches []SkillMatch `json:"technical_matches"`
+	CapabilityScore   *float64     `json:"capability_score,omitempty"`
+	CapabilityGaps    []string     `json:"capability_gaps"`
+	CapabilityMatches []SkillMatch `json:"capability_matches"`
 	// Requirements answered below the depth the JD asked for. Usually empty —
 	// only a posting that states a depth can produce one.
-	TechnicalPartial []SkillMatch `json:"technical_partial"`
+	CapabilityPartial []SkillMatch `json:"capability_partial"`
 	// The capability-level requirements the JD stated in prose. Passed for
-	// context only: ScoreTechnicalFit does not read them, so nothing here is
+	// context only: ScoreCapabilityFit does not read them, so nothing here is
 	// scored, matched, or reported as a gap.
 	//
 	// It is here because the unscored case is otherwise indistinguishable
@@ -202,7 +203,7 @@ type narrativeInput struct {
 	PreferenceMatches   []narrativePreference       `json:"preference_matches"`
 	PreferenceGaps      []narrativePreference       `json:"preference_gaps"`
 	PreferenceConflicts []narrativePreference       `json:"preference_conflicts"`
-	AntiPatternHits     []narrativePreference       `json:"anti_pattern_hits"`
+	DealbreakerHits     []narrativePreference       `json:"dealbreaker_hits"`
 	JDSummary           string                      `json:"jd_summary"`
 	ScreeningSummary    generation.ScreeningSummary `json:"screening_summary"`
 }
@@ -241,8 +242,8 @@ func (s *Service) generateNarrative(
 	ctx context.Context,
 	app db.Application,
 	signals JDSignals,
-	gatePassed bool,
-	technical TechnicalFit,
+	dealbreakersClear bool,
+	capability CapabilityFit,
 	prefMatches []db.Preference,
 	prefGaps []db.Preference,
 	prefConflicts []db.Preference,
@@ -254,7 +255,7 @@ func (s *Service) generateNarrative(
 	}
 
 	input := buildNarrativeInput(
-		app, signals, gatePassed, technical, prefMatches, prefGaps, prefConflicts, gateHits)
+		app, signals, dealbreakersClear, capability, prefMatches, prefGaps, prefConflicts, gateHits)
 	inputJSON, err := json.Marshal(input)
 	if err != nil {
 		return "", fmt.Errorf("marshal narrative input: %w", err)
@@ -270,27 +271,42 @@ func (s *Service) generateNarrative(
 func buildNarrativeInput(
 	app db.Application,
 	signals JDSignals,
-	gatePassed bool,
-	technical TechnicalFit,
+	dealbreakersClear bool,
+	capability CapabilityFit,
 	prefMatches []db.Preference,
 	prefGaps []db.Preference,
 	prefConflicts []db.Preference,
 	gateHits []db.Preference,
 ) narrativeInput {
 	return narrativeInput{
-		AntiPatternPassed:   gatePassed,
-		TechnicalScore:      narrativeScore(technical),
-		TechnicalGaps:       technical.Gaps,
-		TechnicalMatches:    technical.Matches,
-		TechnicalPartial:    technical.Partial,
+		DealbreakersClear:   dealbreakersClear,
+		CapabilityScore:     narrativeScore(capability),
+		CapabilityGaps:      capability.Gaps,
+		CapabilityMatches:   capability.Matches,
+		CapabilityPartial:   capability.Partial,
 		CoreCompetencies:    signals.CoreCompetencies,
 		PreferenceMatches:   projectPreferences(prefMatches),
 		PreferenceGaps:      projectPreferences(prefGaps),
 		PreferenceConflicts: projectPreferences(prefConflicts),
-		AntiPatternHits:     projectPreferences(gateHits),
-		JDSummary:           fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, signals.Domain),
+		DealbreakerHits:     projectPreferences(gateHits),
+		JDSummary:           narrativeJDSummary(app, signals),
 		ScreeningSummary:    signals.ScreeningSummary,
 	}
+}
+
+// narrativeJDSummary is the one-line role identifier at the top of the
+// narrative input. The parenthetical used to be signals.Domain, which was an
+// enum that regularly said "saas" or "platform" about a posting whose actual
+// industry was freight logistics or municipal IT. It reads the free-text
+// industry now, and drops the parenthetical entirely when the posting did not
+// state one — "Staff Engineer at Acme ()" reads as a bug rather than as an
+// absent fact.
+func narrativeJDSummary(app db.Application, signals JDSignals) string {
+	industry := strings.TrimSpace(signals.ScreeningSummary.Industry)
+	if industry == "" {
+		return fmt.Sprintf("%s at %s", app.RoleTitle, app.CompanyName)
+	}
+	return fmt.Sprintf("%s at %s (%s)", app.RoleTitle, app.CompanyName, industry)
 }
 
 // marshalScreeningSummary marshals the summary to a *json.RawMessage,
@@ -324,11 +340,11 @@ func marshalRawNonEmpty[T any](v []T) (*json.RawMessage, error) {
 	return &raw, nil
 }
 
-// technicalScoreColumn stores NULL when nothing was scored. fit_reports
-// .technical_score is nullable and the UI already renders a null as "—", so
+// capabilityScoreColumn stores NULL when nothing was scored. fit_reports
+// .capability_score is nullable and the UI already renders a null as "—", so
 // the honest value is representable end to end; the previous 100 was not
 // merely wrong but confidently wrong.
-func technicalScoreColumn(t TechnicalFit) pgtype.Numeric {
+func capabilityScoreColumn(t CapabilityFit) pgtype.Numeric {
 	if !t.Scored {
 		return pgtype.Numeric{} // Valid: false — SQL NULL
 	}
@@ -338,7 +354,7 @@ func technicalScoreColumn(t TechnicalFit) pgtype.Numeric {
 // narrativeScore omits the score from the narrative input when nothing was
 // scored, rather than passing a number the prompt would feel obliged to
 // characterize.
-func narrativeScore(t TechnicalFit) *float64 {
+func narrativeScore(t CapabilityFit) *float64 {
 	if !t.Scored {
 		return nil
 	}

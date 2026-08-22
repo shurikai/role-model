@@ -23,8 +23,11 @@ attachment point.
 
 The signals in these cases are **hand-authored** against
 `internal/generation/prompts/jd_extraction.tmpl` — its field contract, its
-closed enums for `seniority` / `domain` / `work_type`, its canonicalization
-rules, and its `" | "` alternatives delimiter. They are what a faithful
+`seniority` list (rendered from the user's `career_levels` rows), its
+canonicalization rules, and its `" | "` alternatives delimiter. `domain` and
+`work_type` were closed enums here too until migration 021 deleted them; the
+posting's own words now live in `screening_summary.industry` and
+`screening_summary.work_arrangement`. They are what a faithful
 extraction *should* produce. Nothing yet verifies that it does; that is Layer B.
 
 They are deliberately not reverse-engineered to match preference labels. Where a
@@ -121,8 +124,8 @@ the code:
 
 | Case | Issue | What it holds |
 |---|---|---|
-| `known-gap-adtech-exclude-cannot-fire` | #48 | The `adtech` hard exclude does not fire on the adtech JD. `domain` is a closed enum with no adtech value, and the industry survives only in `screening_summary.industry`, which the gate never reads. |
-| `known-gap-domain-enum-loses-industry` | #45 | `logistics` (weight 9) and `supply chain` (weight 8) are reported as preference gaps on a freight logistics JD, for the same enum reason. |
+| `known-gap-adtech-exclude-cannot-fire` | #48 | The `adtech` hard exclude does not fire on the adtech JD. The routing half closed with migration 021 — the `dealbreaker` branch reads `screening_summary.industry` now — so what is left is lexical: `adtech` is not a whole-word run inside "programmatic advertising technology, demand-side platform". |
+| `known-gap-domain-enum-loses-industry` | #53 | `logistics` now matches through `screening_summary.industry`; `supply chain` (weight 8) is still reported as a gap on a freight logistics JD, because that phrase appears nowhere in the signals. Preference labels have no aliases column. |
 | `known-gap-role-shape-conflicts` | #45 | `frontend`, `on-call heavy`, and `mandatory overtime` do not surface as conflicts on a frontend-majority, on-call-heavy JD. The bonus an unmatched negative used to earn is gone with the score, but the silence is not: the report still says nothing about what the posting advertises. |
 | `known-gap-depth-blind-scoring` | #44 | Full coverage at novice depth scores 100.0, identical to full coverage at expert depth. |
 

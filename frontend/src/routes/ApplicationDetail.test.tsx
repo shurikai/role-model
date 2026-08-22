@@ -28,8 +28,8 @@ function makeApplication(overrides: Partial<Application> = {}): Application {
       required_skills: ["Go"],
       preferred_skills: [],
       seniority: "principal",
-      domain: "defense",
-      work_type: "onsite",
+      industry: "defense/autonomous systems",
+      work_arrangement: "onsite, Orlando FL",
       culture_signals: [],
       core_competencies: [],
       screening_summary: screeningSummary,
@@ -48,11 +48,11 @@ function makeFitReport(overrides: Partial<FitReport> = {}): FitReport {
     id: "fit-1",
     user_id: "u1",
     application_id: APP_ID,
-    anti_pattern_passed: true,
-    anti_pattern_hits: null,
-    technical_score: 100,
-    technical_gaps: null,
-    technical_partial: null,
+    dealbreakers_clear: true,
+    dealbreaker_hits: null,
+    capability_score: 100,
+    capability_gaps: null,
+    capability_partial: null,
     preference_matches: [
       {
         id: "pref-match-1",
@@ -130,8 +130,8 @@ describe("ApplicationDetail", () => {
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
-            anti_pattern_passed: false,
-            anti_pattern_hits: [
+            dealbreakers_clear: false,
+            dealbreaker_hits: [
               {
                 id: "pref-1",
                 label: "defense / aerospace",
@@ -169,13 +169,13 @@ describe("ApplicationDetail", () => {
   });
 
   describe("fit report rendering", () => {
-    it("renders the preference lists and narrative even when anti_pattern_passed is false", async () => {
+    it("renders the preference lists and narrative even when dealbreakers_clear is false", async () => {
       vi.stubGlobal(
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
-            anti_pattern_passed: false,
-            anti_pattern_hits: [
+            dealbreakers_clear: false,
+            dealbreaker_hits: [
               {
                 id: "pref-1",
                 label: "defense / aerospace",
@@ -192,7 +192,7 @@ describe("ApplicationDetail", () => {
       expect(
         await screen.findByText("This is the narrative."),
       ).toBeInTheDocument();
-      expect(screen.getByText("Technical score:")).toBeInTheDocument();
+      expect(screen.getByText("Capability score:")).toBeInTheDocument();
       // Preference fit is four lists and no score. Gaps and matches render as
       // their own labelled lists; the hard-gate hits are the anti-pattern
       // callout above and are deliberately not repeated down here.
@@ -210,8 +210,8 @@ describe("ApplicationDetail", () => {
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
-            anti_pattern_passed: false,
-            anti_pattern_hits: [
+            dealbreakers_clear: false,
+            dealbreaker_hits: [
               {
                 id: "pref-1",
                 label: "defense / aerospace",
@@ -225,7 +225,7 @@ describe("ApplicationDetail", () => {
       );
       renderDetail();
 
-      expect(await screen.findByText("Anti-pattern flag")).toBeInTheDocument();
+      expect(await screen.findByText("Dealbreaker flag")).toBeInTheDocument();
       expect(screen.getByText("defense / aerospace")).toBeInTheDocument();
       expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
     });
@@ -237,7 +237,7 @@ describe("ApplicationDetail", () => {
       expect(
         await screen.findByText("This is the narrative."),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Anti-pattern flag")).not.toBeInTheDocument();
+      expect(screen.queryByText("Dealbreaker flag")).not.toBeInTheDocument();
       // The old always-on "passed" badge is gone too.
       expect(screen.queryByText(/Hard gate/)).not.toBeInTheDocument();
     });
@@ -249,16 +249,16 @@ describe("ApplicationDetail", () => {
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
-            anti_pattern_passed: false,
-            technical_score: null,
+            dealbreakers_clear: false,
+            capability_score: null,
             preference_matches: null,
             preference_gaps: null,
             narrative: null,
-            anti_pattern_hits: [
+            dealbreaker_hits: [
               {
                 id: "pref-1",
                 label: "IT consulting / staff augmentation model",
-                preference_type: "anti_pattern",
+                preference_type: "dealbreaker",
                 sentiment: "negative",
                 notes: null,
               },
@@ -268,11 +268,11 @@ describe("ApplicationDetail", () => {
       );
       renderDetail();
 
-      expect(await screen.findByText("Anti-pattern flag")).toBeInTheDocument();
+      expect(await screen.findByText("Dealbreaker flag")).toBeInTheDocument();
       expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
       expect(
-        screen.getByText("Technical score:").closest("p"),
-      ).toHaveTextContent("Technical score: —");
+        screen.getByText("Capability score:").closest("p"),
+      ).toHaveTextContent("Capability score: —");
       // An empty preference list renders as nothing at all rather than as a
       // dash. There is no score to be absent — a heading with no entries under
       // it would be the only thing pretending otherwise.
@@ -290,8 +290,8 @@ describe("ApplicationDetail", () => {
         "fetch",
         stubFetch(makeApplication(), [
           makeFitReport({
-            technical_gaps: ["GraphQL"],
-            technical_partial: [
+            capability_gaps: ["GraphQL"],
+            capability_partial: [
               {
                 requirement: "Kafka",
                 kind: "direct",
@@ -314,7 +314,7 @@ describe("ApplicationDetail", () => {
       ).toBeInTheDocument();
       // Present, not missing: it must not have been filed under gaps.
       expect(
-        screen.getByText("Technical gaps:").closest("div"),
+        screen.getByText("Capability gaps:").closest("div"),
       ).not.toHaveTextContent("Kafka");
     });
 

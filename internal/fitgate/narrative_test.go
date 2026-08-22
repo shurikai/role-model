@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/generation"
 )
 
 // The case this file exists for: a staff posting that names no technology at
-// all. Both skill lists extract correctly empty, ScoreTechnicalFit returns
+// all. Both skill lists extract correctly empty, ScoreCapabilityFit returns
 // Scored: false, and every requirement the posting actually stated lives in
 // core_competencies. When those did not reach the prompt, the model saw an
 // empty report and wrote that the posting "does not state requirements
@@ -16,7 +17,7 @@ import (
 // of them.
 func TestNarrativeInputCarriesCoreCompetenciesWhenUnscored(t *testing.T) {
 	signals := JDSignals{
-		Domain: "e-commerce",
+		ScreeningSummary: generation.ScreeningSummary{Industry: "e-commerce"},
 		CoreCompetencies: []string{
 			"designing and scaling distributed backend systems",
 			"API design at scale",
@@ -25,10 +26,10 @@ func TestNarrativeInputCarriesCoreCompetenciesWhenUnscored(t *testing.T) {
 	app := db.Application{RoleTitle: "Staff Software Engineer", CompanyName: "Airbnb"}
 
 	input := buildNarrativeInput(
-		app, signals, true, ScoreTechnicalFit(nil, signals, testLevels), nil, nil, nil, nil)
+		app, signals, true, ScoreCapabilityFit(nil, signals, testLevels), nil, nil, nil, nil)
 
-	if input.TechnicalScore != nil {
-		t.Errorf("unscored JD carried a technical_score: %v", *input.TechnicalScore)
+	if input.CapabilityScore != nil {
+		t.Errorf("unscored JD carried a capability_score: %v", *input.CapabilityScore)
 	}
 	if len(input.CoreCompetencies) != 2 {
 		t.Fatalf("core competencies did not reach the narrative input: %v", input.CoreCompetencies)
@@ -45,8 +46,8 @@ func TestNarrativeInputCarriesCoreCompetenciesWhenUnscored(t *testing.T) {
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		t.Fatalf("unmarshal narrative input: %v", err)
 	}
-	if _, present := decoded["technical_score"]; present {
-		t.Error("technical_score present on an unscored JD; absent is what the prompt reads as unassessed")
+	if _, present := decoded["capability_score"]; present {
+		t.Error("capability_score present on an unscored JD; absent is what the prompt reads as unassessed")
 	}
 	got, ok := decoded["core_competencies"].([]any)
 	if !ok || len(got) != 2 {
@@ -66,7 +67,7 @@ func TestCoreCompetenciesAreNotScoredAsMatchesOrGaps(t *testing.T) {
 	}
 	skills := []SkillTerm{{Name: "Go", Category: "Languages"}}
 
-	technical := ScoreTechnicalFit(skills, signals, testLevels)
+	technical := ScoreCapabilityFit(skills, signals, testLevels)
 	if technical.Scored {
 		t.Error("a JD stating only competencies was scored; competencies are not scoring input")
 	}

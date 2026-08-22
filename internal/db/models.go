@@ -139,18 +139,18 @@ type FitReport struct {
 	ID                  uuid.UUID        `json:"id"`
 	UserID              uuid.UUID        `json:"user_id"`
 	ApplicationID       *uuid.UUID       `json:"application_id"`
-	AntiPatternPassed   bool             `json:"anti_pattern_passed"`
-	AntiPatternHits     *json.RawMessage `json:"anti_pattern_hits"`
-	TechnicalScore      pgtype.Numeric   `json:"technical_score"`
-	TechnicalGaps       *json.RawMessage `json:"technical_gaps"`
+	DealbreakersClear   bool             `json:"dealbreakers_clear"`
+	DealbreakerHits     *json.RawMessage `json:"dealbreaker_hits"`
+	CapabilityScore     pgtype.Numeric   `json:"capability_score"`
+	CapabilityGaps      *json.RawMessage `json:"capability_gaps"`
 	PreferenceGaps      *json.RawMessage `json:"preference_gaps"`
 	Narrative           *string          `json:"narrative"`
 	CreatedAt           time.Time        `json:"created_at"`
 	PreferenceConflicts *json.RawMessage `json:"preference_conflicts"`
 	ScreeningSummary    *json.RawMessage `json:"screening_summary"`
-	TechnicalMatches    *json.RawMessage `json:"technical_matches"`
+	CapabilityMatches   *json.RawMessage `json:"capability_matches"`
 	PreferenceMatches   *json.RawMessage `json:"preference_matches"`
-	TechnicalPartial    *json.RawMessage `json:"technical_partial"`
+	CapabilityPartial   *json.RawMessage `json:"capability_partial"`
 }
 
 type ImportBatch struct {
@@ -216,7 +216,7 @@ type Project struct {
 	Status       string      `json:"status"`
 	StartedOn    pgtype.Date `json:"started_on"`
 	EndedOn      pgtype.Date `json:"ended_on"`
-	RepoUrl      *string     `json:"repo_url"`
+	SourceUrl    *string     `json:"source_url"`
 	LiveUrl      *string     `json:"live_url"`
 	WriteupUrl   *string     `json:"writeup_url"`
 	ForceInclude bool        `json:"force_include"`

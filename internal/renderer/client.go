@@ -9,7 +9,7 @@ import (
 )
 
 // Client calls the docx-renderer service's /render endpoint, which takes the
-// intermediate resume JSON document (see /schema/resume.v1.json) and returns
+// intermediate resume JSON document (see /schema/resume.v2.json) and returns
 // a rendered .docx file. The renderer is stateless and owns document output
 // only; this client does not interpret or validate the JSON it sends.
 type Client struct {

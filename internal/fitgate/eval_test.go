@@ -22,7 +22,7 @@ import (
 // conclusion? Without it, reweighting the scorer to fix one issue can silently
 // reopen another, which is the situation #43 through #46 are in.
 //
-// Everything here is deterministic and offline. ScoreTechnicalFit,
+// Everything here is deterministic and offline. ScoreCapabilityFit,
 // ScorePreferenceFit, and RunAntiPatternGate are pure functions, so the harness
 // needs no database and no API key and runs inside `make test`.
 //
@@ -95,9 +95,9 @@ type evalCase struct {
 }
 
 type expectation struct {
-	TechnicalScore   *scoreBand  `json:"technical_score"`
-	TechnicalGaps    *listExpect `json:"technical_gaps"`
-	TechnicalPartial *listExpect `json:"technical_partial"`
+	CapabilityScore   *scoreBand  `json:"capability_score"`
+	CapabilityGaps    *listExpect `json:"capability_gaps"`
+	CapabilityPartial *listExpect `json:"capability_partial"`
 	// Preference fit has no score to band. All four lists assert membership,
 	// which is a stronger statement than a range was: a case can now name the
 	// preference it expects rather than a floor chosen to sit above a ceiling.
@@ -176,14 +176,14 @@ func evalLabels(prefs []db.Preference) []string {
 
 // result is one case's computed outcome, kept together for the scorecard.
 type result struct {
-	technicalScore   float64
-	technicalGaps    []string
-	technicalPartial []string
-	prefMatches      []string
-	preferenceGaps   []string
-	prefConflicts    []string
-	gatePassed       bool
-	gateHits         []string
+	capabilityScore   float64
+	capabilityGaps    []string
+	capabilityPartial []string
+	prefMatches       []string
+	preferenceGaps    []string
+	prefConflicts     []string
+	gatePassed        bool
+	gateHits          []string
 }
 
 func TestFitEval(t *testing.T) {
@@ -205,10 +205,10 @@ func TestFitEval(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			var res result
-			technical := ScoreTechnicalFit(skills, c.Signals, testLevels)
-			res.technicalScore, res.technicalGaps = technical.Score, technical.Gaps
-			for _, m := range technical.Partial {
-				res.technicalPartial = append(res.technicalPartial, m.Requirement)
+			capability := ScoreCapabilityFit(skills, c.Signals, testLevels)
+			res.capabilityScore, res.capabilityGaps = capability.Score, capability.Gaps
+			for _, m := range capability.Partial {
+				res.capabilityPartial = append(res.capabilityPartial, m.Requirement)
 			}
 
 			// The additive invariant, asserted rather than assumed. Skill
@@ -217,11 +217,11 @@ func TestFitEval(t *testing.T) {
 			// existed, and must produce no partial verdict. Every fixture here
 			// predates the feature, so this holds the whole corpus as a
 			// regression net against the common path changing under it.
-			if len(c.Signals.SkillLevels) == 0 && len(technical.Partial) > 0 {
+			if len(c.Signals.SkillLevels) == 0 && len(capability.Partial) > 0 {
 				t.Errorf("case states no skill_levels but produced %d partial match(es): %v\n"+
 					"a requirement with no stated depth must take the original "+
 					"full-credit path",
-					len(technical.Partial), res.technicalPartial)
+					len(capability.Partial), res.capabilityPartial)
 			}
 			matches, gaps, conflicts, hits := ScorePreferenceFit(prefs, c.Signals)
 			res.prefMatches = evalLabels(matches)
@@ -290,7 +290,7 @@ func TestFitEval(t *testing.T) {
 			pref := fmt.Sprintf("%d/%d/%d",
 				len(r.res.prefMatches), len(r.res.preferenceGaps), len(r.res.prefConflicts))
 			fmt.Fprintf(&b, "  %-42s %6.1f %9s %5s  %s\n",
-				r.name, r.res.technicalScore, pref, gate, verdict)
+				r.name, r.res.capabilityScore, pref, gate, verdict)
 		}
 		t.Log(b.String())
 	})
@@ -301,9 +301,9 @@ func TestFitEval(t *testing.T) {
 // picture for a case.
 func checkExpectations(e expectation, r result) []string {
 	var out []string
-	out = append(out, checkBand("technical_score", e.TechnicalScore, r.technicalScore)...)
-	out = append(out, checkList("technical_gaps", e.TechnicalGaps, r.technicalGaps)...)
-	out = append(out, checkList("technical_partial", e.TechnicalPartial, r.technicalPartial)...)
+	out = append(out, checkBand("capability_score", e.CapabilityScore, r.capabilityScore)...)
+	out = append(out, checkList("capability_gaps", e.CapabilityGaps, r.capabilityGaps)...)
+	out = append(out, checkList("capability_partial", e.CapabilityPartial, r.capabilityPartial)...)
 	out = append(out, checkList("preference_matches", e.PreferenceMatches, r.prefMatches)...)
 	out = append(out, checkList("preference_gaps", e.PreferenceGaps, r.preferenceGaps)...)
 	out = append(out, checkList("preference_conflicts", e.PreferenceConflicts, r.prefConflicts)...)
@@ -353,7 +353,7 @@ func checkList(field string, want *listExpect, got []string) []string {
 
 // listContains reports whether want appears in list, either as a whole entry or
 // as one alternative inside a grouped entry. The grouped case matters because a
-// technical gap holds the JD's original string: a gap of
+// capability gap holds the JD's original string: a gap of
 // "TimescaleDB | ClickHouse" is a gap for TimescaleDB, and an assertion naming
 // either alternative should see it.
 func listContains(list []string, want string) bool {

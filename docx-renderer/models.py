@@ -68,11 +68,18 @@ class ProjectEntry(BaseModel):
     project_id: str
     name: str
     tagline: str | None = None
-    role: Literal["author", "maintainer", "contributor", "lead"]
-    status: Literal["active", "dormant", "archived"]
+    #: Free text in schema v2, both of these. v1 enumerated open-source
+    #: repository vocabulary -- author/maintainer/contributor/lead and
+    #: active/dormant/archived -- which a portfolio of buildings, cases,
+    #: recipes, or performances has none of. Nothing branches on either; the
+    #: renderer prints role and uses status for nothing at all.
+    role: str
+    status: str
     started_on: str | None = Field(pattern=r"^\d{4}-\d{2}$", default=None)
     ended_on: str | None = Field(pattern=r"^\d{4}-\d{2}$", default=None)
-    repo_url: str | None = None
+    #: Where the work itself lives: a repository, a catalogue entry, a case
+    #: number, a recording. Named repo_url in schema v1.
+    source_url: str | None = None
     live_url: str | None = None
     writeup_url: str | None = None
     force_include: bool = False

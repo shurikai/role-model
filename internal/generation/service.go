@@ -78,7 +78,7 @@ type ProjectView struct {
 	Status        string             `json:"status"`
 	StartedOn     *string            `json:"started_on,omitempty"`
 	EndedOn       *string            `json:"ended_on,omitempty"`
-	RepoURL       *string            `json:"repo_url,omitempty"`
+	SourceURL     *string            `json:"source_url,omitempty"`
 	LiveURL       *string            `json:"live_url,omitempty"`
 	WriteupURL    *string            `json:"writeup_url,omitempty"`
 	ForceInclude  bool               `json:"force_include"`

@@ -2,7 +2,6 @@
   "name": "strong-match",
   "jd_fixture": "tests/fixtures/sample-strong-match-jd.md",
   "description": "Staff Backend Engineer, freight visibility platform. High technical coverage against the persona's expert skills, remote-first, explicit mentorship, IC track. Should score well on both halves and pass the gate.",
-
   "signals": {
     "required_skills": [
       "Go",
@@ -21,8 +20,6 @@
       "Prometheus"
     ],
     "seniority": "staff",
-    "domain": "saas",
-    "work_type": "remote",
     "culture_signals": [
       "remote-first",
       "small team",
@@ -45,15 +42,27 @@
       ]
     }
   },
-
   "expect": {
-    "technical_score": { "min": 80 },
-    "technical_gaps": {
-      "must_exclude": ["Go", "PostgreSQL", "Kafka", "Distributed Systems", "AWS", "Kubernetes"]
+    "capability_score": {
+      "min": 80
+    },
+    "capability_gaps": {
+      "must_exclude": [
+        "Go",
+        "PostgreSQL",
+        "Kafka",
+        "Distributed Systems",
+        "AWS",
+        "Kubernetes"
+      ]
     },
     "preference_conflicts": {
       "comment": "A light on-call rotation must not read as the 'on-call heavy' anti-preference.",
-      "must_exclude": ["on-call heavy", "frontend", "people management"]
+      "must_exclude": [
+        "on-call heavy",
+        "frontend",
+        "people management"
+      ]
     },
     "gate_passed": true
   }
