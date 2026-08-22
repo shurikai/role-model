@@ -11,6 +11,7 @@ import (
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/intake"
 	"github.com/shurikai/role-model/internal/project"
 	"github.com/shurikai/role-model/internal/renderer"
 	"github.com/shurikai/role-model/internal/stage0"
@@ -21,6 +22,7 @@ type RouterDeps struct {
 	Queries        *db.Queries
 	GenSvc         *generation.Service
 	Stage0Svc      *stage0.Service
+	IntakeSvc      *intake.Service
 	FitSvc         *fitgate.Service
 	ContribSvc     *contribution.Service
 	ProjectSvc     *project.Service
@@ -106,6 +108,10 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Put("/import/drafts/{draftID}", importHandler.UpdateDraft)
 			r.Post("/import/drafts/{draftID}/approve", importHandler.Approve)
 			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
+
+			intakeHandler := handlers.NewIntakeHandler(deps.Queries, deps.IntakeSvc)
+			r.Get("/import/{batchID}/entities", intakeHandler.ListEntityDrafts)
+			r.Post("/import/{batchID}/resolve", intakeHandler.ResolveBatch)
 
 			educationHandler := handlers.NewEducationHandler(deps.Queries)
 			r.Get("/education", educationHandler.List)

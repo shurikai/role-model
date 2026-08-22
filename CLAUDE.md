@@ -646,6 +646,7 @@ Rules:
 /internal/generation             — LLM pipeline (signal extraction + resume generation)
 /internal/generation/prompts     — LLM prompt template files (embedded at compile time)
 /internal/httputil               — shared HTTP helpers (breaks handlers↔middleware cycle)
+/internal/intake                 — turns approved import drafts into rows (resolver)
 /internal/renderer               — HTTP client for the docx-renderer service
 /internal/stage0                 — LLM-assisted import (extract + enrich + review)
 /internal/vocabulary             — starting level vocabularies and section manifest,
