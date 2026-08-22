@@ -74,6 +74,15 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 		return nil, fmt.Errorf("fit evaluation: list preferences: %w", err)
 	}
 
+	// The depth scale is the user's own vocabulary, not a fixed
+	// novice/proficient/expert. An account with no rows falls back to the
+	// shipped neutral scale inside LevelScale.Rank.
+	levelRows, err := s.q.ListProficiencyLevelsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fit evaluation: list proficiency levels: %w", err)
+	}
+	levels := NewLevelScale(levelRows)
+
 	screeningJSON, err := marshalScreeningSummary(signals.ScreeningSummary)
 	if err != nil {
 		return nil, fmt.Errorf("fit evaluation: marshal screening summary: %w", err)
@@ -88,7 +97,7 @@ func (s *Service) RunFitEvaluation(ctx context.Context, userID, applicationID uu
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		technical = ScoreTechnicalFit(skills, signals)
+		technical = ScoreTechnicalFit(skills, signals, levels)
 	}()
 	go func() {
 		defer wg.Done()

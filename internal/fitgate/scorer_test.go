@@ -10,6 +10,19 @@ import (
 	"github.com/shurikai/role-model/internal/generation"
 )
 
+// testLevels is the depth scale every scoring test is run against.
+//
+// Built inline rather than reaching for the shipped defaults, the same way
+// these tests build CategoryAliases inline: the scale is user data now, so a
+// test that depended on whatever internal/vocabulary happens to ship would be
+// asserting a starting value rather than the comparison it means to check.
+// Three bands, because that is what the fixtures and testdata cases use.
+var testLevels = NewLevelScale([]db.ProficiencyLevel{
+	{Value: "novice", Rank: 1},
+	{Value: "proficient", Rank: 2},
+	{Value: "expert", Rank: 3},
+})
+
 // Real label text from the seeded preference rows. The exact wording is what
 // produces the collisions these tests exist to catch, so approximations would
 // defeat the point.
@@ -701,7 +714,7 @@ func TestScoreTechnicalFitOrGroups(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals)
+			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), tt.signals, testLevels)
 			score := fit.Score
 			gaps := fit.Gaps
 			if score != tt.wantScore {
@@ -797,7 +810,7 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required})
+			fit := ScoreTechnicalFit(nameOnlySkills(tt.skillNames), JDSignals{RequiredSkills: tt.required}, testLevels)
 			gaps := fit.Gaps
 			if !slices.Equal(gaps, tt.wantGaps) {
 				t.Errorf("gaps = %q, want %q", gaps, tt.wantGaps)
@@ -816,7 +829,7 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 // closes it. Canonicalization in jd_extraction.tmpl remains the first line of
 // defence; aliases are the recovery path when it does not fire.
 func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) {
-	fit := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	fit := ScoreTechnicalFit(nameOnlySkills(citiSkills), JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
 	gaps := fit.Gaps
 	if len(gaps) == 0 {
 		t.Error("matchesAny appears to bridge RESTful->REST on the name alone now; " +
@@ -832,7 +845,7 @@ func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) 
 func TestScoreTechnicalFitBridgesAdjectivalFormsViaAliases(t *testing.T) {
 	skills := []SkillTerm{{Name: "REST", Aliases: []string{"rest api", "restful"}}}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RESTful APIs"}}, testLevels)
 	score := fit.Score
 	gaps := fit.Gaps
 	matches := fit.Matches
@@ -883,7 +896,7 @@ func TestScoreTechnicalFitCompetencyWordedJD(t *testing.T) {
 		PreferredSkills: []string{"IaC", "multi-agent", "RAG"},
 	}
 
-	fit := ScoreTechnicalFit(competencySkills, signals)
+	fit := ScoreTechnicalFit(competencySkills, signals, testLevels)
 	score := fit.Score
 	gaps := fit.Gaps
 	matches := fit.Matches
@@ -936,7 +949,8 @@ func TestScoreTechnicalFitCategoryRequiresAnActiveSkill(t *testing.T) {
 
 	fit := ScoreTechnicalFit(skills, JDSignals{
 		RequiredSkills: []string{"observability", "CI/CD"},
-	})
+	},
+		testLevels)
 	gaps, matches := fit.Gaps, fit.Matches
 
 	if !slices.Equal(gaps, []string{"observability"}) {
@@ -956,7 +970,7 @@ func TestScoreTechnicalFitPrefersDirectMatchOverCategory(t *testing.T) {
 		{Name: "REST", Category: "Protocols & Messaging", CategoryAliases: []string{"kafka", "messaging"}},
 	}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"Kafka"}}, testLevels)
 	matches := fit.Matches
 	if len(matches) != 1 {
 		t.Fatalf("matches = %+v, want one", matches)
@@ -979,7 +993,7 @@ func TestScoreTechnicalFitCategoryDoesNotMatchOnSubstrings(t *testing.T) {
 		{Name: "JUnit", Category: "Testing", CategoryAliases: []string{"automated testing", "test coverage"}},
 	}
 
-	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}})
+	fit := ScoreTechnicalFit(skills, JDSignals{RequiredSkills: []string{"RAG"}}, testLevels)
 	gaps := fit.Gaps
 	matches := fit.Matches
 	if len(matches) != 0 {
@@ -1026,7 +1040,7 @@ func TestSplitAlternatives(t *testing.T) {
 func TestScoreTechnicalFitUnscoredWhenJDStatesNoRequirements(t *testing.T) {
 	skills := nameOnlySkills([]string{"Java", "Spring Boot", "PostgreSQL"})
 
-	fit := ScoreTechnicalFit(skills, JDSignals{})
+	fit := ScoreTechnicalFit(skills, JDSignals{}, testLevels)
 
 	if fit.Scored {
 		t.Fatal("Scored = true, want false — the JD stated nothing to score")
@@ -1044,7 +1058,8 @@ func TestScoreTechnicalFitUnscoredWhenJDStatesNoRequirements(t *testing.T) {
 func TestScoreTechnicalFitScoredWhenNothingMatches(t *testing.T) {
 	fit := ScoreTechnicalFit(nameOnlySkills([]string{"Java"}), JDSignals{
 		RequiredSkills: []string{"Erlang", "Elixir"},
-	})
+	},
+		testLevels)
 
 	if !fit.Scored {
 		t.Fatal("Scored = false, want true — the JD stated requirements, they just went unanswered")
@@ -1072,6 +1087,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		fit := ScoreTechnicalFit(
 			[]SkillTerm{skill("Kafka", "expert")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
+			testLevels,
 		)
 		if fit.Score != 100 {
 			t.Errorf("score = %.1f, want 100", fit.Score)
@@ -1097,6 +1113,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		fit := ScoreTechnicalFit(
 			[]SkillTerm{skill("Kafka", "proficient")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "proficient")}},
+			testLevels,
 		)
 		if len(fit.Partial) != 0 {
 			t.Errorf("Partial = %v, want none at exactly the required level", fit.Partial)
@@ -1110,6 +1127,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 		fit := ScoreTechnicalFit(
 			[]SkillTerm{skill("Kafka", "novice")},
 			JDSignals{RequiredSkills: []string{"Kafka"}, SkillLevels: []generation.SkillLevel{level("Kafka", "expert")}},
+			testLevels,
 		)
 		if fit.Score != 50 {
 			t.Errorf("score = %.1f, want 50 — one required entry at half of 2 points", fit.Score)
@@ -1145,6 +1163,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				PreferredSkills: []string{"Kafka"},
 				SkillLevels:     []generation.SkillLevel{level("Kafka", "expert")},
 			},
+			testLevels,
 		)
 		want := 4.5 / 5 * 100
 		if fit.Score != want {
@@ -1165,6 +1184,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				RequiredSkills: []string{"Go", "Erlang"},
 				SkillLevels:    []generation.SkillLevel{level("Erlang", "expert")},
 			},
+			testLevels,
 		)
 		if !slices.Equal(fit.Gaps, []string{"Erlang"}) {
 			t.Errorf("Gaps = %v, want [Erlang] verbatim", fit.Gaps)
@@ -1186,6 +1206,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				RequiredSkills: []string{"Observability"},
 				SkillLevels:    []generation.SkillLevel{level("Observability", "expert")},
 			},
+			testLevels,
 		)
 		if len(fit.Partial) != 0 {
 			t.Errorf("Partial = %v, want none — Dynatrace at expert answers the bar", fit.Partial)
@@ -1206,6 +1227,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				RequiredSkills: []string{"Kafka | Kinesis"},
 				SkillLevels:    []generation.SkillLevel{level("Kafka | Kinesis", "expert")},
 			},
+			testLevels,
 		)
 		if len(fit.Partial) != 1 {
 			t.Fatalf("Partial = %d, want 1 — the group carries the level", len(fit.Partial))
@@ -1227,6 +1249,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				RequiredSkills: []string{"Kafka | Kinesis"},
 				SkillLevels:    []generation.SkillLevel{level("Kafka", "expert")},
 			},
+			testLevels,
 		)
 		if len(fit.Partial) != 0 {
 			t.Errorf("Partial = %v, want none — the level does not name this entry", fit.Partial)
@@ -1246,6 +1269,7 @@ func TestTechnicalFitSkillLevels(t *testing.T) {
 				RequiredSkills: []string{"Kafka"},
 				SkillLevels:    []generation.SkillLevel{level("Kafka", "wizard")},
 			},
+			testLevels,
 		)
 		if len(fit.Partial) != 0 {
 			t.Errorf("Partial = %v, want none for an unrankable required level", fit.Partial)
@@ -1271,7 +1295,7 @@ func TestNoSkillLevelsMeansNoBehaviorChange(t *testing.T) {
 		PreferredSkills: []string{"PostgreSQL"},
 	}
 
-	fit := ScoreTechnicalFit(skills, signals)
+	fit := ScoreTechnicalFit(skills, signals, testLevels)
 
 	// 2 of 3 required matched (4 points) plus the preferred (1) out of 7.
 	if want := 5.0 / 7 * 100; fit.Score != want {

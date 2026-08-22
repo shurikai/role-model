@@ -25,7 +25,7 @@ func TestNarrativeInputCarriesCoreCompetenciesWhenUnscored(t *testing.T) {
 	app := db.Application{RoleTitle: "Staff Software Engineer", CompanyName: "Airbnb"}
 
 	input := buildNarrativeInput(
-		app, signals, true, ScoreTechnicalFit(nil, signals), nil, nil, nil, nil)
+		app, signals, true, ScoreTechnicalFit(nil, signals, testLevels), nil, nil, nil, nil)
 
 	if input.TechnicalScore != nil {
 		t.Errorf("unscored JD carried a technical_score: %v", *input.TechnicalScore)
@@ -66,7 +66,7 @@ func TestCoreCompetenciesAreNotScoredAsMatchesOrGaps(t *testing.T) {
 	}
 	skills := []SkillTerm{{Name: "Go", Category: "Languages"}}
 
-	technical := ScoreTechnicalFit(skills, signals)
+	technical := ScoreTechnicalFit(skills, signals, testLevels)
 	if technical.Scored {
 		t.Error("a JD stating only competencies was scored; competencies are not scoring input")
 	}

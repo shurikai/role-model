@@ -55,12 +55,64 @@ The presupposition lived in the vocabulary wrapped around it.
   bullet and a triage-time bullet, and why `framingStaff` no longer uses a
   cruise-API bullet from the private seed set.
 
+- **The seniority ladder and the depth scale are user-owned rows, not enums.**
+  `career_levels` and `proficiency_levels` (migration 020) replaced six
+  hand-synced copies of the ladder — a SQL CHECK, a JSON Schema enum, a Pydantic
+  `Literal`, the extraction prompt's list, and two Go switches — which had
+  already drifted: extraction never emitted `manager`, `director`, or `vp`, so
+  three DB-valid values were unreachable from a job description. See
+  **Level vocabularies** below for the rules that hold now.
+
 **Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
-the seniority ladder (six hand-synced copies, two divergent), the `domain` enum,
-`work_type` meaning two different things, the `novice|proficient|expert` scale,
-`primary_stack`, the `technical_*` / `anti_pattern_*` column names, the fixed
-twelve-section resume contract, and `core_competencies` being scored by nothing.
-Those are Phases 3-6; this section covers Phase 1 only.
+the `domain` enum, `work_type` meaning two different things, `primary_stack`,
+the `technical_*` / `anti_pattern_*` column names, the fixed twelve-section
+resume contract, and `core_competencies` being scored by nothing. Those are
+Phases 4-6; this section covers Phases 1-3.
+
+### Level vocabularies
+
+`career_levels` carries the ladder **and the two levers a rung drives** —
+`length_budget` (how much gets written) and `framing_guidance` (at what
+altitude) — as sibling columns on one row. That relationship is the same one
+the two Go switches used to encode, and it is why a third lever belongs beside
+them as a third column rather than as a third lookup somewhere else.
+
+- **Nothing compares level strings any more; code compares `rank`.** A rung's
+  own `value` outranks another rung's `aliases` entry, the same precedence the
+  fit-gate matcher keeps between direct and alias matches — otherwise whoever
+  wrote an alias silently decides where a level resolves.
+- **The fallback is a flagged row (`is_fallback`), never the median rank.**
+  Deriving it looks neutral and is not: on the ten-rung software ladder the
+  median rung is staff, so every posting whose seniority read `unknown` would
+  have inherited the ownership framing that `framing_guidance` spends two rules
+  warning against reaching for. An unrecognised seniority is not evidence of a
+  senior role. A partial unique index enforces at most one per user.
+- **The CHECKs were dropped, not converted into foreign keys.** A composite FK
+  onto `career_levels` would trade one closed vocabulary for another — a new
+  account starts on the neutral three-band set, so the first position filed as
+  `staff` would be rejected by the database. Both readers already degrade
+  gracefully: the level lookup falls through to the fallback row, and
+  `LevelScale.Rank` ranks an unknown value at 0, below every band, so a typo
+  reads as "no level established" rather than as clearing an expert bar.
+- **Three creators populate these tables, and none of them covers every
+  account.** Migration 020 backfills accounts that already existed with the
+  ladder the code used to hardcode, so their behaviour is byte-for-byte
+  unchanged. `vocabulary.Install` seeds accounts created through signup, inside
+  the same transaction as the user row. `database/sample/001_foundation.sql`
+  seeds its own user, because neither of the other two reaches a user a seed
+  file invents — that is the #74 failure shape exactly, and
+  `TestSampleSeedCarriesLevelVocabularies` is the guard.
+- **The shipped default set is neutral, not software's.** `entry` /
+  `experienced` / `senior`, because a default lands in the user's own data,
+  where it is harder to notice and harder to remove than a Go switch was.
+  Seeding a chef's account with `staff` and `principal` is the failure this
+  guards against; `TestShippedLadderShape` fails if those names return.
+  `internal/vocabulary` is a starting row set, not a lookup table — nothing in
+  the pipeline reads it at runtime except the safety net for an account with no
+  rows at all.
+- **The extraction prompt's seniority enum renders from the user's rows.** That
+  is what closes the drift: the list a JD is scored against and the list the
+  database accepts are now the same list.
 
 ## Stack
 - **Language:** Go
@@ -117,17 +169,24 @@ Those are Phases 3-6; this section covers Phase 1 only.
      and framing guidance
 
      **Seniority drives two levers, and they are siblings on purpose.**
-     `buildLengthBudget` sets how much gets written; `buildFramingGuidance`
-     sets what altitude it is written at. Length was for a long time the only
-     one, so a staff posting got more bullets of the same altitude rather than
-     bullets pitched at the level it was hiring for — every other rule in the
-     prompt pushes toward implementation specificity. Add a third lever to
-     that pair, not somewhere else.
+     `length_budget` sets how much gets written; `framing_guidance` sets what
+     altitude it is written at. Length was for a long time the only one, so a
+     staff posting got more bullets of the same altitude rather than bullets
+     pitched at the level it was hiring for — every other rule in the prompt
+     pushes toward implementation specificity. Add a third lever to that pair,
+     not somewhere else.
 
-     Staff framing adds ownership and scope **on top of** the evidence, never
-     in place of it. Trading the metric for the claim is the failure mode, not
-     the goal: the number is what makes the ownership claim believable, and a
-     broad claim with nothing behind it is what a skeptical reader discounts.
+     Both are columns on one `career_levels` row now, resolved by
+     `seniorityLevers` / `pickCareerLevel` in generate.go. They were two Go
+     switches over a hardcoded ladder, and the pair had already drifted apart:
+     `mid` took the short budget in one and the default branch in the other.
+     See **Level vocabularies** above.
+
+     Top-of-ladder framing adds ownership and scope **on top of** the evidence,
+     never in place of it. Trading the metric for the claim is the failure
+     mode, not the goal: the number is what makes the ownership claim
+     believable, and a broad claim with nothing behind it is what a skeptical
+     reader discounts.
    - **2b summary** (`resume_summary.tmpl`) — writes the summary scoped to
      the bullets 2a already selected, so it cannot assert unsupported claims
 
@@ -319,7 +378,8 @@ differently" with "does not have it".
 **A match can be partial, and partial is a third verdict — not a weak match and
 not a soft gap.** `jd_signals.skill_levels` is a sparse side table recording the
 depth a posting states for a specific requirement ("expert-level Kafka", "5+
-years of Go"), on the same three-value scale as `skills.proficiency`. Where a
+years of Go"), on the same scale as `skills.proficiency` — the user's own
+`proficiency_levels` rows, read through `LevelScale`. Where a
 requirement carries one and the strongest proficiency behind its evidence falls
 below it, the requirement earns half credit and is filed in
 `TechnicalFit.Partial` / `fit_reports.technical_partial`.
@@ -513,6 +573,7 @@ Rules:
 /internal/httputil               — shared HTTP helpers (breaks handlers↔middleware cycle)
 /internal/renderer               — HTTP client for the docx-renderer service
 /internal/stage0                 — LLM-assisted import (extract + enrich + review)
+/internal/vocabulary             — starting level vocabularies, installed at signup
 /docx-renderer                   — Python service: resume JSON -> .docx
 /frontend                        — React + TypeScript + Vite UI
 /database/seed                   — real career seed SQL; a separate private git

@@ -55,7 +55,7 @@ func (h *GenerationHandler) ExtractSignals(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	signals, err := h.svc.ExtractSignals(r.Context(), *app.JdText)
+	signals, err := h.svc.ExtractSignals(r.Context(), userID, *app.JdText)
 	if err != nil {
 		log.Printf("extract signals: %v", err)
 		httputil.WriteError(w, http.StatusBadGateway, "extraction_failed", "failed to extract signals from job description")
