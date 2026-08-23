@@ -198,4 +198,41 @@ ON CONFLICT (id) DO UPDATE SET
   notes           = EXCLUDED.notes,
   updated_at      = now();
 
+-- ============================================================
+-- Preference vocabulary
+--
+-- preferences.aliases is what tags.aliases is: the other ways a posting might
+-- say the same thing. A preference label is the persona's wording and a JD
+-- signal is the employer's, and matching is a whole-word phrase comparison, so
+-- a row whose vocabulary does not overlap the posting's is silent. Three of
+-- the fit gate's four known gaps were that one missing mechanism:
+--
+--   'adtech'        vs "programmatic advertising technology, demand-side platform"
+--   'supply chain'  vs "freight logistics visibility platform"
+--   'on-call heavy' vs "24/7 on-call rotation"
+--
+-- Only these four rows carry vocabulary, and that is the normal case rather
+-- than an omission. Most labels here already ARE the words a posting uses
+-- ("Kubernetes", "remote-first", "gambling"); aliases are for the ones where
+-- the persona's shorthand and the industry's phrasing diverge.
+--
+-- An alias must name the SAME claim, not a superset. 'on-call rotation' was
+-- tried and withdrawn: the strong-match fixture advertises a LIGHT rotation,
+-- and this preference is about heaviness, not about on-call existing. That is
+-- the same rule as a category alias naming a capability rather than one tool,
+-- and it fails the same way -- by matching everything.
+--
+-- Kept as an UPDATE rather than folded into the INSERT above so the four rows
+-- that need vocabulary, and the reasoning for each, read as one block instead
+-- of as four unexplained array literals among eighteen NULLs.
+-- ============================================================
+UPDATE preferences SET aliases = v.aliases FROM (VALUES
+  ('supply chain',       ARRAY['freight logistics', 'freight', 'logistics visibility', 'shipment tracking']),
+  ('on-call heavy',      ARRAY['24/7 on-call', 'heavy on-call', 'frequent on-call']),
+  ('mandatory overtime', ARRAY['extended hours', 'crunch', 'long hours']),
+  ('adtech',             ARRAY['programmatic advertising', 'demand-side platform', 'ad tech', 'advertising technology'])
+) AS v(label, aliases)
+WHERE preferences.user_id = '5a000000-0000-0000-0000-000000000001'
+  AND preferences.label = v.label;
+
 COMMIT;
