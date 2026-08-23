@@ -26,6 +26,7 @@ type Querier interface {
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (Credential, error)
 	CreateEducation(ctx context.Context, arg CreateEducationParams) (Education, error)
 	CreateEmployer(ctx context.Context, arg CreateEmployerParams) (Employer, error)
+	CreateEntityDraft(ctx context.Context, arg CreateEntityDraftParams) (EntityDraft, error)
 	CreateFitReport(ctx context.Context, arg CreateFitReportParams) (FitReport, error)
 	CreateImportBatch(ctx context.Context, arg CreateImportBatchParams) (ImportBatch, error)
 	CreatePosition(ctx context.Context, arg CreatePositionParams) (Position, error)
@@ -62,6 +63,7 @@ type Querier interface {
 	GetEducation(ctx context.Context, userID uuid.UUID) ([]Education, error)
 	GetEmployer(ctx context.Context, arg GetEmployerParams) (Employer, error)
 	GetEmployers(ctx context.Context, userID uuid.UUID) ([]Employer, error)
+	GetEntityDraft(ctx context.Context, arg GetEntityDraftParams) (EntityDraft, error)
 	GetFitReport(ctx context.Context, arg GetFitReportParams) (FitReport, error)
 	GetImportBatch(ctx context.Context, arg GetImportBatchParams) (ImportBatch, error)
 	GetPosition(ctx context.Context, arg GetPositionParams) (Position, error)
@@ -119,6 +121,12 @@ type Querier interface {
 	ListCareerLevelsByUser(ctx context.Context, userID uuid.UUID) ([]CareerLevel, error)
 	ListContributionDraftsByBatch(ctx context.Context, arg ListContributionDraftsByBatchParams) ([]ContributionDraft, error)
 	ListContributionsBySkill(ctx context.Context, skillID uuid.UUID) ([]uuid.UUID, error)
+	// Every draft in the batch, pending and resolved alike.
+	//
+	// The resolver needs the resolved ones: a dependent draft finds its parent's
+	// real id through resolved_id, and filtering them out here would make a
+	// second approval pass unable to see what the first one created.
+	ListEntityDraftsByBatch(ctx context.Context, arg ListEntityDraftsByBatchParams) ([]EntityDraft, error)
 	ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitReport, error)
 	ListFitReportsByApplication(ctx context.Context, arg ListFitReportsByApplicationParams) ([]FitReport, error)
 	ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
@@ -138,7 +146,10 @@ type Querier interface {
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
+	MarkEntityDraftRejected(ctx context.Context, arg MarkEntityDraftRejectedParams) (EntityDraft, error)
+	MarkEntityDraftResolved(ctx context.Context, arg MarkEntityDraftResolvedParams) (EntityDraft, error)
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
+	SetEntityDraftFlags(ctx context.Context, arg SetEntityDraftFlagsParams) (EntityDraft, error)
 	UnassignContributionFromProject(ctx context.Context, arg UnassignContributionFromProjectParams) (int64, error)
 	UnassignTagFromContribution(ctx context.Context, arg UnassignTagFromContributionParams) (int64, error)
 	UnassignTagFromProject(ctx context.Context, arg UnassignTagFromProjectParams) (int64, error)

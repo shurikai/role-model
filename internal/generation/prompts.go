@@ -35,6 +35,7 @@ var templates = template.Must(
 // sources of truth for one fact, which is what this scheme exists to avoid.
 const (
 	jdExtractionPrompt  = "jd_extraction.tmpl"
+	careerExtractPrompt = "stage0_career_extraction.tmpl"
 	resumeBodyPrompt    = "resume_body.tmpl"
 	resumeSummaryPrompt = "resume_summary.tmpl"
 )
@@ -46,6 +47,21 @@ func renderPrompt(name string, data any) (string, error) {
 		return "", fmt.Errorf("render prompt %q: %w", name, err)
 	}
 	return buf.String(), nil
+}
+
+// CareerExtractionPromptData is what stage0_career_extraction.tmpl renders
+// against. ProficiencyValues comes from the user's own proficiency_levels rows,
+// for the same reason the JD extraction prompt's seniority list does: the scale
+// the extractor is told to choose from and the scale the fit gate ranks against
+// have to be one scale.
+type CareerExtractionPromptData struct {
+	CareerText        string
+	ProficiencyValues string
+}
+
+// RenderCareerExtractionPrompt renders the Stage 0 career extraction prompt.
+func RenderCareerExtractionPrompt(data CareerExtractionPromptData) (string, error) {
+	return renderPrompt(careerExtractPrompt, data)
 }
 
 // RawPrompt returns the contents of a static (non-templated) prompt file by
