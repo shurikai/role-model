@@ -15,6 +15,7 @@ import (
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/intake"
 	"github.com/shurikai/role-model/internal/project"
 	"github.com/shurikai/role-model/internal/renderer"
 	"github.com/shurikai/role-model/internal/stage0"
@@ -34,6 +35,7 @@ func main() {
 	genClient := generation.NewClient(cfg.AnthropicAPIKey)
 	genSvc := generation.NewService(queries, genClient)
 	stage0Svc := stage0.NewService(pool, queries, genClient)
+	intakeSvc := intake.NewService(pool, queries)
 	fitSvc := fitgate.NewService(queries, genClient)
 	contribSvc := contribution.NewService(pool, queries)
 	projectSvc := project.NewService(pool, queries)
@@ -43,6 +45,7 @@ func main() {
 		Queries:        queries,
 		GenSvc:         genSvc,
 		Stage0Svc:      stage0Svc,
+		IntakeSvc:      intakeSvc,
 		FitSvc:         fitSvc,
 		ContribSvc:     contribSvc,
 		ProjectSvc:     projectSvc,

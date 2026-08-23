@@ -135,6 +135,20 @@ type Employer struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type EntityDraft struct {
+	ID         uuid.UUID        `json:"id"`
+	UserID     uuid.UUID        `json:"user_id"`
+	BatchID    uuid.UUID        `json:"batch_id"`
+	Kind       string           `json:"kind"`
+	Payload    *json.RawMessage `json:"payload"`
+	DependsOn  []uuid.UUID      `json:"depends_on"`
+	ResolvedID *uuid.UUID       `json:"resolved_id"`
+	Flags      *json.RawMessage `json:"flags"`
+	Status     string           `json:"status"`
+	CreatedAt  time.Time        `json:"created_at"`
+	UpdatedAt  time.Time        `json:"updated_at"`
+}
+
 type FitReport struct {
 	ID                  uuid.UUID        `json:"id"`
 	UserID              uuid.UUID        `json:"user_id"`
