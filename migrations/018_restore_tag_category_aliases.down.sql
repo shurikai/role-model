@@ -11,3 +11,21 @@
 -- direction. Dropping the column entirely is 012's down migration's job.
 
 SELECT 1;
+
+-- ---------------------------------------------------------------------------
+-- The UPDATE statements that used to follow have moved to the seed files.
+--
+-- Migrations own structure; seeds own vocabulary. What was here was one
+-- industry's taxonomy written into the applied history of a public repo, and
+-- inherited by every user whether or not they hold those categories.
+--
+-- It was also the wrong place mechanically, which is the whole of #74: a
+-- migration cannot populate rows the seed has not created yet. Whoever creates
+-- a row populates its columns, so database/sample/001_foundation.sql and the
+-- private seed both carry this vocabulary in the same INSERT that creates the
+-- row it describes. TestSampleSeedCarriesCategoryVocabulary and
+-- TestSampleSeedCarriesCrossCategoryTerms are the guards.
+--
+-- Stripping it here changes nothing for a database that already ran it, and a
+-- fresh one gets the vocabulary from the seed a moment later.
+-- ---------------------------------------------------------------------------

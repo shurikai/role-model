@@ -23,75 +23,23 @@
 -- by SQL as new JD phrasings turn up, and stays out of Go constants.
 
 ALTER TABLE tag_categories ADD COLUMN aliases TEXT[];
-
--- Seed the standard competency vocabulary, matched by category name.
 --
--- Categories are user-defined, so this is deliberately best-effort: a user
--- whose categories are named differently gets no rows updated and no error,
--- and can populate aliases themselves. It is written as one UPDATE per
--- category rather than a CASE so that adding a phrase later is a one-line
--- diff against the category it belongs to.
+-- ---------------------------------------------------------------------------
+-- The data statements that used to live here have moved to the seed files.
 --
--- A category alias should name the *capability*, not a technology. Putting
--- "kafka" here would be wrong — that belongs in tags.aliases on the Kafka
--- row, where it matches one skill instead of granting credit for the whole
--- category.
-
-UPDATE tag_categories SET aliases =
-  ARRAY['ci/cd', 'ci', 'cd', 'continuous integration', 'continuous delivery',
-        'continuous deployment', 'build tooling', 'build automation',
-        'release automation', 'devops']
-WHERE name = 'Tools & CI/CD';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['observability', 'monitoring', 'instrumentation', 'telemetry',
-        'logging', 'tracing', 'distributed tracing', 'apm',
-        'production operations', 'operational readiness']
-WHERE name = 'Observability';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['automated testing', 'test automation', 'automated tests',
-        'unit testing', 'integration testing', 'testing frameworks',
-        'test coverage']
-WHERE name = 'Testing';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['data modeling', 'data modelling', 'database design', 'data systems',
-        'data stores', 'schema design', 'persistence', 'data pipelines',
-        'sql']
-WHERE name = 'Databases';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['event-driven systems', 'event driven systems', 'event-driven',
-        'event driven architecture', 'api design', 'apis', 'messaging',
-        'message brokers', 'pub/sub', 'streaming', 'rpc']
-WHERE name = 'Protocols & Messaging';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['system design', 'systems design', 'architecture',
-        'software architecture', 'distributed systems', 'scalability',
-        'agile', 'agile development', 'sdlc']
-WHERE name = 'Methodologies';
-
--- Note what is deliberately absent here: 'iac' and 'infrastructure as code'.
--- Those name a specific practice (Terraform, Pulumi, CloudFormation), not the
--- cloud category as a whole. Aliasing them here would let a JD asking for IaC
--- be answered by Docker and S3, which is exactly the kind of false credit
--- this mechanism must not hand out.
-UPDATE tag_categories SET aliases =
-  ARRAY['cloud', 'cloud-native', 'cloud native', 'infrastructure',
-        'containers', 'container orchestration']
-WHERE name = 'Cloud & Infrastructure';
-
-UPDATE tag_categories SET aliases =
-  ARRAY['programming languages', 'modern languages', 'backend languages']
-WHERE name = 'Languages';
-
--- Bare 'frameworks' is deliberately NOT an alias. It is a suffix on
--- unrelated requirements — "auth/authz frameworks", "evaluation frameworks",
--- "testing frameworks" — and because matching is whole-word, aliasing it
--- would let every one of those claim credit for React and Spring Boot. A
--- category alias has to be specific enough that matching it means something.
-UPDATE tag_categories SET aliases =
-  ARRAY['libraries', 'web frameworks']
-WHERE name = 'Frameworks & Libraries';
+-- Migrations own structure; seeds own vocabulary. This one carried a software
+-- competency thesaurus keyed by category name -- 'Observability', 'Testing',
+-- 'Tools & CI/CD' -- which is one industry's taxonomy written into the applied
+-- history of the repo, inherited by every user whether or not they have those
+-- categories.
+--
+-- It was also the wrong place mechanically, which is what #74 was: a migration
+-- cannot populate rows the seed has not created yet. On a fresh database these
+-- UPDATEs ran before any category existed, matched zero rows, and left nine of
+-- ten categories on NULL with the whole category matching layer inert.
+--
+-- Whoever creates a row populates its columns. database/sample/001_foundation.sql
+-- and the private seed both carry this vocabulary in the same INSERT that
+-- creates the category, and TestSampleSeedCarriesCategoryVocabulary is the
+-- guard. Stripping it here changes nothing for a database that already ran it.
+-- ---------------------------------------------------------------------------
