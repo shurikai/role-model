@@ -124,9 +124,9 @@ the code:
 
 | Case | Issue | What it holds |
 |---|---|---|
-| `known-gap-adtech-exclude-cannot-fire` | #48 | The `adtech` hard exclude does not fire on the adtech JD. The routing half closed with migration 021 — the `dealbreaker` branch reads `screening_summary.industry` now — so what is left is lexical: `adtech` is not a whole-word run inside "programmatic advertising technology, demand-side platform". |
-| `known-gap-domain-enum-loses-industry` | #53 | `logistics` now matches through `screening_summary.industry`; `supply chain` (weight 8) is still reported as a gap on a freight logistics JD, because that phrase appears nowhere in the signals. Preference labels have no aliases column. |
-| `known-gap-role-shape-conflicts` | #45 | `frontend`, `on-call heavy`, and `mandatory overtime` do not surface as conflicts on a frontend-majority, on-call-heavy JD. The bonus an unmatched negative used to earn is gone with the score, but the silence is not: the report still says nothing about what the posting advertises. |
+| `known-gap-role-shape-conflicts` | #45 | Half closed by migration 023: `on-call heavy` and `mandatory overtime` match through `preferences.aliases`. What remains is `frontend`, which is a routing gap — the row is typed `role_shape`, and this JD's shape lives in `required_skills` and `screening_summary.other_flags`, neither of which that branch reads. |
+| ~~`known-gap-adtech-exclude-cannot-fire`~~ → `industry-exclude-fires` | closed | Was #48. Took migration 021 (routing: the `dealbreaker` branch reads `screening_summary.industry`) **and** migration 023 (vocabulary: `adtech` is not a whole-word run inside "programmatic advertising technology"). Neither was sufficient alone. |
+| ~~`known-gap-domain-enum-loses-industry`~~ → `industry-positives-match` | closed | Was #53. `logistics` matches through the industry field; `supply chain` through `preferences.aliases`. |
 | `known-gap-depth-blind-scoring` | #44 | Full coverage at novice depth scores 100.0, identical to full coverage at expert depth. |
 
 ## Adding a case

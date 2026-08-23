@@ -377,7 +377,7 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   ('57000000-0000-0000-0000-000000000023', '5a000000-0000-0000-0000-000000000001', 'Docker',     ARRAY['containers'],                'Cloud & Infrastructure', 4),
 
   -- Databases
-  ('57000000-0000-0000-0000-000000000030', '5a000000-0000-0000-0000-000000000001', 'PostgreSQL',    ARRAY['Postgres'],               'Databases', 1),
+  ('57000000-0000-0000-0000-000000000030', '5a000000-0000-0000-0000-000000000001', 'PostgreSQL',    ARRAY['Postgres', 'sql'],        'Databases', 1),
   ('57000000-0000-0000-0000-000000000031', '5a000000-0000-0000-0000-000000000001', 'Redis',         NULL,                            'Databases', 2),
   ('57000000-0000-0000-0000-000000000032', '5a000000-0000-0000-0000-000000000001', 'DynamoDB',      ARRAY['Dynamo'],                 'Databases', 3),
   ('57000000-0000-0000-0000-000000000033', '5a000000-0000-0000-0000-000000000001', 'Elasticsearch', ARRAY['ES','OpenSearch'],        'Databases', 4),

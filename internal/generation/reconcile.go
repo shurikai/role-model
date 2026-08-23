@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // reconcileSkills re-adds claimed skills that an emitted bullet names but the
@@ -231,8 +233,8 @@ func namedIn(text, name string) bool {
 		start := offset + idx
 		end := start + len(lowerName)
 
-		beforeOK := start == 0 || !isWordChar(rune(lowerText[start-1]))
-		afterOK := end == len(lowerText) || !isWordChar(rune(lowerText[end]))
+		beforeOK := start == 0 || !isWordChar(lastRune(lowerText[:start]))
+		afterOK := end == len(lowerText) || !isWordChar(firstRune(lowerText[end:]))
 		if beforeOK && afterOK {
 			return true
 		}
@@ -244,6 +246,34 @@ func namedIn(text, name string) bool {
 	}
 }
 
+// isWordChar decides the boundary, and it is Unicode-aware in both halves:
+// the predicate, and how the boundary rune is obtained.
+//
+// It used to test a-z A-Z 0-9 against rune(lowerText[i]) — a BYTE widened to a
+// rune. Both halves were wrong for the same input. A skill named "Café
+// management" or "Röntgen" is bounded by bytes that are UTF-8 continuation
+// bytes, which are neither letters nor digits under the ASCII test, so the
+// boundary check passed on a match that was in the middle of a word; and any
+// non-Latin skill name — a Japanese or Chinese credential, a Cyrillic tool —
+// could never be bounded correctly at all.
+//
+// The punctuation rationale above is unaffected: C++, C#, .NET and CI/CD are
+// still surrounded by characters that are neither letters nor digits, so they
+// still match where a regexp \b would break them.
 func isWordChar(r rune) bool {
-	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// lastRune and firstRune decode the boundary rune rather than indexing a byte.
+// utf8.RuneError is returned for empty input, and it is not a letter or digit,
+// so an undecodable boundary reads as a boundary — the safe direction, since
+// the alternative is claiming a skill a bullet does not name.
+func lastRune(s string) rune {
+	r, _ := utf8.DecodeLastRuneInString(s)
+	return r
+}
+
+func firstRune(s string) rune {
+	r, _ := utf8.DecodeRuneInString(s)
+	return r
 }
