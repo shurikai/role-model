@@ -1,8 +1,10 @@
 package fitgate
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -36,18 +38,14 @@ import (
 // It asserts the vocabulary is present, not that it is complete. Adding a
 // phrase should never fail this; deleting the column's population should.
 func TestSampleSeedCarriesCategoryVocabulary(t *testing.T) {
-	// One representative capability phrase per category the fit gate depends
-	// on, chosen because each is a phrasing real postings use in place of
-	// naming a technology. "apis" is listed explicitly: it is the one that
-	// surfaced #74.
-	want := map[string][]string{
-		"Databases":             {"data modeling", "schema design", "sql"},
-		"Protocols & Messaging": {"apis", "api design", "event-driven systems", "messaging"},
-		"Testing":               {"automated testing", "test automation"},
-		"Observability":         {"observability", "monitoring", "telemetry"},
-		"Methodologies":         {"system design", "architecture", "scalability"},
-		"Tools & CI/CD":         {"ci/cd", "continuous integration", "devops"},
-	}
+	// The expectations are the DATASET's, read from
+	// database/sample/vocabulary.json, not written here. That split is the
+	// point: this file used to name nine software categories and their
+	// phrases inline, so swapping in a non-software sample dataset failed
+	// `make test` on a test that was checking content rather than mechanism.
+	// A second career ships its own vocabulary.json and its own expectations
+	// instead of breaking this one.
+	want := sampleVocabulary(t).CategoryAliases
 
 	block := tagCategoryInsert(t)
 
@@ -69,28 +67,80 @@ func TestSampleSeedCarriesCategoryVocabulary(t *testing.T) {
 	}
 }
 
-// A category alias must name a capability, not a technology: aliasing one tool
-// onto a category grants the whole category for it. Migration 012 calls this
-// out and declines to add 'kafka' to Protocols & Messaging for that reason.
-// The seed is now where the vocabulary lives, so the rule is checked here.
-func TestSampleSeedCategoryVocabularyNamesNoTechnology(t *testing.T) {
-	block := tagCategoryInsert(t)
+// ---------------------------------------------------------------------------
+// Structural invariants. Career-neutral, content-free, and true of ANY seed
+// dataset — these are what the fit gate's matching mechanism needs to hold,
+// as opposed to what this particular career happens to contain.
+//
+// They deliberately do NOT assert that every category carries vocabulary.
+// Languages, Frameworks & Libraries and Cloud & Infrastructure are on NULL on
+// purpose: bare "languages", "frameworks" and "cloud" would each grant a whole
+// category to any posting that used the word, which is the failure the "an
+// alias names a capability, not a tool" rule exists to prevent, seen from the
+// other end. A taxonomy built through conversational intake will also
+// legitimately start with none, and that belongs in review flags rather than
+// in a failing build.
+// ---------------------------------------------------------------------------
 
-	// Product names that would each hand over a whole category. Not
-	// exhaustive — it is a tripwire for the tempting cases, and the tempting
-	// case is always "this one tool is what the category means to me".
-	banned := []string{
-		"kafka", "jenkins", "splunk", "junit", "postgres", "postgresql",
-		"docker", "kubernetes", "terraform", "react", "spring boot",
-		"github actions", "dynatrace", "redis", "mysql", "cassandra",
-	}
-	for _, tech := range banned {
-		if strings.Contains(strings.ToLower(block), "'"+tech+"'") {
-			t.Errorf("%q appears as a category alias in the sample seed.\n"+
-				"A category alias grants every skill in the category as evidence, so a\n"+
-				"technology name there means one tool answers a requirement the other\n"+
-				"members cannot. Put it in tags.aliases on that tag's own row instead.", tech)
+// An alias on two categories makes the category layer ambiguous: the JD term
+// reaches whichever category the skill loop happens to see first, and the
+// evidence set changes with row order.
+func TestSeedCategoryAliasesAreUnambiguous(t *testing.T) {
+	owner := map[string]string{}
+	for category, aliases := range parseCategoryAliases(t, tagCategoryInsert(t)) {
+		seen := map[string]bool{}
+		for _, a := range aliases {
+			key := strings.ToLower(strings.TrimSpace(a))
+			if seen[key] {
+				t.Errorf("category %q lists alias %q twice", category, a)
+			}
+			seen[key] = true
+
+			if other, ok := owner[key]; ok && other != category {
+				t.Errorf("alias %q is on both %q and %q; a category term must name one category",
+					a, other, category)
+			}
+			owner[key] = category
 		}
+	}
+}
+
+// A tag whose alias is another tag's NAME answers job descriptions asking for
+// the other one. That is a shadow, not a synonym, and it is invisible from
+// either row on its own — which is exactly why it needs a test rather than a
+// convention.
+func TestSeedTagAliasesDoNotShadowOtherTags(t *testing.T) {
+	aliasesByTag := parseTagAliases(t, tagInsert(t))
+
+	names := map[string]string{}
+	for tag := range aliasesByTag {
+		names[strings.ToLower(tag)] = tag
+	}
+
+	for tag, aliases := range aliasesByTag {
+		for _, a := range aliases {
+			key := strings.ToLower(strings.TrimSpace(a))
+			if other, ok := names[key]; ok && other != tag {
+				t.Errorf("tag %q carries alias %q, which is the name of tag %q.\n"+
+					"A job description asking for %q would be answered by %q. If they really are\n"+
+					"the same thing, they should be one tag.", tag, a, other, other, tag)
+			}
+		}
+	}
+}
+
+// The whole category layer being empty is the #74 shape: nothing fails, the
+// third matching layer is simply inert, and every capability-worded
+// requirement scores as a gap. Asserting "at least one" rather than "every
+// one" is the difference between a mechanism check and a content check.
+func TestSeedCarriesSomeCategoryVocabulary(t *testing.T) {
+	total := 0
+	for _, aliases := range parseCategoryAliases(t, tagCategoryInsert(t)) {
+		total += len(aliases)
+	}
+	if total == 0 {
+		t.Error("no category in the sample seed carries any alias; the fit gate's third " +
+			"matching layer is inert and every competency-worded requirement will score as a gap")
 	}
 }
 
@@ -111,13 +161,8 @@ func TestSampleSeedCategoryVocabularyNamesNoTechnology(t *testing.T) {
 func TestSampleSeedCarriesCrossCategoryTerms(t *testing.T) {
 	block := tagInsert(t)
 
-	// term -> the tags that must all carry it. The sample has no Microservices
-	// tag, so its backend set is the three the dataset does have.
-	want := map[string][]string{
-		"backend systems":     {"Java", "Distributed Systems", "REST"},
-		"backend engineering": {"Java", "Distributed Systems", "REST"},
-		"apis":                {"REST"},
-	}
+	// term -> the tags that must all carry it, again owned by the dataset.
+	want := sampleVocabulary(t).CrossCategoryTerms
 
 	for term, tags := range want {
 		for _, tag := range tags {
@@ -211,4 +256,83 @@ func seedTagRow(block, tag string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// ---------------------------------------------------------------------------
+// Dataset-owned expectations, and the parsing the structural tests need.
+// ---------------------------------------------------------------------------
+
+// sampleVocabulary is the content contract database/sample states about itself.
+// It lives with the dataset so a second career ships its own rather than
+// breaking this one — the split this file's structural half exists to make.
+type sampleVocabularyFile struct {
+	CategoryAliases    map[string][]string `json:"category_aliases"`
+	CrossCategoryTerms map[string][]string `json:"cross_category_terms"`
+}
+
+func sampleVocabulary(t *testing.T) sampleVocabularyFile {
+	t.Helper()
+	path := filepath.Join("..", "..", "database", "sample", "vocabulary.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading %s: %v", path, err)
+	}
+	var v sampleVocabularyFile
+	if err := json.Unmarshal(b, &v); err != nil {
+		t.Fatalf("parsing %s: %v", path, err)
+	}
+	if len(v.CategoryAliases) == 0 {
+		t.Fatalf("%s states no category expectations", path)
+	}
+	return v
+}
+
+// seedRow matches one VALUES tuple of the shape both the tag_categories and
+// tags inserts use — (id, user_id, name, aliases, ...) — capturing the name and
+// the aliases literal.
+//
+// Splitting on the UUID prefix, which the content helpers above do, cannot be
+// reused here: it cuts each row in the middle of a quoted literal, so every
+// subsequent quote pairs with the wrong partner and the "names" come out as
+// the separators between fields. That produced a parser which returned one
+// entry keyed ", " and three tests that passed against a seed with a
+// deliberately duplicated alias in it. Anchoring on the whole tuple is what
+// makes the quote pairing unambiguous.
+var seedRow = regexp.MustCompile(`\('[0-9a-fA-F-]{36}',\s*'[0-9a-fA-F-]{36}',\s*'([^']*)',\s*(ARRAY\[[^\]]*\]|NULL)`)
+
+var quotedValue = regexp.MustCompile(`'([^']*)'`)
+
+// parseSeedAliases maps each seeded row's name to its alias array. A NULL
+// column yields nil — a row that deliberately carries no vocabulary, not one
+// missing it.
+func parseSeedAliases(t *testing.T, block, what string) map[string][]string {
+	t.Helper()
+
+	out := map[string][]string{}
+	for _, m := range seedRow.FindAllStringSubmatch(block, -1) {
+		name, aliases := m[1], m[2]
+		if aliases == "NULL" {
+			out[name] = nil
+			continue
+		}
+		var list []string
+		for _, q := range quotedValue.FindAllStringSubmatch(aliases, -1) {
+			list = append(list, q[1])
+		}
+		out[name] = list
+	}
+	if len(out) == 0 {
+		t.Fatalf("parsed no %s out of the sample seed", what)
+	}
+	return out
+}
+
+func parseCategoryAliases(t *testing.T, block string) map[string][]string {
+	t.Helper()
+	return parseSeedAliases(t, block, "categories")
+}
+
+func parseTagAliases(t *testing.T, block string) map[string][]string {
+	t.Helper()
+	return parseSeedAliases(t, block, "tags")
 }

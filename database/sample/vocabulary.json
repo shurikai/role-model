@@ -1,0 +1,16 @@
+{
+  "_comment": "Content expectations for the sample dataset's competency vocabulary. Owned by database/sample, not by the fit gate: a second career ships its own file and its own expectations rather than breaking this one. The structural invariants that hold for ANY dataset live in seed_vocabulary_test.go and read no fixture.",
+  "category_aliases": {
+    "Databases": ["data modeling", "schema design", "sql"],
+    "Protocols & Messaging": ["apis", "api design", "event-driven systems", "messaging"],
+    "Testing": ["automated testing", "test automation"],
+    "Observability": ["observability", "monitoring", "telemetry"],
+    "Methodologies": ["system design", "architecture", "scalability"],
+    "Tools & CI/CD": ["ci/cd", "continuous integration", "devops"]
+  },
+  "cross_category_terms": {
+    "backend systems": ["Java", "Distributed Systems", "REST"],
+    "backend engineering": ["Java", "Distributed Systems", "REST"],
+    "apis": ["REST"]
+  }
+}

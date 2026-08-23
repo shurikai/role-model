@@ -409,13 +409,14 @@ Two rules hold this together:
   UPDATEs matched zero rows, nine of ten categories sat on NULL, and the whole
   category layer was inert in the live database while every unit test stayed
   green, because they all build `CategoryAliases` inline. A staff posting
-  requiring "APIs" scored it as a gap against REST at expert (#74). Migration
-  018 repairs existing databases with a `COALESCE` backfill; the durable fix is
-  that both `001_foundation.sql` seeds now carry the vocabulary in the same
-  INSERT that creates the row. **Whoever creates a row populates its columns** —
-  a migration cannot seed rows the seed has not created yet.
-  `TestSampleSeedCarriesCategoryVocabulary` is the guard, and it reads the seed
-  file because no Go-level fixture can see an empty production column.
+  requiring "APIs" scored it as a gap against REST at expert (#74). **Whoever
+  creates a row populates its columns** — a migration cannot seed rows the seed
+  has not created yet. Both `001_foundation.sql` seeds carry the vocabulary in
+  the same INSERT that creates the row, and the data statements have been
+  stripped out of migrations 012, 015, 018 and 019 entirely: **migrations own
+  structure, seeds own vocabulary.** `TestSampleSeedCarriesCategoryVocabulary`
+  is the guard, and it reads the seed file because no Go-level fixture can see
+  an empty production column.
 
 **One term can map to many skills, and there are two mechanisms with different
 behavior.** A **category alias** maps a term to a category, and evidence is
@@ -444,6 +445,20 @@ mapping has no single home; and it does not follow new skills. A
 correct model. Build it when the term list outgrows a handful or someone needs
 to ask what a term currently covers — `TestSampleSeedCarriesCrossCategoryTerms`
 stands in for the constraint the schema does not express.
+
+**The seed tests are split structural from content.** The structural half
+(`TestSeedCategoryAliasesAreUnambiguous`, `TestSeedTagAliasesDoNotShadowOtherTags`,
+`TestSeedCarriesSomeCategoryVocabulary`) asserts what the matching mechanism
+needs of *any* dataset and names no technology. The content half reads its
+expectations from `database/sample/vocabulary.json`, owned by the dataset, so a
+second career ships its own file rather than breaking the first one's — the
+whole test file used to name nine software categories inline, which meant
+swapping in a non-software sample failed `make test`.
+
+The structural tests deliberately do **not** require every category to carry
+vocabulary. `Languages`, `Frameworks & Libraries` and `Cloud & Infrastructure`
+are on NULL on purpose: bare "languages", "frameworks" and "cloud" would each
+grant a whole category to any posting using the word.
 
 Every match carries `evidence` — the specific skills behind it — so the
 narrative cites what the person actually has instead of asserting a score, and
