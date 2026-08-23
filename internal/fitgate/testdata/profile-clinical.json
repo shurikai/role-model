@@ -1,0 +1,241 @@
+{
+  "name": "clinical",
+  "source": "database/sample-clinical, produced by the intake from a pasted career narrative",
+  "note": "The second career this project can serve, and the point of it: an ambulatory quality-improvement nurse. Nothing here is software. If the fit gate behaves sensibly against this profile with no code change, the neutrality work landed; where it does not, the gap is real and belongs in a known_gap case.",
+  "skills": [
+    {
+      "name": "ACLS",
+      "aliases": [],
+      "category": "Certifications",
+      "category_aliases": [
+        "certification",
+        "licensure",
+        "credentialed",
+        "board certified"
+      ],
+      "proficiency": "proficient",
+      "years_experience": 12,
+      "is_active": true
+    },
+    {
+      "name": "Ambulatory Care Nursing (ANCC)",
+      "aliases": [],
+      "category": "Certifications",
+      "category_aliases": [
+        "certification",
+        "licensure",
+        "credentialed",
+        "board certified"
+      ],
+      "proficiency": "proficient",
+      "years_experience": 5,
+      "is_active": true
+    },
+    {
+      "name": "BLS",
+      "aliases": [],
+      "category": "Certifications",
+      "category_aliases": [
+        "certification",
+        "licensure",
+        "credentialed",
+        "board certified"
+      ],
+      "proficiency": "proficient",
+      "years_experience": null,
+      "is_active": true
+    },
+    {
+      "name": "ambulatory care",
+      "aliases": [],
+      "category": "Clinical Specialties",
+      "category_aliases": [],
+      "proficiency": "expert",
+      "years_experience": 6,
+      "is_active": true
+    },
+    {
+      "name": "med-surg",
+      "aliases": [],
+      "category": "Clinical Specialties",
+      "category_aliases": [],
+      "proficiency": "proficient",
+      "years_experience": 3.5,
+      "is_active": true
+    },
+    {
+      "name": "Tableau",
+      "aliases": [],
+      "category": "Data and Analytics",
+      "category_aliases": [
+        "data analysis",
+        "reporting",
+        "dashboards",
+        "analytics"
+      ],
+      "proficiency": "proficient",
+      "years_experience": null,
+      "is_active": true
+    },
+    {
+      "name": "precepting",
+      "aliases": [],
+      "category": "Education and Training",
+      "category_aliases": [
+        "staff education",
+        "training",
+        "preceptorship",
+        "patient education",
+        "teaching"
+      ],
+      "proficiency": "proficient",
+      "years_experience": null,
+      "is_active": true
+    },
+    {
+      "name": "Epic",
+      "aliases": [],
+      "category": "Health Information Systems",
+      "category_aliases": [
+        "ehr",
+        "electronic health record",
+        "charting",
+        "clinical documentation",
+        "health information systems"
+      ],
+      "proficiency": "expert",
+      "years_experience": 7,
+      "is_active": true
+    },
+    {
+      "name": "Meditech",
+      "aliases": [],
+      "category": "Health Information Systems",
+      "category_aliases": [
+        "ehr",
+        "electronic health record",
+        "charting",
+        "clinical documentation",
+        "health information systems"
+      ],
+      "proficiency": "proficient",
+      "years_experience": 3.5,
+      "is_active": true
+    },
+    {
+      "name": "Spanish",
+      "aliases": [],
+      "category": "Languages",
+      "category_aliases": [],
+      "proficiency": "expert",
+      "years_experience": null,
+      "is_active": true
+    },
+    {
+      "name": "PDSA methodology",
+      "aliases": [],
+      "category": "Quality Improvement",
+      "category_aliases": [
+        "quality improvement",
+        "process improvement",
+        "performance improvement",
+        "continuous improvement"
+      ],
+      "proficiency": "expert",
+      "years_experience": null,
+      "is_active": true
+    }
+  ],
+  "preferences": [
+    {
+      "preference_type": "core_practice",
+      "label": "Epic",
+      "sentiment": "positive",
+      "weight": 6,
+      "is_hard_gate": false
+    },
+    {
+      "preference_type": "culture",
+      "label": "interdisciplinary collaboration",
+      "aliases": [
+        "cross-functional",
+        "team-based care"
+      ],
+      "sentiment": "positive",
+      "weight": 6,
+      "is_hard_gate": false
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": "accreditation readiness as the job",
+      "aliases": [
+        "Joint Commission readiness",
+        "survey readiness",
+        "regulatory compliance focus"
+      ],
+      "sentiment": "negative",
+      "weight": 9,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "dealbreaker",
+      "label": "inpatient nights",
+      "aliases": [
+        "night shift",
+        "overnight rotation",
+        "night float"
+      ],
+      "sentiment": "negative",
+      "weight": 10,
+      "is_hard_gate": true
+    },
+    {
+      "preference_type": "domain",
+      "label": "ambulatory care",
+      "aliases": [
+        "outpatient",
+        "clinic-based",
+        "ambulatory network"
+      ],
+      "sentiment": "positive",
+      "weight": 9,
+      "is_hard_gate": false
+    },
+    {
+      "preference_type": "domain",
+      "label": "health equity",
+      "aliases": [
+        "language access",
+        "health disparities",
+        "underserved populations"
+      ],
+      "sentiment": "positive",
+      "weight": 8,
+      "is_hard_gate": false
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "direct patient contact",
+      "aliases": [
+        "clinical contact",
+        "patient facing",
+        "bedside component"
+      ],
+      "sentiment": "positive",
+      "weight": 7,
+      "is_hard_gate": false
+    },
+    {
+      "preference_type": "role_shape",
+      "label": "quality improvement",
+      "aliases": [
+        "performance improvement",
+        "process improvement",
+        "clinical quality"
+      ],
+      "sentiment": "positive",
+      "weight": 9,
+      "is_hard_gate": false
+    }
+  ]
+}

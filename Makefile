@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
+.PHONY: all build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -95,10 +95,56 @@ seed:
 	done
 	@echo "Done."
 
+# The clinical sample dataset, produced BY THE INTAKE rather than written by
+# hand -- see database/sample-clinical/README.md. Separate from seed-sample for
+# the same reason seed-sample is separate from seed: two invented careers in one
+# database is not a thing anyone wants by accident.
+CLINICAL_DIR ?= database/sample-clinical
+
+seed-clinical:
+	$(call guard_sample_target,5b000000-0000-0000-0000-000000000001)
+	@echo "Seeding FICTIONAL clinical sample data from $(CLINICAL_DIR) into $(DATABASE_URL)..."
+	@for f in $(CLINICAL_DIR)/0*.sql; do \
+		echo "  -> $$f"; \
+		psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -f "$$f" || exit 1; \
+	done
+	@echo "Done. Log in as priya@example.com / sample-password."
+
+# Refuse to inject an invented career into a database that holds a different
+# one. This exists because it happened: `DATABASE_URL=<scratch> make
+# seed-clinical` ran against the LIVE database, because `-include .env` sets
+# DATABASE_URL as a makefile variable and a makefile assignment beats the
+# environment. The target printed the DSN it was using and nobody read it.
+#
+# The seed files themselves are upsert-safe, which is exactly why the mistake
+# is quiet: nothing errors, a fictional user simply appears alongside a real
+# one and stays there.
+#
+# $(1) is the user id the dataset owns. Any OTHER user in the database means
+# this is not that dataset's database.
+define guard_sample_target
+	@intruder=$$(psql "$(DATABASE_URL)" -tAc "select count(*) from users where id <> '$(1)'" 2>/dev/null || echo 0); \
+	if [ "$$intruder" != "0" ]; then \
+		echo ""; \
+		echo "  REFUSING: $(DATABASE_URL)"; \
+		echo "  already holds $$intruder user(s) that this dataset does not own."; \
+		echo ""; \
+		echo "  Sample datasets are fictional and this target is upsert-safe, so"; \
+		echo "  loading one here would quietly add an invented career beside a real"; \
+		echo "  one rather than failing. Point DATABASE_URL at a scratch database."; \
+		echo ""; \
+		echo "  Note: an environment DATABASE_URL does NOT override the one in .env."; \
+		echo "  Use:  make $$MAKECMDGOALS DATABASE_URL=postgres://..."; \
+		echo ""; \
+		exit 1; \
+	fi
+endef
+
 # Fictional sample data, tracked in this repo. Deliberately a separate target
 # rather than a default for SEED_DIR: an absent-minded `make seed` must never
 # inject invented employers into a database holding real career history.
 seed-sample:
+	$(call guard_sample_target,5a000000-0000-0000-0000-000000000001)
 	@echo "Seeding FICTIONAL sample data from $(SAMPLE_DIR) into $(DATABASE_URL)..."
 	@for f in $(SAMPLE_DIR)/0*.sql; do \
 		echo "  -> $$f"; \

@@ -1,0 +1,25 @@
+{
+  "name": "clinical-dealbreaker-fires",
+  "description": "Inpatient night-shift charge nurse. She did four years of nights early on and will not go back; the posting says so in its own words rather than hers, which is what preferences.aliases is for.",
+  "signals": {
+    "required_skills": ["ACLS", "BLS", "RN licensure"],
+    "preferred_skills": ["Meditech"],
+    "core_competencies": ["rapid response", "med-surg nursing", "charge coverage overnight"],
+    "core_practice": ["Meditech"],
+    "skill_levels": [],
+    "seniority": "charge",
+    "culture_signals": ["fast-paced", "high acuity"],
+    "screening_summary": {
+      "location": "Warwick, RI",
+      "work_arrangement": "onsite, three twelve-hour night shifts per week",
+      "travel": "none",
+      "industry": "acute care hospital, inpatient medical-surgical",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": ["night float rotation is the whole of the role"]
+    }
+  },
+  "expect": {
+    "gate_passed": false,
+    "gate_hits": {"must_include": ["inpatient nights"]}
+  }
+}
