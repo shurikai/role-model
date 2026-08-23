@@ -76,11 +76,12 @@ type evalSkill struct {
 // weight would otherwise score as zero and quietly contribute nothing, which
 // is the class of silence this harness exists to break.
 type evalPreference struct {
-	PreferenceType string `json:"preference_type"`
-	Label          string `json:"label"`
-	Sentiment      string `json:"sentiment"`
-	Weight         int16  `json:"weight"`
-	IsHardGate     bool   `json:"is_hard_gate"`
+	PreferenceType string   `json:"preference_type"`
+	Label          string   `json:"label"`
+	Aliases        []string `json:"aliases"`
+	Sentiment      string   `json:"sentiment"`
+	Weight         int16    `json:"weight"`
+	IsHardGate     bool     `json:"is_hard_gate"`
 }
 
 type evalCase struct {
@@ -131,6 +132,7 @@ func (p evalProfile) toPreferences() []db.Preference {
 			ID:             uuid.New(),
 			PreferenceType: pref.PreferenceType,
 			Label:          pref.Label,
+			Aliases:        pref.Aliases,
 			Sentiment:      pref.Sentiment,
 			Weight:         pref.Weight,
 			IsHardGate:     pref.IsHardGate,

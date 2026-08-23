@@ -206,6 +206,7 @@ type Preference struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	IsHardGate     bool      `json:"is_hard_gate"`
+	Aliases        []string  `json:"aliases"`
 }
 
 type ProficiencyLevel struct {

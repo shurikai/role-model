@@ -242,6 +242,12 @@
     {
       "preference_type": "domain",
       "label": "supply chain",
+      "aliases": [
+        "freight logistics",
+        "freight",
+        "logistics visibility",
+        "shipment tracking"
+      ],
       "sentiment": "positive",
       "weight": 8
     },
@@ -302,12 +308,22 @@
     {
       "preference_type": "culture",
       "label": "on-call heavy",
+      "aliases": [
+        "24/7 on-call",
+        "heavy on-call",
+        "frequent on-call"
+      ],
       "sentiment": "negative",
       "weight": 5
     },
     {
       "preference_type": "culture",
       "label": "mandatory overtime",
+      "aliases": [
+        "extended hours",
+        "crunch",
+        "long hours"
+      ],
       "sentiment": "negative",
       "weight": 7
     },
@@ -328,6 +344,12 @@
     {
       "preference_type": "dealbreaker",
       "label": "adtech",
+      "aliases": [
+        "programmatic advertising",
+        "demand-side platform",
+        "ad tech",
+        "advertising technology"
+      ],
       "sentiment": "negative",
       "weight": 10,
       "is_hard_gate": true
@@ -347,5 +369,6 @@
       "is_hard_gate": true
     }
   ],
-  "note_core_practice": "The core_practice row exists so the fixture set exercises a label that makes a claim about PROMINENCE rather than presence. Every gate row here was a bare term (.NET, adtech, gambling, surveillance), which is exactly why the harness was blind to #68: a qualified label matched on any bare token inside it, and no fixture had one."
+  "note_core_practice": "The core_practice row exists so the fixture set exercises a label that makes a claim about PROMINENCE rather than presence. Every gate row here was a bare term (.NET, adtech, gambling, surveillance), which is exactly why the harness was blind to #68: a qualified label matched on any bare token inside it, and no fixture had one.",
+  "note_aliases": "preferences.aliases is the vocabulary column tags have had since migration 001, added because three of the four known gaps here turned out to be one missing mechanism rather than three defects: 'adtech' against \"programmatic advertising technology\", 'supply chain' against \"freight logistics visibility platform\", 'on-call heavy' against \"24/7 on-call rotation\". Aliases are matching vocabulary only -- the narrative still sees the user's own label. An alias must name the SAME claim, not a superset: 'on-call rotation' was tried and withdrawn, because the strong-match JD advertises a LIGHT rotation and the preference is about heaviness. Same rule as a category alias naming a capability rather than one tool."
 }

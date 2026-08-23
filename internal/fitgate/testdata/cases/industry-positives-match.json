@@ -1,8 +1,5 @@
 {
-  "name": "known-gap-domain-enum-loses-industry",
-  "status": "known_gap",
-  "issue": "#53",
-  "reason": "MOSTLY CLOSED, AND NO LONGER ABOUT AN ENUM. 'logistics' matches: the domain branch reads screening_summary.industry, which here is 'freight logistics visibility platform'. Migration 021 then deleted the domain enum outright, so the half of this gap that was 'the enum says saas and cannot say freight' no longer exists. What remains is 'supply chain' (weight 8, the persona's second-strongest positive), which appears in neither the industry string nor core_competencies on this fixture. containsPhrase requires a contiguous whole-word run and nothing here contains that phrase, so the row is still reported as an unmet gap on the JD it describes best. Closing it needs a vocabulary layer for preference labels -- the aliases mechanism tags already have -- or richer extraction. Not more routing.",
+  "name": "industry-positives-match",
   "jd_fixture": "tests/fixtures/sample-strong-match-jd.md",
   "description": "Asserted separately from strong-match.json so the enforced case can hold a real preference floor while the remaining half of this gap stays visible.",
   "signals": {
@@ -49,5 +46,6 @@
         "supply chain"
       ]
     }
-  }
+  },
+  "comment": "CLOSED. Was #53. Both halves now match on a freight logistics JD. 'logistics' matches through screening_summary.industry, which #53's routing widening supplied and migration 021 made the only industry field there is. 'supply chain' -- the persona's second-strongest positive, and the half that survived #53 -- matches through preferences.aliases (migration 023), because the posting says 'freight logistics visibility platform' and never those two words. The name of this fixture is historical: there is no domain enum any more."
 }
