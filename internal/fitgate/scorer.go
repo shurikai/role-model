@@ -551,7 +551,7 @@ func ScorePreferenceFit(prefs []db.Preference, signals JDSignals) (
 	matches []db.Preference, gaps []db.Preference, conflicts []db.Preference, gateHits []db.Preference,
 ) {
 	for _, p := range prefs {
-		matched := preferenceMatches(p, prefFieldsFor(p.PreferenceType, signals))
+		matched := preferenceAnswered(p, signals)
 
 		if p.IsHardGate {
 			if matched {
@@ -722,6 +722,80 @@ func prefFieldsFor(prefType string, signals JDSignals) []string {
 		}
 		return fields
 	}
+}
+
+// preferenceAnswered reports whether a preference row is answered by the JD,
+// routing it at the fields its type is about and applying the matching rule
+// that type carries.
+//
+// Every type but core_practice is answered by any one field. core_practice is
+// answered only by a whole entry — see corePracticeAnswered.
+func preferenceAnswered(p db.Preference, signals JDSignals) bool {
+	fields := prefFieldsFor(p.PreferenceType, signals)
+	if p.PreferenceType == "core_practice" {
+		return corePracticeAnswered(p, fields)
+	}
+	return preferenceMatches(p, fields)
+}
+
+// corePracticeAnswered reports whether a preference answers a core_practice
+// entry outright: it must answer EVERY alternative in the entry, not merely
+// appear somewhere inside it.
+//
+// # Declining to split a group was never protection on its own
+//
+// prefFieldsFor hands core_practice entries over ungrouped, on the rule that a
+// technology you can be excused from is not what the role is built on — that
+// is #68, and "Proficiency in Java and/or Python" is the posting that made it
+// concrete. But containsPhrase matches a token run ANYWHERE inside the field,
+// so leaving "Java | Python" whole stops nothing by itself: the run ["python"]
+// sits inside it either way.
+//
+// What held the rule up until now was label length, which is not a mechanism.
+// Every gated label happened to be prose — "Python as a primary language" is
+// five tokens and cannot sit inside a two-token group — so the group survived
+// on the accident that no label was short enough to defeat it. Two things
+// defeat it the moment they appear, and both already exist:
+//
+//   - A short label. The clinical profile carries core_practice "Epic", and a
+//     posting whose core practice reads "Epic | Cerner" matched it.
+//   - Any alias. Vocabulary on these rows is a single technology name by
+//     nature, which is exactly the shape that reaches inside a group. This is
+//     why database/seed/025_preference_vocabulary.sql left all seven
+//     core_practice rows without vocabulary while the other 19 rows got theirs.
+//
+// The rule stated positively: a group means the posting offers substitutes, so
+// it is answered only when the row refuses ALL of them. A row refusing both
+// halves of "TypeScript | Node.js" is not being offered an out, and still
+// fires. A row refusing only Python is, and does not.
+//
+// The row answers each alternative as a whole — label or any alias — rather
+// than one term having to cover the entire group, so a group may be refused
+// jointly: the label answering one half and an alias the other is still a
+// posting with no acceptable option in it.
+//
+// An entry with no alternatives is skipped rather than answered. Ranging over
+// an empty list would satisfy "every alternative" vacuously and match
+// everything, which is how splitAlternatives' own malformed-entry guard reads
+// as unsatisfied rather than universal.
+func corePracticeAnswered(p db.Preference, entries []string) bool {
+	for _, entry := range entries {
+		alts := splitAlternatives(entry)
+		if len(alts) == 0 {
+			continue
+		}
+		answered := true
+		for _, alt := range alts {
+			if !preferenceMatches(p, []string{alt}) {
+				answered = false
+				break
+			}
+		}
+		if answered {
+			return true
+		}
+	}
+	return false
 }
 
 // preferenceMatches reports whether a preference row answers any of the fields
