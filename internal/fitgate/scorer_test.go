@@ -49,6 +49,15 @@ func hardGate(label, prefType string) db.Preference {
 	}
 }
 
+// withAliases attaches matching vocabulary to a row. On core_practice this is
+// the shape that used to defeat the OR-group rule: an alias there is a single
+// technology name by nature, and a single name is exactly what fits inside a
+// group.
+func withAliases(p db.Preference, aliases ...string) db.Preference {
+	p.Aliases = aliases
+	return p
+}
+
 // labelsOf reduces a preference list to its labels. Every list ScorePreferenceFit
 // returns is []db.Preference now — the full row is what the report stores and
 // what the frontend renders — but a test only ever asserts on the label, and
@@ -189,6 +198,64 @@ func TestHardGateMatching(t *testing.T) {
 			wantPassed: true,
 		},
 		{
+			// #94. Every case above holds only because the label is prose:
+			// "Python as a primary language" is five tokens and cannot sit
+			// inside a two-token group. A SHORT label defeated that, because
+			// containsPhrase matches a run anywhere inside the field — and the
+			// clinical profile already carries one, core_practice "Epic".
+			// Declining to split the group is not protection on its own; the
+			// row has to answer every alternative.
+			name:       "a short label does not trip on one member of an or-group",
+			pref:       hardGate("Angular", "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Angular | React"}},
+			wantPassed: true,
+		},
+		{
+			// The converse, so the rule above is a distinction and not a
+			// blanket disarm of short labels.
+			name:       "a short label still trips on an ungrouped entry",
+			pref:       hardGate("Angular", "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Angular"}},
+			wantPassed: false,
+		},
+		{
+			// #94, the alias half. An alias on a core_practice row is a bare
+			// technology name by nature, so it reaches inside a group the way
+			// a short label does. This is the case that kept vocabulary off
+			// all seven core_practice rows in seed 025.
+			name:       "an alias does not trip on one member of an or-group",
+			pref:       withAliases(hardGate(pythonLabel, "core_practice"), "Python"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Java | Python"}},
+			wantPassed: true,
+		},
+		{
+			// And the alias still does its job on an ungrouped entry, which is
+			// the whole reason to carry one.
+			name:       "an alias trips on an ungrouped entry",
+			pref:       withAliases(hardGate(pythonLabel, "core_practice"), "Python 3"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Python 3"}},
+			wantPassed: false,
+		},
+		{
+			// The rule is "every alternative", not "no groups ever". A posting
+			// offering a choice between two technologies the row refuses is
+			// not offering an out, and must still trip. Here the label answers
+			// both halves on its own.
+			name:       "an or-group refused in every alternative still trips",
+			pref:       hardGate(typescriptLabel, "core_practice"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"TypeScript | Node.js"}},
+			wantPassed: false,
+		},
+		{
+			// The same, refused jointly: the label answers Ruby and an alias
+			// answers the other half. The row is what must cover the group,
+			// not any single term in it.
+			name:       "a group refused jointly by label and alias still trips",
+			pref:       withAliases(hardGate("Ruby / Rails as primary language", "core_practice"), "Ruby on Rails"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"Ruby | Ruby on Rails"}},
+			wantPassed: false,
+		},
+		{
 			name:       "typescript in the primary stack trips the typescript exclude",
 			pref:       hardGate(typescriptLabel, "core_practice"),
 			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, CorePractice: []string{"TypeScript"}},
@@ -206,6 +273,17 @@ func TestHardGateMatching(t *testing.T) {
 			name:       "a bare technology exclude still fires on a required skill",
 			pref:       hardGate("C# / .NET", "dealbreaker"),
 			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"C#", "Azure"}},
+			wantPassed: false,
+		},
+		{
+			// #94 must not leak across the types. dealbreaker splits
+			// alternatives and fires on one member deliberately — it asks
+			// whether the JD demands the thing at all, where core_practice
+			// asks what the role is built on. The whole-entry rule belongs to
+			// the second question only.
+			name:       "a bare technology exclude still fires on one member of an or-group",
+			pref:       hardGate("C# / .NET", "dealbreaker"),
+			signals:    JDSignals{ScreeningSummary: generation.ScreeningSummary{Industry: "saas"}, RequiredSkills: []string{"C# | Java"}},
 			wantPassed: false,
 		},
 		{
