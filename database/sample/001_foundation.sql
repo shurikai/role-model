@@ -361,6 +361,12 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   ('57000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'Python',     ARRAY['Python 3'],                  'Languages', 2),
   ('57000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Java',
    ARRAY['Java 8','Java 17','backend systems','backend services','backend engineering','backend development'], 'Languages', 3),
+  -- This dataset has a SQL tag of its own, so PostgreSQL deliberately does NOT
+  -- carry 'sql' as an alias the way the private seed's does. The direct layer
+  -- answers a JD requiring SQL from this row by name, and aliasing another
+  -- tag's name onto PostgreSQL would make a posting asking for SQL answered by
+  -- Postgres instead -- a shadow, which TestSeedTagAliasesDoNotShadowOtherTags
+  -- rejects. If they really were the same thing they would be one tag.
   ('57000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'SQL',        ARRAY['ANSI SQL'],                  'Languages', 4),
   ('57000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'TypeScript', ARRAY['TS'],                        'Languages', 5),
 
@@ -377,7 +383,7 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   ('57000000-0000-0000-0000-000000000023', '5a000000-0000-0000-0000-000000000001', 'Docker',     ARRAY['containers'],                'Cloud & Infrastructure', 4),
 
   -- Databases
-  ('57000000-0000-0000-0000-000000000030', '5a000000-0000-0000-0000-000000000001', 'PostgreSQL',    ARRAY['Postgres', 'sql'],        'Databases', 1),
+  ('57000000-0000-0000-0000-000000000030', '5a000000-0000-0000-0000-000000000001', 'PostgreSQL',    ARRAY['Postgres'],               'Databases', 1),
   ('57000000-0000-0000-0000-000000000031', '5a000000-0000-0000-0000-000000000001', 'Redis',         NULL,                            'Databases', 2),
   ('57000000-0000-0000-0000-000000000032', '5a000000-0000-0000-0000-000000000001', 'DynamoDB',      ARRAY['Dynamo'],                 'Databases', 3),
   ('57000000-0000-0000-0000-000000000033', '5a000000-0000-0000-0000-000000000001', 'Elasticsearch', ARRAY['ES','OpenSearch'],        'Databases', 4),
