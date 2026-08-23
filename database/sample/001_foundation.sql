@@ -361,6 +361,12 @@ INSERT INTO tags (id, user_id, name, aliases, category, sort_order) VALUES
   ('57000000-0000-0000-0000-000000000002', '5a000000-0000-0000-0000-000000000001', 'Python',     ARRAY['Python 3'],                  'Languages', 2),
   ('57000000-0000-0000-0000-000000000003', '5a000000-0000-0000-0000-000000000001', 'Java',
    ARRAY['Java 8','Java 17','backend systems','backend services','backend engineering','backend development'], 'Languages', 3),
+  -- This dataset has a SQL tag of its own, so PostgreSQL deliberately does NOT
+  -- carry 'sql' as an alias the way the private seed's does. The direct layer
+  -- answers a JD requiring SQL from this row by name; aliasing another tag's
+  -- name onto PostgreSQL would make a posting asking for SQL answered by
+  -- Postgres instead, which is a shadow rather than a synonym. If they really
+  -- were the same thing they would be one tag.
   ('57000000-0000-0000-0000-000000000004', '5a000000-0000-0000-0000-000000000001', 'SQL',        ARRAY['ANSI SQL'],                  'Languages', 4),
   ('57000000-0000-0000-0000-000000000005', '5a000000-0000-0000-0000-000000000001', 'TypeScript', ARRAY['TS'],                        'Languages', 5),
 

@@ -607,14 +607,69 @@ func TestContainsPhrase(t *testing.T) {
 	}
 }
 
-// Known limitation, asserted so it is a documented decision rather than an
-// untested assumption. Tokenization is exact: no stemming, no plural folding.
-// "microservice" does not match "microservices". Fixing that means a stemmer,
-// which is a bigger change than this pass warrants and risks its own class of
-// false positives.
-func TestContainsPhraseDoesNotStem(t *testing.T) {
-	if containsPhrase("microservice", "microservices architecture") {
-		t.Error("stemming appears to have been added; update this test and the doc comment")
+// Regular plurals fold; nothing else does. This was a documented limitation
+// until the fold landed — "microservice" did not match "microservices", and on
+// a career whose vocabulary is ordinary English nouns rather than product
+// names, that miss is most of the corpus rather than an annoyance.
+func TestTokenizeFoldsRegularPlurals(t *testing.T) {
+	for _, tt := range []struct {
+		needle, haystack string
+		want             bool
+	}{
+		{"microservice", "microservices architecture", true},
+		{"API", "APIs", true},
+		{"patient assessment", "patient assessments", true},
+		{"patient assessments", "patient assessment", true},
+
+		// The fold is applied to both sides inside tokenize, so an exact
+		// match today is still an exact match after folding. It only widens.
+		{"Kafka", "Kafka", true},
+		{"CI/CD", "CI/CD pipelines", true},
+	} {
+		if got := containsPhrase(tt.needle, tt.haystack); got != tt.want {
+			t.Errorf("containsPhrase(%q, %q) = %v, want %v", tt.needle, tt.haystack, got, tt.want)
+		}
+	}
+}
+
+// The fold declines the cases where a trailing "s" is reliably not a plural.
+// It does not try to be right about the rest — "Redis" folds to "redi" — and
+// the test below is why that is safe.
+func TestFoldPluralDeclinesNonPlurals(t *testing.T) {
+	for _, token := range []string{
+		// Too short: the trailing S is part of the name.
+		"aws", "os", "ios", "css", "dds", "dis",
+		// "ss" is never a plural marker in English.
+		"harness", "business", "process",
+	} {
+		if got := foldPlural(token); got != token {
+			t.Errorf("foldPlural(%q) = %q, want it left alone", token, got)
+		}
+	}
+	for _, tt := range []struct{ in, want string }{
+		{"apis", "api"}, {"systems", "system"}, {"services", "service"},
+		{"assessments", "assessment"}, {"pipelines", "pipeline"},
+	} {
+		if got := foldPlural(tt.in); got != tt.want {
+			t.Errorf("foldPlural(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// The fold must not make unrelated words equal. Anything that folds to the
+// same token matches, so this is the blast radius.
+func TestPluralFoldDoesNotCollapseUnrelatedTerms(t *testing.T) {
+	for _, tt := range []struct{ needle, haystack string }{
+		{"Go", "Google Cloud"},
+		{"Java", "JavaScript"},
+		{"REST", "Redis"},
+		{"bus", "business"},
+		{"analysis", "analyses"},
+	} {
+		if containsPhrase(tt.needle, tt.haystack) {
+			t.Errorf("containsPhrase(%q, %q) matched; the fold collapsed two different words",
+				tt.needle, tt.haystack)
+		}
 	}
 }
 
@@ -748,12 +803,18 @@ func TestScoreTechnicalFitSkillNameShapes(t *testing.T) {
 			wantGaps:   nil,
 		},
 		{
-			// The forward direction still has to work: a JD naming the general
-			// technology is answered by a specific implementation of it.
-			name:       "a JD term inside a longer skill name still matches",
+			// The case that used to justify the raw-substring direction, now
+			// on the other side of the ledger. "SQL" is not a whole word
+			// inside "PostgreSQL", so on the NAME alone it is a gap — and it
+			// should be, because the same rule answered "API" with Anthropic
+			// API and "systems" with Distributed systems.
+			//
+			// It is answered by data instead: see
+			// TestScoreCapabilityFitAnswersSQLThroughAliases below.
+			name:       "a JD term inside a longer skill name no longer matches on the name alone",
 			skillNames: citiSkills,
 			required:   []string{"SQL"},
-			wantGaps:   nil,
+			wantGaps:   []string{"SQL"},
 		},
 		{
 			// GraphQL is genuinely held, so it is genuinely not a gap. Asserted
@@ -816,6 +877,52 @@ func TestScoreTechnicalFitDoesNotBridgeAdjectivalFormsOnNameAlone(t *testing.T) 
 		t.Error("matchesAny appears to bridge RESTful->REST on the name alone now; " +
 			"update this test, the matchesAny doc comment, and the canonicalization " +
 			"rule in jd_extraction.tmpl")
+	}
+}
+
+// The replacement for the raw-substring direction, and the reason deleting it
+// costs nothing: PostgreSQL carries 'sql' in tags.aliases, so a JD asking for
+// SQL is answered by the specific skill rather than by a letter coincidence.
+//
+// The match is better than the one it replaces, not merely equal. It reports
+// Kind: alias against PostgreSQL, where the substring rule reported Kind:
+// direct — a claim that the JD had named the skill, which it had not.
+func TestScoreCapabilityFitAnswersSQLThroughAliases(t *testing.T) {
+	skills := []SkillTerm{{Name: "PostgreSQL", Aliases: []string{"postgres", "psql", "sql"}}}
+
+	fit := ScoreCapabilityFit(skills, JDSignals{RequiredSkills: []string{"SQL"}}, testLevels)
+
+	if len(fit.Gaps) != 0 {
+		t.Fatalf("gaps = %q, want none", fit.Gaps)
+	}
+	if len(fit.Matches) != 1 {
+		t.Fatalf("got %d matches, want 1", len(fit.Matches))
+	}
+	if fit.Matches[0].Kind != MatchAlias {
+		t.Errorf("kind = %q, want %q — the alias layer is what answers this now",
+			fit.Matches[0].Kind, MatchAlias)
+	}
+}
+
+// The over-reach the substring direction bought along with the SQL case, kept
+// as a regression because each of these was a real match before #75.
+func TestScoreCapabilityFitDoesNotMatchOnSharedLetters(t *testing.T) {
+	skills := []SkillTerm{
+		{Name: "Anthropic API"}, {Name: "FastAPI"},
+		{Name: "Distributed systems"}, {Name: "ArgoCD"},
+		{Name: "charting"}, {Name: "Medicare"}, {Name: "gradation"},
+	}
+
+	// "API" and "systems" over-reached on the software side; the last three
+	// are what the same rule does to ordinary English, which is #75's other
+	// half — a JD requiring art, care, or rad answered by charting, Medicare
+	// and gradation.
+	required := []string{"API", "systems", "Go", "art", "care", "rad"}
+
+	fit := ScoreCapabilityFit(skills, JDSignals{RequiredSkills: required}, testLevels)
+
+	if len(fit.Gaps) != len(required) {
+		t.Errorf("gaps = %q, want all %d reported as gaps", fit.Gaps, len(required))
 	}
 }
 
