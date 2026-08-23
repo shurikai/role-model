@@ -1,0 +1,35 @@
+{
+  "name": "clinical-strong-match",
+  "description": "Ambulatory quality improvement manager at a community health network. Names the work she has actually done, in the words a posting uses rather than the words she used. Should score well and pass the gate.",
+  "signals": {
+    "required_skills": ["Epic", "RN licensure", "quality improvement methodology"],
+    "preferred_skills": ["Tableau", "Spanish"],
+    "core_competencies": [
+      "leading performance improvement across multiple clinic sites",
+      "care coordination and referral management",
+      "staff education and training",
+      "working with underserved populations"
+    ],
+    "core_practice": ["Epic"],
+    "skill_levels": [
+      {"requirement": "Epic", "level": "expert", "signal": "expert-level Epic required"}
+    ],
+    "seniority": "charge",
+    "culture_signals": ["interdisciplinary", "team-based care", "patient-centered"],
+    "screening_summary": {
+      "location": "Providence, RI",
+      "work_arrangement": "hybrid, 3 days on site across the clinic network",
+      "travel": "between six clinic sites",
+      "industry": "community health network, ambulatory and outpatient services",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": ["health equity named as a program priority rather than an initiative"]
+    }
+  },
+  "expect": {
+    "capability_score": {"min": 55},
+    "capability_gaps": {"must_exclude": ["Epic"]},
+    "preference_matches": {"must_include": ["ambulatory care", "quality improvement"]},
+    "preference_conflicts": {"must_exclude": ["inpatient nights"]},
+    "gate_passed": true
+  }
+}
