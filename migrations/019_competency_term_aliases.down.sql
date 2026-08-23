@@ -14,17 +14,20 @@
 -- already had it this is exactly symmetric; on one that did not, the term
 -- survives the rollback. That asymmetry errs toward keeping a match.
 
-UPDATE tags SET aliases = ARRAY(
-  SELECT existing
-  FROM unnest(COALESCE(aliases, '{}')) AS existing
-  WHERE lower(existing) NOT IN ('backend systems', 'backend services',
-                                'backend engineering', 'backend development')
-)
-WHERE lower(name) IN ('java', 'microservices', 'distributed systems', 'rest');
-
-UPDATE tags SET aliases = ARRAY(
-  SELECT existing
-  FROM unnest(COALESCE(aliases, '{}')) AS existing
-  WHERE lower(existing) NOT IN ('apis', 'restful api')
-)
-WHERE lower(name) = 'rest';
+-- ---------------------------------------------------------------------------
+-- The UPDATE statements that used to follow have moved to the seed files.
+--
+-- Migrations own structure; seeds own vocabulary. What was here was one
+-- industry's taxonomy written into the applied history of a public repo, and
+-- inherited by every user whether or not they hold those categories.
+--
+-- It was also the wrong place mechanically, which is the whole of #74: a
+-- migration cannot populate rows the seed has not created yet. Whoever creates
+-- a row populates its columns, so database/sample/001_foundation.sql and the
+-- private seed both carry this vocabulary in the same INSERT that creates the
+-- row it describes. TestSampleSeedCarriesCategoryVocabulary and
+-- TestSampleSeedCarriesCrossCategoryTerms are the guards.
+--
+-- Stripping it here changes nothing for a database that already ran it, and a
+-- fresh one gets the vocabulary from the seed a moment later.
+-- ---------------------------------------------------------------------------
