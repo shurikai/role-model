@@ -536,6 +536,24 @@ Two rules specific to `core_practice`:
   `"Java | Python"` back apart is how a JD reading "Proficiency in Java and/or
   Python" tripped the Python gate. `dealbreaker` still splits, correctly: it
   asks whether the JD demands the technology at all.
+
+  **And not splitting a group is not, on its own, protection.** `containsPhrase`
+  matches a token run anywhere inside the field, so `["python"]` sits inside
+  `"Java | Python"` whether or not the group was split. What actually held the
+  rule up for a year was label length — every gated label happened to be prose
+  too long to fit inside a two-token group — which is an accident, not a
+  mechanism, and a one-word label or any alias defeats it (#94). The rule is
+  enforced positively now, in `corePracticeAnswered`: **a `core_practice` entry
+  is answered only when the row answers every alternative in it.** A row
+  refusing both halves of `"TypeScript | Node.js"` is not being offered an out
+  and still fires; a row refusing only Python is, and does not. The row is what
+  must cover the group, not any single term in it — label and aliases can refuse
+  different alternatives and together close it.
+
+  This is what makes vocabulary safe on these rows. An alias here is a bare
+  technology name by nature, which is exactly the shape that reaches inside a
+  group, and it is why `preferences.aliases` was populated for 19 rows and
+  deliberately withheld from every `core_practice` row until this rule existed.
 - **`collapseSubsumed` runs first.** Postings state their stack twice — a choice
   in the must-haves, a flat list under "Core Technical Stack" — and an entry
   whose alternatives are a strict subset of another's is the looser restatement

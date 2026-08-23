@@ -1,0 +1,54 @@
+{
+  "name": "clinical-or-group-core-practice",
+  "issue": "#94",
+  "jd_fixture": "synthetic; a network mid-migration that names either EHR as acceptable",
+  "description": "A quality improvement role at a network running two EHRs through a consolidation, whose core practice reads 'Epic | Cerner'. The persona holds Epic as a positive core_practice preference. The posting offers a substitute, so it does not confirm the thing she wants: Epic belongs in gaps, not matches.",
+  "comment": "The enforced regression for #94, and the short-label half of it. Every other core_practice case in this corpus is protected by label length -- 'TypeScript / Node.js as a primary language' is five tokens and cannot sit inside a two-token group -- so nothing exercised what happens when the label IS a technology name. 'Epic' is one token, containsPhrase matches a run anywhere inside the field, and before the whole-entry rule this posting reported Epic as a confirmed match on the strength of a group she may never be given. Positive rather than negative on purpose: the failure is symmetric, and on the positive side it manufactures a match rather than a gate hit, which is the quieter of the two.",
+  "signals": {
+    "required_skills": [
+      "Epic | Cerner",
+      "RN licensure",
+      "quality improvement methodology"
+    ],
+    "preferred_skills": [
+      "Tableau"
+    ],
+    "core_competencies": [
+      "leading performance improvement across multiple clinic sites",
+      "care coordination and referral management"
+    ],
+    "core_practice": [
+      "Epic | Cerner"
+    ],
+    "seniority": "charge",
+    "culture_signals": [
+      "interdisciplinary",
+      "team-based care"
+    ],
+    "screening_summary": {
+      "location": "Providence, RI",
+      "work_arrangement": "hybrid, 3 days on site across the clinic network",
+      "travel": "between six clinic sites",
+      "industry": "community health network mid-consolidation, two EHRs in service",
+      "clearance_citizenship": "not mentioned",
+      "other_flags": [
+        "EHR consolidation named as a two-year program"
+      ]
+    }
+  },
+  "expect": {
+    "gate_passed": true,
+    "preference_matches": {
+      "comment": "The posting offers Cerner as a substitute, so nothing here confirms the role is practised in Epic.",
+      "must_exclude": [
+        "Epic"
+      ]
+    },
+    "preference_gaps": {
+      "comment": "A positive the JD does not answer is a gap -- the correct reading of a choice she does not control.",
+      "must_include": [
+        "Epic"
+      ]
+    }
+  }
+}
