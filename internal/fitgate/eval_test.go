@@ -34,9 +34,16 @@ import (
 //
 // Run `go test ./internal/fitgate -run TestFitEval -v` for the scorecard.
 
+// The harness runs EVERY profile in testdata against its own case directory.
+//
+// It was single-profile with a hardcoded path, which is the shape a corpus
+// takes when there has only ever been one career in it. A second career is the
+// whole acceptance test for the neutrality work — if the fit gate behaves
+// sensibly against a nurse with no code change, it landed — so the corpus has
+// to hold two without either one's expectations breaking the other's.
 const (
-	profilePath = "testdata/profile-sample.json"
-	casesDir    = "testdata/cases"
+	profileGlob = "testdata/profile-*.json"
+	casesRoot   = "testdata/cases"
 )
 
 // statusKnownGap marks a case that asserts correct behavior the scorer does not
@@ -189,8 +196,14 @@ type result struct {
 }
 
 func TestFitEval(t *testing.T) {
-	profile := loadProfile(t)
-	cases := loadCases(t)
+	for _, profile := range loadProfiles(t) {
+		t.Run(profile.Name, func(t *testing.T) {
+			evalProfileCases(t, profile, loadCases(t, profile.Name))
+		})
+	}
+}
+
+func evalProfileCases(t *testing.T, profile evalProfile, cases []evalCase) {
 
 	prefs := profile.toPreferences()
 	skills := profile.activeSkills()
@@ -252,7 +265,7 @@ func TestFitEval(t *testing.T) {
 				t.Errorf("known gap %s now PASSES.\n"+
 					"The underlying defect appears to be fixed. Remove the "+
 					"\"status\": \"known_gap\" marker from %s/%s.json and close out %s.",
-					c.Name, casesDir, c.Name, c.Issue)
+					c.Name, casesRoot, c.Name, c.Issue)
 
 			case len(failures) > 0:
 				t.Errorf("%s:\n  %s", c.Description, strings.Join(failures, "\n  "))
@@ -372,24 +385,39 @@ func listContains(list []string, want string) bool {
 	return false
 }
 
-func loadProfile(t *testing.T) evalProfile {
+func loadProfiles(t *testing.T) []evalProfile {
 	t.Helper()
-	var p evalProfile
-	readJSON(t, profilePath, &p)
-	if len(p.Skills) == 0 || len(p.Preferences) == 0 {
-		t.Fatalf("%s: profile is missing skills or preferences", profilePath)
-	}
-	return p
-}
-
-func loadCases(t *testing.T) []evalCase {
-	t.Helper()
-	paths, err := filepath.Glob(filepath.Join(casesDir, "*.json"))
+	paths, err := filepath.Glob(profileGlob)
 	if err != nil {
-		t.Fatalf("glob %s: %v", casesDir, err)
+		t.Fatalf("glob %s: %v", profileGlob, err)
 	}
 	if len(paths) == 0 {
-		t.Fatalf("no eval cases found in %s", casesDir)
+		t.Fatalf("no profiles found matching %s", profileGlob)
+	}
+	out := make([]evalProfile, 0, len(paths))
+	for _, path := range paths {
+		var p evalProfile
+		readJSON(t, path, &p)
+		if p.Name == "" {
+			t.Fatalf("%s: profile has no name, and the name is what selects its cases", path)
+		}
+		if len(p.Skills) == 0 || len(p.Preferences) == 0 {
+			t.Fatalf("%s: profile is missing skills or preferences", path)
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
+func loadCases(t *testing.T, profileName string) []evalCase {
+	t.Helper()
+	dir := filepath.Join(casesRoot, profileName)
+	paths, err := filepath.Glob(filepath.Join(dir, "*.json"))
+	if err != nil {
+		t.Fatalf("glob %s: %v", dir, err)
+	}
+	if len(paths) == 0 {
+		t.Fatalf("no eval cases found in %s; a profile with no cases asserts nothing", dir)
 	}
 
 	cases := make([]evalCase, 0, len(paths))

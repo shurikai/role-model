@@ -1,0 +1,12 @@
+{
+  "_comment": "Content expectations for the clinical dataset's competency vocabulary. Owned by database/sample-clinical, so this career's expectations cannot break the software sample's and vice versa — the split Phase 7 made in internal/fitgate/seed_vocabulary_test.go.",
+  "category_aliases": {
+    "Certifications": ["certification", "licensure"],
+    "Health Information Systems": ["ehr", "electronic health record", "charting"],
+    "Quality Improvement": ["quality improvement", "process improvement"],
+    "Clinical Operations": ["care coordination", "referral management"],
+    "Education and Training": ["training", "staff education"],
+    "Data and Analytics": ["data analysis", "dashboards"]
+  },
+  "cross_category_terms": {}
+}

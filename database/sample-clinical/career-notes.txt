@@ -1,0 +1,55 @@
+Priya Raghunathan, RN, MSN — career notes, written out for my own reference.
+
+I started at St. Brigid Regional Hospital in Providence in June 2011, straight
+out of my BSN at Rhode Island College. Med-surg floor, 32 beds, nights. I was a
+staff nurse there until early 2015. The thing I'm proudest of from those years
+is that I built the shift handoff sheet the floor still uses — before that,
+handoff was verbal and we were losing things between shifts, mostly pending labs
+and pain-management plans. I put together a one-page structured sheet with the
+charge nurse and we went from about four handoff-related incident reports a
+month to under one. I also precepted new grads, six of them over those years,
+and two of them are charge nurses now. I got my ACLS in 2012 and have kept it
+current ever since. We were on Meditech then, which I never loved.
+
+In February 2015 I moved to Coastal Vascular Associates, an outpatient specialty
+practice, as a clinical nurse. Much smaller — five providers, about 60 patients a
+day. I was there until August 2018. What I actually did there was rebuild how
+pre-op teaching worked. Patients were showing up for vascular procedures without
+having stopped their anticoagulants, and we were cancelling maybe three cases a
+week. I wrote the teaching materials, set up a call-back protocol two days out,
+and got the cancellation rate down to under one a month within about six months.
+I also ran the practice's transition to Epic in 2017 — I was the clinical lead
+for it, worked with the vendor team, trained all fourteen clinical staff, and we
+went live on schedule with no downtime beyond the planned weekend. That's where
+I really learned Epic; I'd call myself expert on it now, seven-ish years.
+
+Then I went back to the hospital system, but on the administrative side. County
+Health Network, September 2018 to now. Started as a Nurse Care Coordinator and
+moved to Charge Nurse over the ambulatory network in March 2021. Six clinic sites,
+roughly 400 referrals a month coming through. The big piece of work was the
+referral intake rebuild in 2022 — referrals were sitting an average of three
+weeks before anyone triaged them, and some were falling off entirely. I mapped
+the whole thing, found that everything was queuing at a single fax intake point,
+and rebuilt it as a shared work queue with triage criteria the nurses could apply
+themselves. Average wait went from three weeks to four days. We also stopped
+losing referrals, which mattered more.
+
+Since 2023 I've been running our quality improvement work for ambulatory. I lead
+the PDSA cycles, sit on the network quality committee, and I've trained about
+thirty staff on the improvement methodology. I did my MSN in Nursing Leadership
+at UMass Boston, finished May 2020.
+
+Other things: I've been bilingual English/Spanish my whole life and I use it
+daily — probably a third of our patient population. I'm certified in Ambulatory
+Care Nursing (ANCC, since 2019). I know my way around Tableau well enough to
+build the quality dashboards we use, though I wouldn't call myself an analyst.
+BLS obviously, current. I did a wound care certification in 2016 but I've let
+that lapse and don't use it.
+
+What I want next: I want to stay in ambulatory quality improvement, ideally
+somewhere that takes health equity seriously — I've done a lot of work on
+language-access gaps and I want that to be part of the job, not a side project.
+I do not want to go back to inpatient nights. I don't want a role that's purely
+data analysis with no clinical contact. And I've had enough of organizations
+where quality improvement is a compliance exercise for accreditation — if the
+posting is all about Joint Commission readiness I'm not interested.
