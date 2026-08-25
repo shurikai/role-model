@@ -13,7 +13,7 @@ function makeBatch(overrides: Partial<ImportBatch> = {}): ImportBatch {
     id: BATCH_ID,
     user_id: "u1",
     raw_text: "pasted resume text",
-    status: "ready",
+    status: "review",
     error_text: null,
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z",
@@ -252,7 +252,7 @@ describe("ImportReview", () => {
     expect(calls.filter((c) => c.method !== "GET")).toHaveLength(0);
   });
 
-  it("shows progress instead of a draft list while the batch is not ready", async () => {
+  it("shows progress instead of a draft list while the batch is still working", async () => {
     const { fetchMock } = stubFetch(makeBatch({ status: "enriching" }), [
       makeDraft(),
     ]);
@@ -261,6 +261,26 @@ describe("ImportReview", () => {
 
     expect(await screen.findByText(/Still working/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Summary")).not.toBeInTheDocument();
+  });
+
+  it("renders drafts for any status that is not a working one", async () => {
+    // The regression this exists for: the screen first tested for a status of
+    // "ready", which the database's CHECK constraint does not contain and
+    // nothing writes. Stage 0 finishes at "review", so every real batch read
+    // as still-extracting and no draft ever rendered. Testing the working set
+    // means an unrecognised status degrades to showing the drafts.
+    for (const status of ["review", "complete", "something-new"] as const) {
+      const { fetchMock } = stubFetch(
+        makeBatch({ status: status as ImportBatch["status"] }),
+        [makeDraft()],
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      renderReview();
+
+      expect(await screen.findByLabelText("Summary")).toBeInTheDocument();
+      expect(screen.queryByText(/Still working/)).not.toBeInTheDocument();
+      cleanup();
+    }
   });
 
   it("surfaces the batch's own error text when extraction failed", async () => {

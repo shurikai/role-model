@@ -230,8 +230,18 @@ export interface ContributionDraft {
   updated_at: string;
 }
 
+/**
+ * The batch lifecycle, as the database defines it
+ * (`import_batches_status_check`, migration 006).
+ *
+ * There is no `ready`. Stage 0 ends a successful extraction at **`review`**
+ * (`stage0.Service.RunExtraction`), and `complete` is what a resolved batch
+ * reaches. Anything deciding "can this be reviewed yet" must test the WORKING
+ * states rather than one finished state, so a status this UI has not heard of
+ * degrades to reviewable rather than to a screen that waits forever.
+ */
 export type ImportBatchStatus =
-  "pending" | "extracting" | "enriching" | "ready" | "failed";
+  "pending" | "extracting" | "enriching" | "review" | "complete" | "failed";
 
 export interface DraftCounts {
   total: number;
@@ -325,4 +335,115 @@ export interface CreatePositionRequest {
   level_rationale?: string | null;
   context_narrative?: string | null;
   sort_order?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Career intake (entity drafts)
+// ---------------------------------------------------------------------------
+
+/**
+ * The wide import path. Where a `ContributionDraft` needs a position that
+ * already exists, an `EntityDraft` can be the employer and the position too —
+ * which is what makes an import usable on an account with nothing in it.
+ *
+ * `kind` is deliberately not a database CHECK on the backend: an extractor
+ * proposing a kind nothing can resolve should surface as one unresolvable
+ * draft in the queue, not as a migration. Anything rendering these must
+ * therefore tolerate a kind it has not heard of.
+ */
+export type EntityDraftKind =
+  "employer" | "position" | "contribution" | "skill" | "preference";
+
+export type EntityDraftStatus = "pending" | "approved" | "rejected";
+
+/** Advisory only. Flags are things to look at, never a refusal. */
+export interface EntityDraftFlags {
+  preference_collisions?: string[];
+  new_categories?: string[];
+}
+
+export interface EntityDraft {
+  id: string;
+  batch_id: string;
+  kind: EntityDraftKind;
+  /** Shape depends on `kind` — one of the five payloads below. */
+  payload: Record<string, unknown> | null;
+  /**
+   * Draft ids this one needs resolved first. A position names its employer
+   * draft, a contribution names its position draft. Null when it needs
+   * nothing — skills and preferences depend on no one.
+   */
+  depends_on: string[] | null;
+  /** The real row id, once approved. Null while pending or rejected. */
+  resolved_id: string | null;
+  flags: EntityDraftFlags | null;
+  status: EntityDraftStatus;
+}
+
+export interface EmployerPayload {
+  name: string;
+  industry?: string | null;
+  notes?: string | null;
+}
+
+export interface PositionPayload {
+  employer_draft?: string | null;
+  title: string;
+  industry_level?: string | null;
+  industry_role?: string | null;
+  location?: string | null;
+  /** "YYYY-MM" or "YYYY-MM-DD" — extraction writes the first. */
+  started_on: string;
+  ended_on?: string | null;
+  context_narrative?: string | null;
+}
+
+export interface ContributionPayload {
+  position_draft?: string | null;
+  summary: string;
+  full_description: string;
+  outcomes?: string | null;
+  scale_context?: string | null;
+  tags?: { category: string; name: string }[];
+}
+
+export interface SkillPayload {
+  category: string;
+  tag: string;
+  proficiency: string;
+  years_experience?: number | null;
+}
+
+export interface PreferencePayload {
+  preference_type: string;
+  label: string;
+  aliases?: string[];
+  sentiment: string;
+  weight: number;
+  is_hard_gate: boolean;
+  notes?: string | null;
+}
+
+export interface StartCareerImportResponse {
+  id: string;
+  status: ImportBatchStatus;
+  error_text?: string | null;
+  draft_count: number;
+  draft_count_by_kind: Record<string, number>;
+}
+
+/**
+ * `POST /import/{batchID}/resolve`. A partially resolved batch answers 409
+ * with this same body rather than 200 with a quiet subset — "eleven of your
+ * fourteen became rows and three did not" is something the caller has to be
+ * told, not something to discover by counting.
+ */
+export interface ResolveBatchResponse {
+  resolved: Record<string, string>;
+  unresolved: Record<string, string>;
+}
+
+export interface ApproveEntityDraftResponse {
+  draft_id: string;
+  resolved_id: string;
 }
