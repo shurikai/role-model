@@ -54,12 +54,20 @@ export function Applications() {
     <div className="mx-auto mt-12 max-w-3xl px-4">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Applications</h1>
-        <Link
-          to="/applications/new"
-          className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white"
-        >
-          New Application
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/import/new"
+            className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+          >
+            Import career history
+          </Link>
+          <Link
+            to="/applications/new"
+            className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white"
+          >
+            New Application
+          </Link>
+        </div>
       </div>
 
       {isLoading && <p className="text-sm text-gray-600">Loading...</p>}
