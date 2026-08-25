@@ -1,1 +1,43 @@
 @import "tailwindcss";
+
+/*
+ * Kanagawa Lotus, from design/reference/stage0c-kanagawa-lotus.jsx.
+ *
+ * The reference file is a sandbox mockup: inline styles and hex literals so it
+ * could render in a preview with no build step. The hexes below are its COLORS
+ * object verbatim; everything downstream reaches them as Tailwind utilities
+ * (bg-paper, text-ink, border-verify) rather than as arbitrary values, so there
+ * is one place to change a colour.
+ *
+ * Note the reference file's header comment disagrees with its own COLORS
+ * object about which hex is `paper` and which is `card`. The object is what it
+ * actually rendered, so the object wins.
+ */
+@theme {
+  --color-paper: #d5cea3;
+  --color-card: #e5ddb0;
+  --color-surface: #f2ecbc;
+  --color-ink: #545464;
+  --color-ink-dim: #716e61;
+  --color-verify: #4d699b;
+  --color-flag: #cc6d00;
+  --color-flag-highlight: #f9d791;
+  --color-stamp: #6e915f;
+  --color-reject: #c84053;
+  --color-rail: #8a8980;
+  --color-border: #dcd5ac;
+
+  /*
+   * Self-hosted through @fontsource (imported in main.tsx) rather than the
+   * reference file's Google Fonts @import, which was a preview shortcut. Each
+   * stack keeps a real fallback so a failed font load degrades instead of
+   * landing on the browser default for everything.
+   */
+  --font-display:
+    "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-body:
+    "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
