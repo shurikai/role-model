@@ -96,11 +96,29 @@ The presupposition lived in the vocabulary wrapped around it.
   labels carry an `aliases` column (migration 023) — which turned out to be the
   one mechanism three of the four fit-gate known gaps were missing.
 
+**The import is reachable now, by two paths that stay separate.** The narrow
+one (`ImportHandler`, `contribution_drafts`) stages contributions against
+employers and positions that already exist. The wide one (`IntakeHandler`,
+`entity_drafts`) stages the employers and positions too, which is what a new
+account needs — `ApproveDraft` requiring a `position_id` that already existed
+is what made the import unusable by anyone who had not already typed their
+career in by hand. Both have a frontend: `/import/...` for the narrow path,
+`/import/career/...` for the wide one.
+
+Do not unify them. They stage different things, and the narrow path is still
+the right shape once an account has a career in it — a contribution against a
+position that has existed for years does not need a resolver.
+
+**Dependency edges are crossed explicitly in both directions.** Approving a
+draft whose parent is still pending is a 409 naming that parent, never a
+silent cascade that writes rows the reviewer never saw; rejecting a draft with
+dependents warns about what it strands rather than deleting them. Neither
+direction resolves on the reviewer's behalf — that is the whole function of a
+review queue.
+
 **Still not neutral, and tracked in the plan** (`~/.claude/plans/i-want-to-do-bright-wall.md`):
-Stage 0 drafts contributions only and `ApproveDraft` requires a `position_id`
-that already exists, so a non-engineer cannot use the import at all without
-first creating employers and positions by hand. That is Phase 8, and Phase 9 is
-proving it with a second career. This section covers Phases 1-6.
+Phase 9 is proving the whole thing with a second career, end to end through the
+UI rather than through `cmd/intakerun`. This section covers Phases 1-6.
 
 ### The section manifest
 
@@ -696,7 +714,9 @@ Rules:
 /internal/generation             — LLM pipeline (signal extraction + resume generation)
 /internal/generation/prompts     — LLM prompt template files (embedded at compile time)
 /internal/httputil               — shared HTTP helpers (breaks handlers↔middleware cycle)
-/internal/intake                 — turns approved import drafts into rows (resolver)
+/internal/intake                 — whole-career import: extraction, review flags,
+                                   and the dependency-ordered resolver that turns
+                                   approved drafts into rows
 /internal/renderer               — HTTP client for the docx-renderer service
 /internal/stage0                 — LLM-assisted import (extract + enrich + review)
 /internal/vocabulary             — starting level vocabularies and section manifest,

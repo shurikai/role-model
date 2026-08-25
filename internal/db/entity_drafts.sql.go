@@ -139,7 +139,7 @@ func (q *Queries) ListEntityDraftsByBatch(ctx context.Context, arg ListEntityDra
 const markEntityDraftRejected = `-- name: MarkEntityDraftRejected :one
 UPDATE entity_drafts
 SET status = 'rejected', updated_at = now()
-WHERE id = $1 AND user_id = $2
+WHERE id = $1 AND user_id = $2 AND status = 'pending'
 RETURNING id, user_id, batch_id, kind, payload, depends_on, resolved_id, flags, status, created_at, updated_at
 `
 
@@ -148,6 +148,15 @@ type MarkEntityDraftRejectedParams struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
+// Rejecting is legal only from pending.
+//
+// The guard is in the WHERE clause rather than in a Go check before the call,
+// because a check-then-write loses to a resolve that lands between the two:
+// the draft becomes 'approved' with a real row behind it, and the reject
+// overwrites the status while the row it created stays. What the caller sees
+// for a non-pending draft is pgx.ErrNoRows, which is the same thing it sees
+// for a draft belonging to someone else -- so a caller that needs to tell 404
+// from 409 reads the draft first and uses this as the authority.
 func (q *Queries) MarkEntityDraftRejected(ctx context.Context, arg MarkEntityDraftRejectedParams) (EntityDraft, error) {
 	row := q.db.QueryRow(ctx, markEntityDraftRejected, arg.ID, arg.UserID)
 	var i EntityDraft
@@ -214,6 +223,43 @@ type SetEntityDraftFlagsParams struct {
 
 func (q *Queries) SetEntityDraftFlags(ctx context.Context, arg SetEntityDraftFlagsParams) (EntityDraft, error) {
 	row := q.db.QueryRow(ctx, setEntityDraftFlags, arg.ID, arg.UserID, arg.Flags)
+	var i EntityDraft
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.BatchID,
+		&i.Kind,
+		&i.Payload,
+		&i.DependsOn,
+		&i.ResolvedID,
+		&i.Flags,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateEntityDraftPayload = `-- name: UpdateEntityDraftPayload :one
+UPDATE entity_drafts
+SET payload = $3, updated_at = now()
+WHERE id = $1 AND user_id = $2 AND status = 'pending'
+RETURNING id, user_id, batch_id, kind, payload, depends_on, resolved_id, flags, status, created_at, updated_at
+`
+
+type UpdateEntityDraftPayloadParams struct {
+	ID      uuid.UUID        `json:"id"`
+	UserID  uuid.UUID        `json:"user_id"`
+	Payload *json.RawMessage `json:"payload"`
+}
+
+// Full-payload replace, pending only.
+//
+// Not a field-level patch: the five kinds have five payload shapes, and the
+// editor for a kind always submits a complete object for it. The same
+// pending-only guard as MarkEntityDraftRejected, for the same race.
+func (q *Queries) UpdateEntityDraftPayload(ctx context.Context, arg UpdateEntityDraftPayloadParams) (EntityDraft, error) {
+	row := q.db.QueryRow(ctx, updateEntityDraftPayload, arg.ID, arg.UserID, arg.Payload)
 	var i EntityDraft
 	err := row.Scan(
 		&i.ID,
