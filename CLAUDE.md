@@ -841,12 +841,46 @@ pg_format or sqlfluff.
 - All handlers receive a context, all DB calls respect context cancellation
 - Config via environment variables, loaded at startup into a typed Config struct
 
+## Dependencies
+
+**The conservative dependency rule is about the Go service, and only the Go
+service.** There, a dependency is a real cost — it ships inside a
+single-binary server, it is a supply-chain surface for something self-hosted,
+and the stdlib usually already answers the question. Adding one to `go.mod`
+needs a reason a reviewer would agree with. `chi`, `pgx`, `sqlc` and the
+Anthropic SDK are the shape of the exception, not the start of a trend.
+
+**The frontend and the renderer follow their own ecosystems' normal practice.**
+`frontend/` is a Vite bundle: dependencies are tree-shaken, versioned in a
+lockfile, and ship only what is imported. A well-maintained library that
+answers the need is the right call there — reaching for React, TanStack Query,
+Tailwind, or an icon set is ordinary work and needs no justification beyond
+"this is what it is for". The same holds for `docx-renderer/`, which is a
+separate Python process with its own `pyproject.toml`.
+
+This is written down because the rule was once read the other way round.
+Session 034 hand-rolled nine inline SVG icons to avoid adding `lucide-react`,
+citing the Do Not list below — a page of hand-maintained path data standing in
+for a tree-shaken import that cost under 1 KB gzipped once measured. The
+backend rule had been applied to a frontend decision. **Do not infer the Go
+rule onto `frontend/` or `docx-renderer/`.**
+
+What still applies everywhere: prefer a dependency that is maintained, prefer
+one over three, and say in the commit message what it replaced.
+
 ## Do Not
+
+The technical bullets here are about the **Go service** — that is where the
+architectural commitments live, and most of them have no frontend or renderer
+equivalent. See **Dependencies** above before reading one as project-wide. The
+last two are workflow rules and apply to the whole repository.
+
 - Use an ORM
 - Use database/sql directly
 - Use gin, echo, or any heavy framework
 - Hardcode any user identity, file paths, or config values
-- Add dependencies without a clear justification
+- Add a Go dependency without a clear justification — this one is Go-only, and
+  does NOT govern `frontend/` or `docx-renderer/`; see **Dependencies** above
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
 - Invent prompt improvements — prompts live in /internal/generation/prompts
