@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
+  isBatchWorking,
   useApproveDraft,
   useImportBatch,
   useImportDrafts,
@@ -187,7 +188,7 @@ export function ImportReview() {
             )}
           </header>
 
-          {batch && batch.status !== "ready" && batch.status !== "failed" && (
+          {batch && isBatchWorking(batch.status) && (
             <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
               Still working — extraction and enrichment are running. This page
               refreshes itself.
@@ -203,36 +204,38 @@ export function ImportReview() {
             </p>
           )}
 
-          {batch?.status === "ready" && (
-            <>
-              {draftsQuery.isLoading && (
-                <p className="font-body text-sm text-ink-dim">
-                  Loading drafts…
-                </p>
-              )}
-              {draftsQuery.error && (
-                <p className="font-body text-sm text-reject">
-                  {formatApiError(draftsQuery.error)}
-                </p>
-              )}
-              {drafts.length === 0 && !draftsQuery.isLoading && (
-                <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-                  This batch produced no drafts.
-                </p>
-              )}
-              {drafts.map((draft) => (
-                <DraftCard
-                  key={draft.id}
-                  draft={draft}
-                  batchID={batchID}
-                  skipped={skipped.has(draft.id)}
-                  onSkip={() =>
-                    setSkipped((prev) => new Set(prev).add(draft.id))
-                  }
-                />
-              ))}
-            </>
-          )}
+          {batch &&
+            !isBatchWorking(batch.status) &&
+            batch.status !== "failed" && (
+              <>
+                {draftsQuery.isLoading && (
+                  <p className="font-body text-sm text-ink-dim">
+                    Loading drafts…
+                  </p>
+                )}
+                {draftsQuery.error && (
+                  <p className="font-body text-sm text-reject">
+                    {formatApiError(draftsQuery.error)}
+                  </p>
+                )}
+                {drafts.length === 0 && !draftsQuery.isLoading && (
+                  <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
+                    This batch produced no drafts.
+                  </p>
+                )}
+                {drafts.map((draft) => (
+                  <DraftCard
+                    key={draft.id}
+                    draft={draft}
+                    batchID={batchID}
+                    skipped={skipped.has(draft.id)}
+                    onSkip={() =>
+                      setSkipped((prev) => new Set(prev).add(draft.id))
+                    }
+                  />
+                ))}
+              </>
+            )}
 
           <div className="mt-8 border-t border-dashed border-rail pt-5">
             <Link
