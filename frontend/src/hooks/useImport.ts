@@ -23,16 +23,22 @@ export function useCreateImportBatch() {
 }
 
 /**
- * Poll only while the batch is still working.
+ * The states a batch is still being worked in. Everything else — `review`,
+ * `complete`, and any status added later that this UI has not heard of — is
+ * something a person can look at.
  *
- * Today `POST /import` runs extraction and enrichment synchronously and does
- * not answer until they finish, so a batch is almost always `ready` or
- * `failed` on first read and this never fires. It is here because the states
- * exist in the schema and the handler is the sort of thing that moves to a
- * queue — when it does, the screen already waits correctly instead of showing
- * an empty draft list.
+ * Defined as the working set rather than as a single finished state on
+ * purpose. The first version of this screen tested `status === "ready"`, a
+ * value the database's CHECK constraint does not contain and nothing ever
+ * writes, so every batch read as still-extracting and no draft ever rendered.
+ * A closed list of finished states fails that way; a closed list of working
+ * states degrades to showing the drafts.
  */
 const WORKING_STATUSES = new Set(["pending", "extracting", "enriching"]);
+
+export function isBatchWorking(status: string): boolean {
+  return WORKING_STATUSES.has(status);
+}
 
 export function useImportBatch(batchID: string | undefined) {
   return useQuery({
@@ -40,7 +46,7 @@ export function useImportBatch(batchID: string | undefined) {
     queryFn: () => apiFetch<ImportBatch>(`/import/${batchID}`),
     enabled: !!batchID,
     refetchInterval: (query) =>
-      query.state.data && WORKING_STATUSES.has(query.state.data.status)
+      query.state.data && isBatchWorking(query.state.data.status)
         ? 2000
         : false,
   });

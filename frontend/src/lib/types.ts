@@ -230,8 +230,18 @@ export interface ContributionDraft {
   updated_at: string;
 }
 
+/**
+ * The batch lifecycle, as the database defines it
+ * (`import_batches_status_check`, migration 006).
+ *
+ * There is no `ready`. Stage 0 ends a successful extraction at **`review`**
+ * (`stage0.Service.RunExtraction`), and `complete` is what a resolved batch
+ * reaches. Anything deciding "can this be reviewed yet" must test the WORKING
+ * states rather than one finished state, so a status this UI has not heard of
+ * degrades to reviewable rather than to a screen that waits forever.
+ */
 export type ImportBatchStatus =
-  "pending" | "extracting" | "enriching" | "ready" | "failed";
+  "pending" | "extracting" | "enriching" | "review" | "complete" | "failed";
 
 export interface DraftCounts {
   total: number;
