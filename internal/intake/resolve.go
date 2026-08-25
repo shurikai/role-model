@@ -1,6 +1,7 @@
 package intake
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -264,8 +265,8 @@ func resolveEmployer(ctx context.Context, q *db.Queries, userID uuid.UUID, d db.
 	if err := payloadOf(d, &p); err != nil {
 		return uuid.Nil, err
 	}
-	if strings.TrimSpace(p.Name) == "" {
-		return uuid.Nil, errors.New("employer name is required")
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
 	}
 
 	// An employer the account already has is reused rather than duplicated.
@@ -363,8 +364,8 @@ func resolveContribution(
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if strings.TrimSpace(p.Summary) == "" || strings.TrimSpace(p.FullDescription) == "" {
-		return uuid.Nil, errors.New("summary and full_description are both required")
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
 	}
 
 	row, err := q.CreateContribution(ctx, db.CreateContributionParams{
@@ -406,8 +407,8 @@ func resolveSkill(ctx context.Context, q *db.Queries, userID uuid.UUID, d db.Ent
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if strings.TrimSpace(p.Proficiency) == "" {
-		return uuid.Nil, errors.New("proficiency is required")
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
 	}
 
 	var years pgtype.Numeric
@@ -442,8 +443,8 @@ func resolvePreference(ctx context.Context, q *db.Queries, userID uuid.UUID, d d
 	if err := payloadOf(d, &p); err != nil {
 		return uuid.Nil, err
 	}
-	if strings.TrimSpace(p.Label) == "" {
-		return uuid.Nil, errors.New("label is required")
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
 	}
 
 	row, err := q.CreatePreference(ctx, db.CreatePreferenceParams{
@@ -470,4 +471,205 @@ func parseDate(s string) (pgtype.Date, error) {
 		}
 	}
 	return out, fmt.Errorf("%q is not YYYY-MM or YYYY-MM-DD", s)
+}
+
+// ErrDependencyNotResolved is returned when a single draft is approved before
+// something it depends on. Distinct from ErrUnresolved, which is a batch-level
+// report: this one names a specific missing parent and is recoverable by
+// approving that parent first.
+var ErrDependencyNotResolved = errors.New("draft depends on a draft that has not been resolved")
+
+// ErrDraftNotPending is returned when a draft is approved, rejected or edited
+// from a status other than pending. Mirrors stage0.ErrDraftNotPending, which
+// the narrow contribution path uses for the same situation.
+var ErrDraftNotPending = errors.New("draft is not pending")
+
+// ApproveDraft resolves exactly one draft, in its own transaction.
+//
+// The resolver was always designed for this. ResolveBatch's own contract is
+// that "drafts resolved by an earlier pass are already parents for this one",
+// so a single-draft approve is another pass with one draft in it rather than a
+// second code path — it reuses resolveOne and marks the same way.
+//
+// # A missing parent is refused, never created
+//
+// If the draft depends on something still pending, this returns
+// ErrDependencyNotResolved naming that draft, and writes nothing. Resolving the
+// parent on the reviewer's behalf would be the one thing this review queue
+// exists to prevent: approving a row the person never looked at, discovered
+// later as an employer they would have rejected. It is the same rule the
+// reject side follows from the other direction — rejecting a draft with
+// dependents warns about them rather than cascading.
+func (s *Service) ApproveDraft(ctx context.Context, userID, draftID uuid.UUID) (uuid.UUID, error) {
+	draft, err := s.q.GetEntityDraft(ctx, db.GetEntityDraftParams{ID: draftID, UserID: userID})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft: get draft: %w", err)
+	}
+	if draft.Status != "pending" {
+		return uuid.Nil, ErrDraftNotPending
+	}
+
+	// The batch's other drafts are what a dependency id resolves through —
+	// the same map ResolveBatch seeds before ordering anything.
+	siblings, err := s.q.ListEntityDraftsByBatch(ctx, db.ListEntityDraftsByBatchParams{
+		BatchID: draft.BatchID,
+		UserID:  userID,
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft: list batch drafts: %w", err)
+	}
+	resolved := map[uuid.UUID]uuid.UUID{}
+	for _, d := range siblings {
+		if d.Status == "approved" && d.ResolvedID != nil {
+			resolved[d.ID] = *d.ResolvedID
+		}
+	}
+
+	for _, dep := range draft.DependsOn {
+		if _, ok := resolved[dep]; ok {
+			continue
+		}
+		return uuid.Nil, fmt.Errorf("%w: %s", ErrDependencyNotResolved, describeDependency(dep, siblings))
+	}
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft: begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) // no-op after a successful commit
+	qtx := s.q.WithTx(tx)
+
+	rowID, err := s.resolveOne(ctx, qtx, userID, draft, resolved)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft %s (%s): %w", draft.ID, draft.Kind, err)
+	}
+	if _, err := qtx.MarkEntityDraftResolved(ctx, db.MarkEntityDraftResolvedParams{
+		ID: draft.ID, UserID: userID, ResolvedID: &rowID,
+	}); err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft: mark resolved: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, fmt.Errorf("approve draft: commit: %w", err)
+	}
+	return rowID, nil
+}
+
+// describeDependency names an unresolved parent in words a reviewer can act on.
+// A bare uuid tells them nothing about which card to approve first, and the
+// batch listing is already loaded, so the kind and status cost nothing.
+func describeDependency(dep uuid.UUID, siblings []db.EntityDraft) string {
+	for _, d := range siblings {
+		if d.ID == dep {
+			return fmt.Sprintf("%s draft %s is %s", d.Kind, d.ID, d.Status)
+		}
+	}
+	return fmt.Sprintf("draft %s is not in this batch", dep)
+}
+
+// ValidatePayload reports whether raw is a usable payload for kind.
+//
+// Called when a reviewer edits a draft, so a payload that cannot become a row
+// fails at edit time — on the form, next to the field — rather than at resolve
+// time, where it surfaces as one draft mysteriously refusing to become a row
+// after the reviewer has moved on.
+//
+// Unknown fields are an error rather than being dropped. A dropped field means
+// an edit the person typed and watched save is silently not there, which is
+// worse than a rejected save telling them the name they used.
+//
+// Each kind's checks are the SAME function the resolver runs — not a second
+// copy of the rules. A validator that drifts from the resolver is worse than no
+// validator: it passes what resolution then refuses.
+func ValidatePayload(kind string, raw json.RawMessage) error {
+	decode := func(v any) error {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(v); err != nil {
+			return fmt.Errorf("payload does not fit a %s draft: %w", kind, err)
+		}
+		return nil
+	}
+
+	switch kind {
+	case KindEmployer:
+		var p employerPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	case KindPosition:
+		var p positionPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	case KindContribution:
+		var p contributionPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	case KindSkill:
+		var p skillPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	case KindPreference:
+		var p preferencePayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	default:
+		return fmt.Errorf("no resolver for kind %q", kind)
+	}
+}
+
+// The per-kind rules, in one place each so the edit-time validator and the
+// resolver cannot disagree about what a usable payload is.
+//
+// Each one encodes exactly what its resolver already enforced, and nothing
+// more — a position's title is not checked here because resolvePosition never
+// checked it, and tightening resolution is a separate decision from making
+// editing safe.
+
+func (p employerPayload) validate() error {
+	if strings.TrimSpace(p.Name) == "" {
+		return errors.New("employer name is required")
+	}
+	return nil
+}
+
+func (p positionPayload) validate() error {
+	if _, err := parseDate(p.StartedOn); err != nil {
+		return fmt.Errorf("started_on: %w", err)
+	}
+	if p.EndedOn != nil && *p.EndedOn != "" {
+		if _, err := parseDate(*p.EndedOn); err != nil {
+			return fmt.Errorf("ended_on: %w", err)
+		}
+	}
+	return nil
+}
+
+func (p contributionPayload) validate() error {
+	if strings.TrimSpace(p.Summary) == "" || strings.TrimSpace(p.FullDescription) == "" {
+		return errors.New("summary and full_description are both required")
+	}
+	return nil
+}
+
+func (p skillPayload) validate() error {
+	if strings.TrimSpace(p.Proficiency) == "" {
+		return errors.New("proficiency is required")
+	}
+	return nil
+}
+
+func (p preferencePayload) validate() error {
+	if strings.TrimSpace(p.Label) == "" {
+		return errors.New("label is required")
+	}
+	return nil
 }

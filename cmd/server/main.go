@@ -46,6 +46,7 @@ func main() {
 		GenSvc:         genSvc,
 		Stage0Svc:      stage0Svc,
 		IntakeSvc:      intakeSvc,
+		GenClient:      genClient,
 		FitSvc:         fitSvc,
 		ContribSvc:     contribSvc,
 		ProjectSvc:     projectSvc,
