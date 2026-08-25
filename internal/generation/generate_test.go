@@ -31,6 +31,7 @@ func TestGenerate(t *testing.T) {
 	}
 	defer pool.Close()
 
+	userID := integrationUserID(t, ctx, pool)
 	queries := db.New(pool)
 	client := generation.NewClient(apiKey)
 	svc := generation.NewService(queries, client)
@@ -47,7 +48,7 @@ func TestGenerate(t *testing.T) {
 	}`)
 
 	app, err := queries.CreateApplication(ctx, db.CreateApplicationParams{
-		UserID:      stubUserID,
+		UserID:      userID,
 		CompanyName: "Test Corp",
 		RoleTitle:   "Senior Software Engineer",
 		JdText:      strPtr("Looking for a senior Go engineer with distributed systems experience."),
@@ -63,14 +64,14 @@ func TestGenerate(t *testing.T) {
 
 	_, err = queries.UpdateApplicationSignals(ctx, db.UpdateApplicationSignalsParams{
 		ID:        app.ID,
-		UserID:    stubUserID,
+		UserID:    userID,
 		JdSignals: &signals,
 	})
 	if err != nil {
 		t.Fatalf("set jd_signals: %v", err)
 	}
 
-	rv, err := svc.Generate(ctx, app.ID, stubUserID)
+	rv, err := svc.Generate(ctx, app.ID, userID)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -96,8 +97,24 @@ func TestGenerate(t *testing.T) {
 	if err := json.Unmarshal(*rv.StructuredOutput, &out); err != nil {
 		t.Fatalf("unmarshal structured_output: %v", err)
 	}
-	if len(out.Education) == 0 {
-		t.Error("expected education to be populated (Tulane is seeded)")
+	// "Tulane is seeded" was the old assertion, and Tulane is in the private
+	// dataset only — the same hardcoding as the user id (#90). What the
+	// document must actually do is carry the education this account has, so
+	// the expectation is read from the account rather than named.
+	var educationRows int
+	if err := pool.QueryRow(ctx,
+		`SELECT count(*) FROM education WHERE user_id = $1`, userID,
+	).Scan(&educationRows); err != nil {
+		t.Fatalf("count education: %v", err)
+	}
+	if educationRows > 0 && len(out.Education) == 0 {
+		t.Errorf("this account has %d education rows, none of which reached the document", educationRows)
+	}
+
+	// These three are arrays either way. An empty list and a null are
+	// different things to a renderer, and null is the one that breaks it.
+	if out.Education == nil {
+		t.Error("expected an education array (may be empty, but must not be null)")
 	}
 	if out.Credentials == nil {
 		t.Error("expected credentials array (may be empty, but must not be null)")
