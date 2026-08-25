@@ -8,6 +8,8 @@ import { Signup } from "./routes/Signup";
 import { Applications } from "./routes/Applications";
 import { ApplicationNew } from "./routes/ApplicationNew";
 import { ApplicationDetail } from "./routes/ApplicationDetail";
+import { ImportStart } from "./routes/ImportStart";
+import { ImportReview } from "./routes/ImportReview";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +39,8 @@ function App() {
                   path="/applications/:id"
                   element={<ApplicationDetail />}
                 />
+                <Route path="/import/new" element={<ImportStart />} />
+                <Route path="/import/:batchID" element={<ImportReview />} />
               </Route>
             </Routes>
           </ErrorBoundary>
