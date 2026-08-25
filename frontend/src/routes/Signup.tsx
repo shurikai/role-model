@@ -18,8 +18,13 @@ export function Signup() {
     setSubmitting(true);
     try {
       await signup(email, password);
+      // A brand-new account has nothing in it, and the applications list is
+      // no use without a career to tailor against — so a signup with no
+      // redirect of its own lands on the career import instead of on an
+      // empty list with no path off it. A ?redirect= still wins: someone
+      // sent to sign up from a specific page is going back to that page.
       const redirect = searchParams.get("redirect");
-      navigate(redirect || "/");
+      navigate(redirect || "/import/career/new");
     } catch (err) {
       setError(formatApiError(err));
     } finally {

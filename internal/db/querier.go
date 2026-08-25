@@ -146,6 +146,15 @@ type Querier interface {
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
+	// Rejecting is legal only from pending.
+	//
+	// The guard is in the WHERE clause rather than in a Go check before the call,
+	// because a check-then-write loses to a resolve that lands between the two:
+	// the draft becomes 'approved' with a real row behind it, and the reject
+	// overwrites the status while the row it created stays. What the caller sees
+	// for a non-pending draft is pgx.ErrNoRows, which is the same thing it sees
+	// for a draft belonging to someone else -- so a caller that needs to tell 404
+	// from 409 reads the draft first and uses this as the authority.
 	MarkEntityDraftRejected(ctx context.Context, arg MarkEntityDraftRejectedParams) (EntityDraft, error)
 	MarkEntityDraftResolved(ctx context.Context, arg MarkEntityDraftResolvedParams) (EntityDraft, error)
 	NextResumeVersionNumber(ctx context.Context, arg NextResumeVersionNumberParams) (int32, error)
@@ -161,6 +170,12 @@ type Querier interface {
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) (Credential, error)
 	UpdateEducation(ctx context.Context, arg UpdateEducationParams) (Education, error)
 	UpdateEmployer(ctx context.Context, arg UpdateEmployerParams) (Employer, error)
+	// Full-payload replace, pending only.
+	//
+	// Not a field-level patch: the five kinds have five payload shapes, and the
+	// editor for a kind always submits a complete object for it. The same
+	// pending-only guard as MarkEntityDraftRejected, for the same race.
+	UpdateEntityDraftPayload(ctx context.Context, arg UpdateEntityDraftPayloadParams) (EntityDraft, error)
 	UpdateImportBatchStatus(ctx context.Context, arg UpdateImportBatchStatusParams) (ImportBatch, error)
 	UpdatePosition(ctx context.Context, arg UpdatePositionParams) (Position, error)
 	UpdatePreference(ctx context.Context, arg UpdatePreferenceParams) (Preference, error)

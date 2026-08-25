@@ -26,9 +26,29 @@ WHERE id = $1 AND user_id = $2
 RETURNING *;
 
 -- name: MarkEntityDraftRejected :one
+-- Rejecting is legal only from pending.
+--
+-- The guard is in the WHERE clause rather than in a Go check before the call,
+-- because a check-then-write loses to a resolve that lands between the two:
+-- the draft becomes 'approved' with a real row behind it, and the reject
+-- overwrites the status while the row it created stays. What the caller sees
+-- for a non-pending draft is pgx.ErrNoRows, which is the same thing it sees
+-- for a draft belonging to someone else -- so a caller that needs to tell 404
+-- from 409 reads the draft first and uses this as the authority.
 UPDATE entity_drafts
 SET status = 'rejected', updated_at = now()
-WHERE id = $1 AND user_id = $2
+WHERE id = $1 AND user_id = $2 AND status = 'pending'
+RETURNING *;
+
+-- name: UpdateEntityDraftPayload :one
+-- Full-payload replace, pending only.
+--
+-- Not a field-level patch: the five kinds have five payload shapes, and the
+-- editor for a kind always submits a complete object for it. The same
+-- pending-only guard as MarkEntityDraftRejected, for the same race.
+UPDATE entity_drafts
+SET payload = $3, updated_at = now()
+WHERE id = $1 AND user_id = $2 AND status = 'pending'
 RETURNING *;
 
 -- name: SetEntityDraftFlags :one

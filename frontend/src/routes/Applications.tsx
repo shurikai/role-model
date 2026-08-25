@@ -56,7 +56,7 @@ export function Applications() {
         <h1 className="text-2xl font-semibold text-gray-900">Applications</h1>
         <div className="flex items-center gap-2">
           <Link
-            to="/import/new"
+            to="/import/career/new"
             className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
           >
             Import career history
@@ -74,9 +74,22 @@ export function Applications() {
       {error && <p className="text-sm text-red-600">{formatApiError(error)}</p>}
 
       {applications && applications.length === 0 && (
-        <p className="text-sm text-gray-600">
-          No applications yet. Paste a job description to get started.
-        </p>
+        <div className="text-sm text-gray-600">
+          <p>No applications yet. Paste a job description to get started.</p>
+          {/*
+            An account with no applications is usually an account with no
+            career in it either, and a job description is not much use without
+            one. There is no "does this user have career data" signal to gate
+            on, so this offers the import rather than asserting it is needed.
+          */}
+          <p className="mt-2">
+            If you have not brought your career in yet,{" "}
+            <Link to="/import/career/new" className="underline">
+              start there
+            </Link>
+            .
+          </p>
+        </div>
       )}
 
       {applications && applications.length > 0 && (

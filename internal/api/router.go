@@ -18,11 +18,14 @@ import (
 )
 
 type RouterDeps struct {
-	Pool           *pgxpool.Pool
-	Queries        *db.Queries
-	GenSvc         *generation.Service
-	Stage0Svc      *stage0.Service
-	IntakeSvc      *intake.Service
+	Pool      *pgxpool.Pool
+	Queries   *db.Queries
+	GenSvc    *generation.Service
+	Stage0Svc *stage0.Service
+	IntakeSvc *intake.Service
+	// The raw model client, for the one intake endpoint that calls a model
+	// directly rather than through a service that owns one.
+	GenClient      intake.Extractor
 	FitSvc         *fitgate.Service
 	ContribSvc     *contribution.Service
 	ProjectSvc     *project.Service
@@ -109,9 +112,13 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/import/drafts/{draftID}/approve", importHandler.Approve)
 			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
 
-			intakeHandler := handlers.NewIntakeHandler(deps.Queries, deps.IntakeSvc)
+			intakeHandler := handlers.NewIntakeHandler(deps.Queries, deps.IntakeSvc, deps.GenClient)
+			r.Post("/import/career", intakeHandler.StartCareerImport)
 			r.Get("/import/{batchID}/entities", intakeHandler.ListEntityDrafts)
 			r.Post("/import/{batchID}/resolve", intakeHandler.ResolveBatch)
+			r.Post("/import/entities/{draftID}/approve", intakeHandler.ApproveEntityDraft)
+			r.Post("/import/entities/{draftID}/reject", intakeHandler.RejectEntityDraft)
+			r.Put("/import/entities/{draftID}", intakeHandler.UpdateEntityDraftPayload)
 
 			educationHandler := handlers.NewEducationHandler(deps.Queries)
 			r.Get("/education", educationHandler.List)
