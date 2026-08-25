@@ -918,8 +918,17 @@ func containsPhrase(needle, haystack string) bool {
 	return false
 }
 
-// matchesTerm reports whether any of terms answers the JD term tag, in either
-// direction, on whole-word boundaries.
+// matchesTerm reports whether any of terms answers the JD term tag, on
+// whole-word boundaries. It runs in ONE direction: a term answers tag when the
+// term's tokens sit as a contiguous run inside tag, so the skill "Kafka"
+// answers a requirement of "Apache Kafka" and the skill "GitHub Actions" does
+// not answer a requirement of "GitHub". That asymmetry is deliberate and is
+// what the alias layer is for — 'github' on the GitHub Actions tag is the same
+// move as 'sql' on PostgreSQL, described below.
+//
+// This is not preference matching, which compares in both directions
+// (matchesSignal) because a preference label is broader than the field it is
+// weighed against, not narrower.
 //
 // # There used to be a raw-substring direction, and it is gone
 //
