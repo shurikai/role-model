@@ -848,9 +848,26 @@ func matchesSignal(label string, fields []string) bool {
 // separators, and folds regular plurals. "TypeScript / Node.js" becomes
 // ["typescript", "node", "js"]; "patient assessments" becomes ["patient",
 // "assessment"].
+//
+// "+" and "#" are kept when they sit against an alphanumeric, because on a
+// handful of language names they are the only thing distinguishing two terms.
+// Stripping every non-alphanumeric rune folded both "C++" and "C#" to the bare
+// token ["c"], which made them the same term to every layer of the matcher —
+// and since the dealbreaker branch splits alternatives, a posting requiring
+// "Java | Ruby | Go | C++" handed "C++" to matchesSignal, which found ["c"] as
+// a whole-word run inside the label "C# / .NET" and reported a conflict on a
+// posting that named neither (#103). No word-boundary rule can recover a
+// distinction the tokenizer already erased.
+//
+// The other separators still split, so this changes nothing else in the
+// corpus: ".NET" is ["net"], "CI/CD" is ["ci", "cd"], "Node.js" is ["node",
+// "js"] and "Objective-C" is ["objective", "c"], exactly as before. Only "+"
+// and "#" are spared, and only these two — widening the set further would
+// start attaching trailing commas and periods to ordinary prose tokens, since
+// tokenize runs over JD sentences as well as technology names.
 func tokenize(s string) []string {
 	raw := strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '+' && r != '#'
 	})
 	out := make([]string, 0, len(raw))
 	for _, t := range raw {
