@@ -751,6 +751,89 @@ func TestPluralFoldDoesNotCollapseUnrelatedTerms(t *testing.T) {
 	}
 }
 
+// Punctuation that is part of a name survives tokenization. Stripping every
+// non-alphanumeric rune made "C++" and "C#" the same token, which is not a
+// weak match or an over-reach — it is two different languages arriving at the
+// matcher as one term, with no boundary left for containsPhrase to enforce
+// (#103).
+func TestTokenizeKeepsNameBearingPunctuation(t *testing.T) {
+	for _, tt := range []struct {
+		in   string
+		want []string
+	}{
+		{"C++", []string{"c++"}},
+		{"C#", []string{"c#"}},
+		{"F#", []string{"f#"}},
+
+		// The other separators still split, so nothing else in the corpus
+		// moves. These are the punctuation-carrying names CLAUDE.md calls out.
+		{".NET", []string{"net"}},
+		{"CI/CD", []string{"ci", "cd"}},
+		{"Node.js", []string{"node", "js"}},
+		{"Objective-C", []string{"objective", "c"}},
+		{"C# / .NET", []string{"c#", "net"}},
+	} {
+		if got := tokenize(tt.in); !slices.Equal(got, tt.want) {
+			t.Errorf("tokenize(%q) = %v, want %v", tt.in, got, tt.want)
+		}
+	}
+
+	// The pair that collided, stated as the matching property rather than as
+	// token equality — this is the direction that actually fired.
+	for _, tt := range []struct{ needle, haystack string }{
+		{"C++", "C# / .NET"},
+		{"C#", "C++"},
+		{"C", "C++"},
+	} {
+		if containsPhrase(tt.needle, tt.haystack) {
+			t.Errorf("containsPhrase(%q, %q) matched; punctuation was erased before matching",
+				tt.needle, tt.haystack)
+		}
+	}
+}
+
+// The AirBnB Staff Payments Compliance JD, which is what surfaced the
+// collision. It names neither C# nor .NET, and its back-end requirement offers
+// C++ as one of four alternatives; the dealbreaker branch splits those, so
+// "C++" reached matchesSignal on its own and matched the label. The row landed
+// in conflicts and the narrative asserted the posting "does actively involve
+// C# and .NET".
+func TestPreferenceDealbreakerDoesNotFireOnCPlusPlus(t *testing.T) {
+	dotnet := db.Preference{
+		ID:             uuid.New(),
+		Label:          "C# / .NET",
+		PreferenceType: "dealbreaker",
+		Sentiment:      "negative",
+		Weight:         4,
+		Aliases:        []string{"dotnet", "ASP.NET", "Blazor", "Entity Framework"},
+	}
+	signals := JDSignals{
+		RequiredSkills: []string{"Java | Ruby | Go | C++", "HTML", "CSS", "React"},
+		ScreeningSummary: generation.ScreeningSummary{
+			Industry:        "global payments platform for hospitality marketplace",
+			WorkArrangement: "fully remote with occasional office work or offsites",
+		},
+	}
+
+	_, _, conflicts, hits := ScorePreferenceFit([]db.Preference{dotnet}, signals)
+	if slices.Contains(labelsOf(conflicts), dotnet.Label) {
+		t.Errorf("conflicts = %v: the JD names neither C# nor .NET", labelsOf(conflicts))
+	}
+	if len(hits) != 0 {
+		t.Errorf("gateHits = %v, want none", labelsOf(hits))
+	}
+
+	// And it must still fire when the JD genuinely asks for the thing —
+	// the fix must not buy silence by making the row unmatchable.
+	for _, req := range []string{"C#", ".NET", "ASP.NET"} {
+		fired := JDSignals{RequiredSkills: []string{req}}
+		_, _, conflicts, _ := ScorePreferenceFit([]db.Preference{dotnet}, fired)
+		if !slices.Contains(labelsOf(conflicts), dotnet.Label) {
+			t.Errorf("a JD requiring %q did not trip the C# / .NET dealbreaker", req)
+		}
+	}
+}
+
 // The Citi Principal Java Engineer JD, which is what surfaced the
 // double-counting. Two of its requirements each offer four interchangeable
 // technologies; holding one of each satisfies both.
