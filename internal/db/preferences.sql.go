@@ -12,8 +12,8 @@ import (
 )
 
 const createPreference = `-- name: CreatePreference :one
-INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes, aliases)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases
 `
 
@@ -27,6 +27,7 @@ type CreatePreferenceParams struct {
 	IsHardGate     bool      `json:"is_hard_gate"`
 	ContextType    *string   `json:"context_type"`
 	Notes          *string   `json:"notes"`
+	Aliases        []string  `json:"aliases"`
 }
 
 func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferenceParams) (Preference, error) {
@@ -40,6 +41,7 @@ func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferencePara
 		arg.IsHardGate,
 		arg.ContextType,
 		arg.Notes,
+		arg.Aliases,
 	)
 	var i Preference
 	err := row.Scan(

@@ -273,3 +273,111 @@ func TestPlanStageResolveRoundTrip(t *testing.T) {
 		t.Errorf("skills = %d, want 2", len(skills))
 	}
 }
+
+// #89 end to end, and the aliases defect it depended on.
+//
+// preferencePayload has declared an Aliases field since the intake substrate
+// landed, but CreatePreference never inserted the column, so every preference
+// the import created carried NULL aliases. Nothing failed — the row was
+// written, the review queue showed the aliases the reviewer had approved, and
+// the fit gate then matched on the label alone. Only a resolved row read back
+// out of the database can see it, which is why this is here and not in
+// extract_test.go.
+func TestResolveBatchCarriesPreferencesEducationAndCredentials(t *testing.T) {
+	ctx := context.Background()
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		t.Skip("DATABASE_URL required for intake integration tests")
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	defer pool.Close()
+
+	q := db.New(pool)
+	svc := NewService(pool, q)
+
+	userID := uuid.New()
+	if _, err := q.CreateUser(ctx, db.CreateUserParams{
+		ID: userID, Email: "wants-" + userID.String() + "@test.local",
+	}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	batch, err := q.CreateImportBatch(ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: userID, RawText: "pasted career text", Status: "review",
+	})
+	if err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+
+	var x CareerExtraction
+	if err := json.Unmarshal([]byte(clinicalExtractionWithWants), &x); err != nil {
+		t.Fatalf("parse canned extraction: %v", err)
+	}
+	planned, err := PlanDrafts(x)
+	if err != nil {
+		t.Fatalf("PlanDrafts: %v", err)
+	}
+	if _, err := svc.StageDrafts(ctx, userID, batch.ID, planned); err != nil {
+		t.Fatalf("StageDrafts: %v", err)
+	}
+	result, err := svc.ResolveBatch(ctx, userID, batch.ID)
+	if err != nil {
+		t.Fatalf("ResolveBatch: %v (unresolved: %v)", err, result.Unresolved)
+	}
+
+	prefs, err := q.ListPreferencesByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("list preferences: %v", err)
+	}
+	if len(prefs) != 3 {
+		t.Fatalf("preferences = %d, want 3", len(prefs))
+	}
+
+	var gate db.Preference
+	for _, p := range prefs {
+		if p.Label == "inpatient nights" {
+			gate = p
+		}
+	}
+	if gate.Label == "" {
+		t.Fatal("the hard-gate preference was not written")
+	}
+	if !gate.IsHardGate {
+		t.Error("the gate lost is_hard_gate on the way to the row")
+	}
+	// The assertion this test exists for.
+	if len(gate.Aliases) != 3 {
+		t.Errorf("aliases = %v, want the three postings' wordings; "+
+			"a NULL here means CreatePreference dropped the column again", gate.Aliases)
+	}
+
+	education, err := q.GetEducation(ctx, userID)
+	if err != nil {
+		t.Fatalf("get education: %v", err)
+	}
+	if len(education) != 1 {
+		t.Errorf("education = %d, want 1", len(education))
+	}
+
+	// A licensed professional's certifications belong here and not in skills:
+	// filing them as skills is what printed an empty CREDENTIALS section over
+	// a nurse who holds three of them.
+	creds, err := q.GetCredentials(ctx, userID)
+	if err != nil {
+		t.Fatalf("get credentials: %v", err)
+	}
+	if len(creds) != 2 {
+		t.Fatalf("credentials = %d, want 2", len(creds))
+	}
+	var undated bool
+	for _, c := range creds {
+		if c.Name == "RN Licence" && !c.IssuedOn.Valid {
+			undated = true
+		}
+	}
+	if !undated {
+		t.Error("a credential with no issue date should store a NULL, not fail")
+	}
+}
