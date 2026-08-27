@@ -1,6 +1,6 @@
 -- name: CreatePreference :one
-INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO preferences (id, user_id, preference_type, label, sentiment, weight, is_hard_gate, context_type, notes, aliases)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetPreference :one

@@ -237,3 +237,104 @@ func TestExtractCareerRefusesEmptyText(t *testing.T) {
 		}
 	}
 }
+
+// The #89 extraction, with the three arrays the extractor used to discard. The
+// preference paragraph is the shape a person actually writes: what they want,
+// what they will not go back to, and what they have had enough of.
+const clinicalExtractionWithWants = `{
+  "employers": [{"ref": "e1", "name": "County Health Network", "industry": "public health"}],
+  "positions": [{"ref": "p1", "employer_ref": "e1", "title": "Charge Nurse", "started_on": "2019-03"}],
+  "contributions": [],
+  "skills": [],
+  "preferences": [
+    {"preference_type": "domain", "label": "ambulatory quality improvement",
+     "aliases": ["outpatient quality", "clinic quality improvement"],
+     "sentiment": "positive", "weight": 9, "is_hard_gate": false, "notes": null},
+    {"preference_type": "dealbreaker", "label": "inpatient nights",
+     "aliases": ["night shift", "overnight rotation", "night float"],
+     "sentiment": "negative", "weight": 10, "is_hard_gate": true, "notes": "said she will not go back"},
+    {"preference_type": "core_practice", "label": "data analysis as the main duty",
+     "aliases": ["data analyst"],
+     "sentiment": "negative", "weight": 7, "is_hard_gate": false, "notes": null}
+  ],
+  "education": [
+    {"institution": "Rush University", "degree": "BSN", "field_of_study": "Nursing",
+     "started_on": "2010-09", "ended_on": "2014-05", "notes": null}
+  ],
+  "credentials": [
+    {"name": "ACLS", "issuer": "American Heart Association",
+     "issued_on": "2023-04", "expires_on": "2025-04", "credential_url": null},
+    {"name": "RN Licence", "issuer": null, "issued_on": null, "expires_on": null, "credential_url": null}
+  ]
+}`
+
+// #89: the extractor asked for four arrays and discarded everything else, so
+// the preference axis of the fit gate scored against zero rows for every
+// account that had not been seeded by hand. These three kinds depend on
+// nothing — a preference is a claim about the person, not about a job.
+func TestPlanDraftsStagesPreferencesEducationAndCredentials(t *testing.T) {
+	drafts, err := PlanDrafts(parse(t, clinicalExtractionWithWants))
+	if err != nil {
+		t.Fatalf("PlanDrafts: %v", err)
+	}
+
+	byKind := map[string][]PlannedDraft{}
+	for _, d := range drafts {
+		byKind[d.Kind] = append(byKind[d.Kind], d)
+	}
+	for kind, want := range map[string]int{
+		KindPreference: 3, KindEducation: 1, KindCredential: 2,
+	} {
+		if got := len(byKind[kind]); got != want {
+			t.Errorf("%s drafts: got %d, want %d", kind, got, want)
+		}
+	}
+
+	for _, kind := range []string{KindPreference, KindEducation, KindCredential} {
+		for _, d := range byKind[kind] {
+			if len(d.DependsOn) != 0 {
+				t.Errorf("%s draft should depend on nothing, got %v", kind, d.DependsOn)
+			}
+		}
+	}
+
+	// Aliases are the field that decides whether a preference ever matches a
+	// posting: "inpatient nights" reaches "three twelve-hour night shifts"
+	// only through them. They were declared on the payload and dropped on the
+	// floor by CreatePreference until this change.
+	var gate preferencePayload
+	for _, d := range byKind[KindPreference] {
+		var p preferencePayload
+		if err := json.Unmarshal(d.Payload, &p); err != nil {
+			t.Fatalf("unmarshal preference payload: %v", err)
+		}
+		if p.Label == "inpatient nights" {
+			gate = p
+		}
+	}
+	if gate.Label == "" {
+		t.Fatal("the hard-gate preference was not planned")
+	}
+	if !gate.IsHardGate || gate.Sentiment != "negative" {
+		t.Errorf("gate lost its severity: is_hard_gate=%v sentiment=%q", gate.IsHardGate, gate.Sentiment)
+	}
+	if len(gate.Aliases) != 3 {
+		t.Errorf("gate aliases: got %v, want three postings' wordings", gate.Aliases)
+	}
+
+	// A credential with no dates is ordinary; refusing it would push the
+	// reviewer into inventing one.
+	var undated bool
+	for _, d := range byKind[KindCredential] {
+		var c credentialPayload
+		if err := json.Unmarshal(d.Payload, &c); err != nil {
+			t.Fatalf("unmarshal credential payload: %v", err)
+		}
+		if c.Name == "RN Licence" && c.IssuedOn == nil {
+			undated = true
+		}
+	}
+	if !undated {
+		t.Error("a credential with no issue date should plan cleanly")
+	}
+}
