@@ -1,5 +1,85 @@
+# Captured BEFORE .env is read, and this ordering is the whole point.
+#
+# `-include .env` gives the FILE's value precedence over the environment for
+# the rest of this Makefile, and `export` then pushes that value back out over
+# the caller's -- so by the time a recipe runs, the original is gone. These two
+# variables are the only surviving record of what the caller actually asked
+# for, and guard_env_override below is what makes the disagreement visible.
+#
+# The failure this exists for: `SEED_DIR=/tmp/empty make seed` reads as "seed
+# from an empty directory, so do nothing", and silently seeds a real career
+# into whatever .env points at instead. Only a command-line override
+# (`make seed SEED_DIR=...`) beats a file assignment.
+CALLER_DATABASE_URL := $(DATABASE_URL)
+CALLER_SEED_DIR := $(SEED_DIR)
+
+# .env values in this project are commonly quoted (SEED_DIR="./database/seed"),
+# and make keeps the quotes as part of the value -- the shell strips them later,
+# which is why the seed glob has always worked. Comparing raw would therefore
+# refuse a caller who exported the SAME path without quotes, and a guard that
+# fires on agreement is one people learn to route around.
+unquote = $(patsubst "%",%,$(patsubst '%',%,$(1)))
+
 -include .env
 export
+
+# Refuses when the caller's environment disagrees with the value actually in
+# effect, rather than proceeding with the one they did not choose.
+#
+# Only fires when the caller set something AND it lost, so the ordinary case --
+# no environment variable at all, .env supplies everything -- is untouched. A
+# command-line override wins outright and never reaches here, because Make
+# resolves it above the file assignment and the two values agree.
+define guard_env_override
+	@if [ -n "$(CALLER_DATABASE_URL)" ] && [ "$(call unquote,$(CALLER_DATABASE_URL))" != "$(call unquote,$(DATABASE_URL))" ]; then \
+		echo ""; \
+		echo "  REFUSING: your environment and .env disagree about DATABASE_URL."; \
+		echo ""; \
+		echo "    you set:   $(CALLER_DATABASE_URL)"; \
+		echo "    .env wins: $(DATABASE_URL)"; \
+		echo ""; \
+		echo "  A file assignment beats the environment in make, so this would"; \
+		echo "  have written to the second one. Use a command-line override:"; \
+		echo "    make $(MAKECMDGOALS) DATABASE_URL='$(CALLER_DATABASE_URL)'"; \
+		echo ""; \
+		exit 1; \
+	fi
+	@if [ -n "$(CALLER_SEED_DIR)" ] && [ "$(call unquote,$(CALLER_SEED_DIR))" != "$(call unquote,$(SEED_DIR))" ]; then \
+		echo ""; \
+		echo "  REFUSING: your environment and .env disagree about SEED_DIR."; \
+		echo ""; \
+		echo "    you set:   $(CALLER_SEED_DIR)"; \
+		echo "    .env wins: $(SEED_DIR)"; \
+		echo ""; \
+		echo "  A file assignment beats the environment in make, so this would"; \
+		echo "  have seeded from the second one. Use a command-line override:"; \
+		echo "    make $(MAKECMDGOALS) SEED_DIR='$(CALLER_SEED_DIR)'"; \
+		echo ""; \
+		exit 1; \
+	fi
+endef
+
+# The mirror of guard_sample_target: that one keeps invented careers out of a
+# database holding a real one, this keeps a real career out of a database
+# holding an invented one. Both directions produce the same mess -- two
+# careers upserted into one account space, with nothing failing.
+define guard_real_seed_target
+	@for id in 5a000000-0000-0000-0000-000000000001 5b000000-0000-0000-0000-000000000001; do \
+		n=$$(psql "$(DATABASE_URL)" -tAc "select count(*) from users where id = '$$id'" 2>/dev/null || echo 0); \
+		if [ "$$n" != "0" ]; then \
+			echo ""; \
+			echo "  REFUSING: $(DATABASE_URL)"; \
+			echo "  holds a bundled sample dataset (user $$id)."; \
+			echo ""; \
+			echo "  make seed loads a REAL career and upserts, so it would add one"; \
+			echo "  beside the invented one rather than failing. Point DATABASE_URL"; \
+			echo "  at your own database:"; \
+			echo "    make seed DATABASE_URL=postgres://..."; \
+			echo ""; \
+			exit 1; \
+		fi; \
+	done
+endef
 
 # SEED_DIR ?= ../role-model-data/seed
 # DATABASE_URL ?= postgres://rolemodel:rolemodel@localhost:5433/role_model?sslmode=disable
@@ -68,6 +148,7 @@ db-down:
 # application, jd_signals blob, resume version, and fit report — exists only
 # there, so this is not recoverable from the seed repo.
 db-reset: db-dump
+	$(call guard_env_override)
 	@echo "This DESTROYS the database volume behind $(DATABASE_URL)."
 	@read -p "Type 'destroy' to continue: " confirm; \
 	 [ "$$confirm" = "destroy" ] || { echo "Aborted."; exit 1; }
@@ -106,6 +187,7 @@ migrate-down:
 # The full teardown, behind its own name and its own confirmation. Takes a
 # dump first: the recovery path should not depend on remembering to.
 migrate-down-all: db-dump
+	$(call guard_env_override)
 	@echo "This rolls back ALL migrations and empties $(DATABASE_URL)."
 	@read -p "Type 'destroy' to continue: " confirm; \
 	 [ "$$confirm" = "destroy" ] || { echo "Aborted."; exit 1; }
@@ -122,6 +204,8 @@ migrate-create:
 # directory". That reads as a broken repository rather than as "this target is
 # not for you", which is the first thing a stranger following the README hit.
 seed:
+	$(call guard_env_override)
+	$(call guard_real_seed_target)
 	@if [ -z "$(SEED_DIR)" ]; then \
 		echo "SEED_DIR is not set. It points at your own career seed files."; \
 		echo "To load a bundled fictional dataset instead, run:"; \
@@ -152,6 +236,7 @@ seed:
 CLINICAL_DIR ?= database/sample-clinical
 
 seed-clinical:
+	$(call guard_env_override)
 	$(call guard_sample_target,5b000000-0000-0000-0000-000000000001)
 	@echo "Seeding FICTIONAL clinical sample data from $(CLINICAL_DIR) into $(DATABASE_URL)..."
 	@for f in $(CLINICAL_DIR)/0*.sql; do \
@@ -184,7 +269,7 @@ define guard_sample_target
 		echo "  one rather than failing. Point DATABASE_URL at a scratch database."; \
 		echo ""; \
 		echo "  Note: an environment DATABASE_URL does NOT override the one in .env."; \
-		echo "  Use:  make $$MAKECMDGOALS DATABASE_URL=postgres://..."; \
+		echo "  Use:  make $(MAKECMDGOALS) DATABASE_URL=postgres://..."; \
 		echo ""; \
 		exit 1; \
 	fi
@@ -194,6 +279,7 @@ endef
 # rather than a default for SEED_DIR: an absent-minded `make seed` must never
 # inject invented employers into a database holding real career history.
 seed-sample:
+	$(call guard_env_override)
 	$(call guard_sample_target,5a000000-0000-0000-0000-000000000001)
 	@echo "Seeding FICTIONAL sample data from $(SAMPLE_DIR) into $(DATABASE_URL)..."
 	@for f in $(SAMPLE_DIR)/0*.sql; do \
