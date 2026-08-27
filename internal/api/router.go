@@ -132,6 +132,22 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Patch("/credentials/{id}", credentialHandler.Update)
 			r.Delete("/credentials/{id}", credentialHandler.Delete)
 
+			// Preferences and skills drive the fit gate, and until now the
+			// intake resolver was the only writer of either — so a new
+			// account could never state a preference at all, and the
+			// preference axis scored against zero rows forever.
+			preferenceHandler := handlers.NewPreferenceHandler(deps.Queries)
+			r.Get("/preferences", preferenceHandler.List)
+			r.Post("/preferences", preferenceHandler.Create)
+			r.Patch("/preferences/{id}", preferenceHandler.Update)
+			r.Delete("/preferences/{id}", preferenceHandler.Delete)
+
+			skillHandler := handlers.NewSkillHandler(deps.Queries)
+			r.Get("/skills", skillHandler.List)
+			r.Post("/skills", skillHandler.Create)
+			r.Patch("/skills/{id}", skillHandler.Update)
+			r.Delete("/skills/{id}", skillHandler.Delete)
+
 			tagHandler := handlers.NewTagHandler(deps.Queries)
 			r.Post("/tags", tagHandler.Create)
 			r.Get("/tags", tagHandler.List)

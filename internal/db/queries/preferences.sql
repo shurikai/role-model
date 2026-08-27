@@ -31,10 +31,11 @@ SET preference_type = $3,
     is_hard_gate    = $7,
     context_type    = $8,
     notes           = $9,
+    aliases         = $10,
     updated_at      = now()
 WHERE id = $1 AND user_id = $2
 RETURNING *;
 
--- name: DeletePreference :exec
+-- name: DeletePreference :execrows
 DELETE FROM preferences
 WHERE id = $1 AND user_id = $2;

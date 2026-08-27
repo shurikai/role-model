@@ -26,9 +26,24 @@ SET proficiency      = $3,
 WHERE id = $1 AND user_id = $2
 RETURNING *;
 
--- name: DeleteSkill :exec
+-- name: DeleteSkill :execrows
 DELETE FROM skills
 WHERE id = $1 AND user_id = $2;
+
+-- name: ListSkillsWithTagsByUser :many
+-- Every claimed skill with the tag behind it, for the management API.
+--
+-- Distinct from ListActiveSkillProfileByUser, which is the generation prompt's
+-- view: this one carries the id (nothing can be edited without it) and does
+-- NOT filter on is_active, because deactivating a skill is the main thing the
+-- screen is for and a list that hides what you just deactivated cannot show
+-- you how to put it back.
+SELECT s.id, s.tag_id, t.name, t.category, s.proficiency, s.years_experience,
+       s.is_active, s.created_at, s.updated_at
+FROM skills s
+JOIN tags t ON t.id = s.tag_id AND t.user_id = s.user_id
+WHERE s.user_id = $1
+ORDER BY t.category, t.name;
 
 -- name: ListContributionsBySkill :many
 SELECT contribution_id FROM v_skill_provenance

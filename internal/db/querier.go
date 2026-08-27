@@ -47,11 +47,11 @@ type Querier interface {
 	DeleteEducation(ctx context.Context, arg DeleteEducationParams) (int64, error)
 	DeleteEmployer(ctx context.Context, arg DeleteEmployerParams) error
 	DeletePosition(ctx context.Context, arg DeletePositionParams) error
-	DeletePreference(ctx context.Context, arg DeletePreferenceParams) error
+	DeletePreference(ctx context.Context, arg DeletePreferenceParams) (int64, error)
 	DeleteProject(ctx context.Context, arg DeleteProjectParams) (int64, error)
 	DeleteProjectContributions(ctx context.Context, projectID uuid.UUID) error
 	DeleteProjectTags(ctx context.Context, projectID uuid.UUID) error
-	DeleteSkill(ctx context.Context, arg DeleteSkillParams) error
+	DeleteSkill(ctx context.Context, arg DeleteSkillParams) (int64, error)
 	DeleteTag(ctx context.Context, arg DeleteTagParams) (int64, error)
 	DeleteTagCategory(ctx context.Context, arg DeleteTagCategoryParams) (int64, error)
 	GetApplication(ctx context.Context, arg GetApplicationParams) (Application, error)
@@ -144,6 +144,14 @@ type Querier interface {
 	ListResumeSectionsByUser(ctx context.Context, userID uuid.UUID) ([]ResumeSection, error)
 	ListResumeVersions(ctx context.Context, arg ListResumeVersionsParams) ([]ResumeVersion, error)
 	ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
+	// Every claimed skill with the tag behind it, for the management API.
+	//
+	// Distinct from ListActiveSkillProfileByUser, which is the generation prompt's
+	// view: this one carries the id (nothing can be edited without it) and does
+	// NOT filter on is_active, because deactivating a skill is the main thing the
+	// screen is for and a list that hides what you just deactivated cannot show
+	// you how to put it back.
+	ListSkillsWithTagsByUser(ctx context.Context, userID uuid.UUID) ([]ListSkillsWithTagsByUserRow, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
 	// Rejecting is legal only from pending.

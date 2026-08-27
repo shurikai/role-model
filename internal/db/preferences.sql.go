@@ -61,7 +61,7 @@ func (q *Queries) CreatePreference(ctx context.Context, arg CreatePreferencePara
 	return i, err
 }
 
-const deletePreference = `-- name: DeletePreference :exec
+const deletePreference = `-- name: DeletePreference :execrows
 DELETE FROM preferences
 WHERE id = $1 AND user_id = $2
 `
@@ -71,9 +71,12 @@ type DeletePreferenceParams struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) DeletePreference(ctx context.Context, arg DeletePreferenceParams) error {
-	_, err := q.db.Exec(ctx, deletePreference, arg.ID, arg.UserID)
-	return err
+func (q *Queries) DeletePreference(ctx context.Context, arg DeletePreferenceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePreference, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getPreference = `-- name: GetPreference :one
@@ -237,6 +240,7 @@ SET preference_type = $3,
     is_hard_gate    = $7,
     context_type    = $8,
     notes           = $9,
+    aliases         = $10,
     updated_at      = now()
 WHERE id = $1 AND user_id = $2
 RETURNING id, user_id, preference_type, label, sentiment, weight, context_type, notes, created_at, updated_at, is_hard_gate, aliases
@@ -252,6 +256,7 @@ type UpdatePreferenceParams struct {
 	IsHardGate     bool      `json:"is_hard_gate"`
 	ContextType    *string   `json:"context_type"`
 	Notes          *string   `json:"notes"`
+	Aliases        []string  `json:"aliases"`
 }
 
 func (q *Queries) UpdatePreference(ctx context.Context, arg UpdatePreferenceParams) (Preference, error) {
@@ -265,6 +270,7 @@ func (q *Queries) UpdatePreference(ctx context.Context, arg UpdatePreferencePara
 		arg.IsHardGate,
 		arg.ContextType,
 		arg.Notes,
+		arg.Aliases,
 	)
 	var i Preference
 	err := row.Scan(
