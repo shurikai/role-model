@@ -903,7 +903,6 @@ last two are workflow rules and apply to the whole repository.
 - Store rendered document files in the database (blob storage interface goes here)
 - Put business logic in HTTP handlers
 - Invent prompt improvements — prompts live in /internal/generation/prompts
-  (/prompts holds per-session task specs, not prompts)
 - Add a version number to a prompt filename or a prompt version constant — see
   Prompt management above; content hashing replaced both
 - Open new issues unprompted during a session focused on something else. If you
