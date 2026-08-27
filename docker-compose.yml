@@ -1,3 +1,13 @@
+# The whole stack: database, migrations, API, renderer, and the web front end.
+#
+#   cp .env.example .env      # then set ANTHROPIC_API_KEY and JWT_SECRET
+#   docker compose up --build
+#
+# Then browse to http://localhost:8080. That is the only published
+# application port: the web container serves the bundle and proxies /api/v1
+# to the API from the same origin, so one URL is the whole instance and the
+# bundled deployment needs no CORS configuration at all.
+
 services:
   db:
     image: postgres:16
@@ -7,9 +17,96 @@ services:
       POSTGRES_PASSWORD: rolemodel
       POSTGRES_DB: role_model
     ports:
+      # Published so psql, `make migrate-up` and the integration tests can
+      # reach it from the host. This is a development convenience; an
+      # instance exposed to a network should drop this line.
       - "5433:5432"
     volumes:
       - role_model_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Everything downstream waits on this. Without it the migrate service
+      # races Postgres' startup and fails on a connection refused, which
+      # reads as a broken migration rather than a slow database.
+      test: ["CMD-SHELL", "pg_isready -U rolemodel -d role_model"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    image: migrate/migrate:v4.18.1
+    volumes:
+      - ./migrations:/migrations:ro
+    command:
+      - -path=/migrations
+      - -database=postgres://rolemodel:rolemodel@db:5432/role_model?sslmode=disable
+      - up
+    depends_on:
+      db:
+        condition: service_healthy
+    # Runs once and exits. The API waits for it to exit SUCCESSFULLY, so a
+    # deploy cannot start a server against a stale schema — which is what
+    # happens today, where migrations are a Makefile target someone has to
+    # remember. golang-migrate is idempotent, so a rerun is a no-op.
+    restart: "no"
+
+  server:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgres://rolemodel:rolemodel@db:5432/role_model?sslmode=disable
+      RENDERER_URL: http://renderer:8000
+      PORT: "8080"
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # Required. The server refuses to start without either of these — an
+      # empty JWT_SECRET would sign every token with a zero-length key.
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env — `openssl rand -base64 32`}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env — you supply your own key}
+      # Same origin through the web proxy, so there is no cross-origin
+      # request to allow. Set this only if you point a bundle built elsewhere
+      # at this API.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      # Closed by default outside development: an open signup on a reachable
+      # instance lets anyone create an account and spend the key above. Open
+      # it to create your first account, then close it again.
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Deliberately NOT published. The web container reaches it as
+    # http://server:8080 on the compose network, and publishing it as well
+    # would put a second, unproxied entrance beside the one that is
+    # configured. Add a ports: mapping if you want to curl the API directly.
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  renderer:
+    build:
+      context: ./docx-renderer
+    # NOT published, and this one is a security property rather than tidiness.
+    # The renderer has no authentication, no request size limit and no CORS
+    # configuration, because it was built to sit behind the API on a private
+    # network. Publishing it hands anyone who can reach the host an
+    # unauthenticated document generator.
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Relative on purpose — see frontend/Dockerfile. Vite inlines this at
+        # build time, so an absolute URL would bake in one hostname and break
+        # for every other way of reaching the instance.
+        VITE_API_BASE_URL: /api/v1
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - server
+    restart: unless-stopped
 
 volumes:
   role_model_pgdata:

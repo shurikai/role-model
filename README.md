@@ -33,9 +33,29 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 
 **Every generated bullet carries provenance.** A `contribution_ids` field on each bullet ties it back to the source data. If a bullet looks off, the question "where did that come from" has an actual answer.
 
-**Career data is seeded, not written through the API.** Write endpoints for career history were considered and deliberately skipped in favor of versioned, idempotent seed files. This isn't a CRUD app for editing a career — the career data changes slowly and deliberately, and seed files with upsert semantics are a better fit than a UI for that cadence.
+**Career data enters through review, not through a form.** The main path in is
+the career import: paste a résumé, a CV, or free-form notes about what you did,
+and an LLM pass turns it into staged *drafts* — employers, positions,
+contributions, skills, preferences, education, credentials — which you approve
+or reject one at a time. Nothing reaches your record unreviewed, and a draft
+whose parent is still pending is refused by name rather than cascaded, because
+resolving on the reviewer's behalf is the one thing a review queue exists to
+prevent.
 
-**This is closed and single-user on purpose.** The schema carries a `user_id` on tenant-scoped tables, which would make a multi-tenant path possible without a redesign — but there's no near-term intention to license this to other users or build it as a product. It's a job-search tool first and a portfolio piece second. Both of those goals are served by depth and correctness, not by adding auth, billing, and multi-tenant guarantees nobody asked for.
+Versioned seed SQL is still a supported way in, and it is how the author's own
+history is kept: idempotent files, corrections as new numbered files rather
+than edits to old ones, so the record of what changed survives beside the data.
+Both paths write the same tables.
+
+**Single-user by default, self-hostable by design.** One person, one instance,
+their own database and their own API key — signup is closed unless you open it,
+and there is no billing, no tenant isolation to trust, and nothing shared with
+anyone. Every tenant-scoped table already carries a `user_id`, so a multi-tenant
+path stays open without a redesign, but that is a deployment decision rather
+than a schema one and it has not been made.
+
+What follows from that: your career history and your Anthropic key never leave
+your machine, and the cost of running this is whatever your own key costs.
 
 ## Stack
 
@@ -48,28 +68,83 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 
 ## Getting started
 
-Requires Go, Node, Docker, `uv`, and `migrate`, `sqlc`, and `psql` on your `PATH`.
+### With Docker (recommended)
+
+Requires Docker and an Anthropic API key. Nothing else — no Go, Node, `uv`,
+`migrate` or `psql` on your PATH.
 
 ```bash
-cp .env.example .env   # then fill in ANTHROPIC_API_KEY and adjust DATABASE_URL/SEED_DIR as needed
-
-make db-up              # start Postgres in Docker
-make migrate-up         # apply schema migrations
-make sqlc               # generate query code from SQL
-make seed               # load career history from $SEED_DIR (see note below)
-                        # -- or `make seed-sample` for the bundled fictional dataset
-make dev                # start the API, the frontend, and the renderer together
+cp .env.example .env    # then set ANTHROPIC_API_KEY and JWT_SECRET
+docker compose up --build
 ```
 
-A full stack is three processes. `make dev` runs all of them and stops the whole set on Ctrl-C; `make run`, `make run-frontend`, and `make run-renderer` start them individually if you'd rather have separate terminals.
+Then open <http://localhost:8080>.
 
-Other useful targets: `make test` (Go unit tests), `make test-renderer` (the Python renderer's pytest suite), `make test-integration` (requires a running database), `make fmt` and `make fmt-check` (format or verify Go, TypeScript, and Python together), `make migrate-create` (scaffold a new migration), `make db-reset` (drop and recreate the database volume), `make db-down` (stop the database).
+That is the whole instance behind one URL: the web container serves the app
+and proxies `/api/v1` to the API from the same origin, so there is no CORS to
+configure and the address works whether you reach it as `localhost`, a LAN
+address, or a hostname. Migrations run automatically before the API starts.
 
-There is no password reset flow in the UI yet. Until there is, `make reset-password EMAIL=you@example.com` prompts for a new password and writes the hash directly. It reads the password from stdin rather than an argument, so it needs a real terminal; set `NEWPASS` in the environment to run it non-interactively.
+Two things the compose file will not let you skip. `JWT_SECRET` must be set —
+an empty one signs every token with a zero-length key, so the server refuses
+to start — and `ANTHROPIC_API_KEY` must be yours. **You supply your own key
+and pay for your own tokens; this project never ships one.**
 
-Career history itself — employers, positions, contributions — lives in a separate private repo as a set of versioned, idempotent SQL seed files, pointed to by `SEED_DIR`. Check it out in place at `database/seed` (gitignored here, so it is never tracked by this repo) and leave `SEED_DIR="./database/seed"`; any other path works equally well. This is intentional (see "Career data is seeded, not written through the API" above): the whole point is that this seeds *your* career, not a demo one.
+Signup is closed by default outside development, because an open signup on a
+reachable instance lets anyone create an account and spend that key. To create
+your first account, start with `SIGNUP_ENABLED=true` in `.env`, sign up, then
+set it back to `false` and `docker compose up -d` again.
 
-To try the pipeline without a career-history seed set of your own, `make seed-sample` loads a bundled fictional dataset from `database/sample/` — a backend/platform engineer in freight logistics, with three employers, six positions, 35 contributions, varied skill depth, and a full preference set. Three paired JD fixtures in `tests/fixtures/` exercise a strong match, a poor match, and the anti-pattern hard gate. See [`database/sample/README.md`](database/sample/README.md). It is a separate target from `make seed` on purpose, so an absent-minded invocation can't mix invented employers into real career history.
+The database is published on port 5433 for `psql` and the integration tests.
+An instance exposed to a network should drop that line from
+`docker-compose.yml`. The renderer and the API are deliberately not published
+at all — the renderer in particular has no authentication and is meant to sit
+behind the API on a private network.
+
+To try the pipeline without a career of your own:
+
+```bash
+make seed-sample      # a backend engineer in freight logistics
+make seed-clinical    # a nurse, built through the intake
+```
+
+### Without Docker
+
+Requires Go, Node, Docker (for Postgres), `uv`, and `migrate`, `sqlc` and
+`psql` on your PATH.
+
+```bash
+make setup      # .env files, database, migrations, npm install
+                # then set ANTHROPIC_API_KEY and JWT_SECRET in .env
+make seed-sample
+make dev        # API, frontend and renderer together; Ctrl-C stops all three
+```
+
+`make dev` runs the three processes in one terminal; `make run`,
+`make run-frontend` and `make run-renderer` start them individually. Here the
+frontend is on `:5173` and the API on `:8080`, which *are* different origins —
+so `CORS_ALLOWED_ORIGINS` matters on this path, and defaults to
+`http://localhost:5173`.
+
+Other useful targets: `make test` (Go unit tests), `make test-integration`
+(needs a running database), `make test-renderer` (the renderer's pytest
+suite), `make fmt` / `make fmt-check` (Go, TypeScript and Python together),
+`make migrate-create`, `make db-reset`, `make db-down`.
+
+### Your own career history
+
+`make seed` loads career data from `$SEED_DIR`, which points at a **separate
+private repo** checked out in place at `database/seed` and gitignored here.
+That is one way in, and it is the author's; it is not the path a new user
+takes. The one you want is the career import in the UI — paste a résumé, a CV
+or free-form notes, review what it extracted, and approve it. Nothing is
+written to your record until you do.
+
+There is no password reset in the UI yet. Until there is,
+`make reset-password EMAIL=you@example.com` prompts for a new password and
+writes the hash directly. It reads from stdin rather than an argument, so it
+needs a real terminal; set `NEWPASS` in the environment to run it
+non-interactively.
 
 ### Frontend
 

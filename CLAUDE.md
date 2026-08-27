@@ -722,6 +722,9 @@ Rules:
 /internal/vocabulary             — starting level vocabularies and section manifest,
                                    installed at signup
 /docx-renderer                   — Python service: resume JSON -> .docx
+/Dockerfile, /docker-compose.yml — the containerised stack: db, migrations,
+                                   API, renderer, and nginx serving the bundle
+                                   and proxying /api/v1 from the same origin
 /frontend                        — React + TypeScript + Vite UI
 /database/seed                   — real career seed SQL; a separate private git
                                    repo checked out in place, gitignored here
