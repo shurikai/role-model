@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
+.PHONY: all setup build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -87,7 +87,29 @@ migrate-create:
 	@read -p "Migration name: " name; \
 	migrate create -ext sql -dir migrations -seq $$name
 
+# SEED_DIR points at a SEPARATE PRIVATE REPO holding a real career, checked
+# out in place at database/seed. Anyone who is not its owner has an empty or
+# absent directory there -- and the glob below then expands to nothing, passes
+# the literal `database/seed/0*.sql` to psql, and fails with "No such file or
+# directory". That reads as a broken repository rather than as "this target is
+# not for you", which is the first thing a stranger following the README hit.
 seed:
+	@if [ -z "$(SEED_DIR)" ]; then \
+		echo "SEED_DIR is not set. It points at your own career seed files."; \
+		echo "To load a bundled fictional dataset instead, run:"; \
+		echo "    make seed-sample     # a backend engineer in freight logistics"; \
+		echo "    make seed-clinical   # a nurse, built through the intake"; \
+		exit 1; \
+	fi
+	@if [ -z "$$(ls $(SEED_DIR)/0*.sql 2>/dev/null)" ]; then \
+		echo "No seed files found in $(SEED_DIR)."; \
+		echo ""; \
+		echo "That directory holds a private career seed repo, checked out in"; \
+		echo "place. If you are not its owner, you want a sample dataset:"; \
+		echo "    make seed-sample     # a backend engineer in freight logistics"; \
+		echo "    make seed-clinical   # a nurse, built through the intake"; \
+		exit 1; \
+	fi
 	@echo "Seeding from $(SEED_DIR)..."
 	@for f in $(SEED_DIR)/0*.sql; do \
 		echo "  -> $$f"; \
@@ -203,6 +225,40 @@ check-prompts:
 		echo "  you need to trace later."; \
 		echo ""; \
 	}
+
+# One command to a working host install, for the path that does not use
+# containers. `docker compose up --build` is the other one, and needs none of
+# this.
+#
+# Every step is idempotent, so running it again after a pull is the normal way
+# to pick up a new migration or dependency.
+setup:
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env — set ANTHROPIC_API_KEY and JWT_SECRET before running."; \
+	else \
+		echo ".env already exists, leaving it alone."; \
+	fi
+	@if [ ! -f frontend/.env ]; then \
+		cp frontend/.env.example frontend/.env; \
+		echo "Created frontend/.env"; \
+	else \
+		echo "frontend/.env already exists, leaving it alone."; \
+	fi
+	$(MAKE) db-up
+	@echo "Waiting for Postgres..."
+	@for i in $$(seq 1 30); do \
+		docker compose exec -T db pg_isready -U rolemodel -d role_model >/dev/null 2>&1 && break; \
+		sleep 1; \
+	done
+	$(MAKE) migrate-up
+	cd frontend && npm install
+	@echo ""
+	@echo "Ready. Next:"
+	@echo "  1. Set ANTHROPIC_API_KEY and JWT_SECRET in .env"
+	@echo "     (JWT_SECRET: openssl rand -base64 32 — the server will not start without it)"
+	@echo "  2. make seed-sample     # optional: a fictional career to try the pipeline against"
+	@echo "  3. make dev             # API, frontend and renderer together"
 
 run: check-prompts
 	go run ./cmd/server
