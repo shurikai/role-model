@@ -352,7 +352,13 @@ export interface CreatePositionRequest {
  * therefore tolerate a kind it has not heard of.
  */
 export type EntityDraftKind =
-  "employer" | "position" | "contribution" | "skill" | "preference";
+  | "employer"
+  | "position"
+  | "contribution"
+  | "skill"
+  | "preference"
+  | "education"
+  | "credential";
 
 export type EntityDraftStatus = "pending" | "approved" | "rejected";
 
@@ -366,12 +372,14 @@ export interface EntityDraft {
   id: string;
   batch_id: string;
   kind: EntityDraftKind;
-  /** Shape depends on `kind` — one of the five payloads below. */
+  /** Shape depends on `kind` — one of the payloads below. */
   payload: Record<string, unknown> | null;
   /**
    * Draft ids this one needs resolved first. A position names its employer
    * draft, a contribution names its position draft. Null when it needs
-   * nothing — skills and preferences depend on no one.
+   * nothing — skills, preferences, education and credentials depend on no
+   * one. A preference is a claim about the person rather than about any one
+   * job, and a degree outlives the employer it was earned around.
    */
   depends_on: string[] | null;
   /** The real row id, once approved. Null while pending or rejected. */
@@ -422,6 +430,24 @@ export interface PreferencePayload {
   weight: number;
   is_hard_gate: boolean;
   notes?: string | null;
+}
+
+export interface EducationPayload {
+  institution: string;
+  degree?: string | null;
+  field_of_study?: string | null;
+  /** "YYYY-MM" or "YYYY-MM-DD". Absent is ordinary, not an error. */
+  started_on?: string | null;
+  ended_on?: string | null;
+  notes?: string | null;
+}
+
+export interface CredentialPayload {
+  name: string;
+  issuer?: string | null;
+  issued_on?: string | null;
+  expires_on?: string | null;
+  credential_url?: string | null;
 }
 
 export interface StartCareerImportResponse {
