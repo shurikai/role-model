@@ -161,7 +161,7 @@ export function ImportReview() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div>
       <div className="mx-auto flex max-w-5xl">
         <LedgerRail drafts={drafts} skipped={skipped} />
 

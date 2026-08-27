@@ -31,8 +31,10 @@ function PartialMatchList({ entries }: { entries: SkillMatch[] | null }) {
   if (!entries || entries.length === 0) return null;
   return (
     <div>
-      <span className="font-medium">Below the level asked for:</span>
-      <ul className="ml-4 list-disc text-gray-700">
+      <p className="font-mono text-[10px] tracking-widest text-rail uppercase">
+        Below the level asked for
+      </p>
+      <ul className="ml-4 list-disc font-body text-sm text-ink-dim">
         {entries.map((m) => (
           <li key={m.requirement}>
             {m.requirement}
@@ -68,11 +70,17 @@ function PreferenceList({
   const conflict = tone === "conflict";
   return (
     <div>
-      <span className={conflict ? "font-medium text-red-800" : "font-medium"}>
+      <p
+        className={`font-mono text-[10px] tracking-widest uppercase ${
+          conflict ? "text-reject" : "text-rail"
+        }`}
+      >
         {label}
-      </span>
+      </p>
       <ul
-        className={`ml-4 list-disc ${conflict ? "text-red-700" : "text-gray-700"}`}
+        className={`ml-4 list-disc font-body text-sm ${
+          conflict ? "text-reject" : "text-ink-dim"
+        }`}
       >
         {entries.map((entry) => (
           <li key={preferenceLabel(entry)}>{preferenceLabel(entry)}</li>
@@ -101,22 +109,22 @@ function ScreeningSummaryPanel({ summary }: { summary: ScreeningSummary }) {
   ];
 
   return (
-    <div className="mb-3 rounded border border-gray-300 bg-gray-50 p-4">
-      <h3 className="mb-2 text-sm font-semibold text-gray-900">
+    <div className="mb-3 border border-border bg-surface p-4">
+      <p className="mb-2 font-mono text-[10px] tracking-widest text-rail uppercase">
         Screening summary
-      </h3>
-      <dl className="space-y-1 text-sm">
+      </p>
+      <dl className="font-body text-sm">
         {fields.map(([label, value]) => (
           <div key={label} className="flex gap-2">
-            <dt className="font-medium text-gray-700">{label}:</dt>
-            <dd className="text-gray-800">{value || "—"}</dd>
+            <dt className="text-ink-dim">{label}:</dt>
+            <dd className="text-ink">{value || "—"}</dd>
           </div>
         ))}
       </dl>
       {summary.other_flags.length > 0 && (
-        <div className="mt-2 text-sm">
-          <p className="font-medium text-gray-700">Other flags:</p>
-          <ul className="ml-4 list-disc text-gray-800">
+        <div className="mt-2">
+          <p className="font-body text-sm text-ink-dim">Other flags:</p>
+          <ul className="ml-4 list-disc font-body text-sm text-ink">
             {summary.other_flags.map((flag) => (
               <li key={flag}>{flag}</li>
             ))}
@@ -156,42 +164,38 @@ function ResumeVersionRow({
   }
 
   return (
-    <li className="rounded border border-gray-200 px-4 py-3">
-      <div className="flex items-center justify-between">
+    <li className="mb-2 border-y border-r border-l-[6px] border-border border-l-rail bg-card px-4 py-2.5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-gray-900">
+          <p className="font-mono text-[10px] tracking-widest text-rail uppercase">
             Version {version.version_number}
-            {version.submitted && (
-              <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                submitted
-              </span>
-            )}
+            {version.submitted && " · submitted"}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="font-body text-xs text-ink-dim">
             {new Date(version.created_at).toLocaleString()}
           </p>
           {version.generation_notes && (
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="mt-1 font-body text-xs text-ink-dim">
               {version.generation_notes}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-2">
           {downloaded && (
-            <span className="text-xs text-green-700">Downloaded ✓</span>
+            <span className="font-body text-xs text-stamp">Downloaded ✓</span>
           )}
           <button
             type="button"
             onClick={handleDownload}
             disabled={renderVersion.isPending}
-            className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            className="bg-ink px-4 py-1.5 font-display text-sm font-bold text-surface disabled:opacity-50"
           >
-            {renderVersion.isPending ? "Rendering..." : "Download .docx"}
+            {renderVersion.isPending ? "Rendering…" : "Download .docx"}
           </button>
         </div>
       </div>
       {renderVersion.isError && (
-        <p className="mt-2 text-sm text-red-600">
+        <p className="mt-2 font-body text-sm text-reject">
           {formatApiError(renderVersion.error)}
         </p>
       )}
@@ -210,14 +214,14 @@ export function ApplicationDetail() {
 
   if (isLoading) {
     return (
-      <p className="mx-auto mt-12 max-w-3xl px-4 text-sm text-gray-600">
-        Loading...
+      <p className="mx-auto max-w-3xl px-6 py-10 font-body text-sm text-ink-dim">
+        Loading…
       </p>
     );
   }
   if (error || !application) {
     return (
-      <p className="mx-auto mt-12 max-w-3xl px-4 text-sm text-red-600">
+      <p className="mx-auto max-w-3xl px-6 py-10 font-body text-sm text-reject">
         {error ? formatApiError(error) : "Application not found."}
       </p>
     );
@@ -233,41 +237,47 @@ export function ApplicationDetail() {
     .replace(/[^a-z0-9]+/g, "-");
 
   return (
-    <div className="mx-auto mt-12 max-w-3xl px-4 pb-16">
-      <Link to="/applications" className="text-sm text-gray-600 underline">
-        &larr; All applications
-      </Link>
-
-      <h1 className="mt-2 mb-1 text-2xl font-semibold text-gray-900">
-        {application.role_title} — {application.company_name}
+    <div className="mx-auto max-w-4xl px-6 py-10">
+      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
+        {/* The breadcrumb is the back affordance. The shell's nav reaches the
+            same place, but a detail page should not make you go looking. */}
+        <Link to="/applications" className="underline">
+          Applications
+        </Link>{" "}
+        · {application.company_name}
+      </p>
+      <h1 className="mb-1 font-display text-2xl font-bold text-ink">
+        {application.role_title}
       </h1>
-      <p className="mb-6 text-sm text-gray-500">Status: {application.status}</p>
+      <p className="mb-6 font-body text-[13px] text-ink-dim">
+        Status: {application.status}
+      </p>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">
-          Job Description Signals
+      <section className="mb-6">
+        <h2 className="mb-2 font-display text-lg font-bold text-ink">
+          Job description signals
         </h2>
         {!application.jd_signals ? (
-          <div className="rounded border border-gray-200 p-4">
-            <p className="mb-3 text-sm text-gray-600">
+          <div className="border border-border bg-card p-4">
+            <p className="mb-3 font-body text-sm text-ink-dim">
               Signals have not been extracted yet.
             </p>
             <button
               type="button"
               onClick={() => extractSignals.mutate(application.id)}
               disabled={extractSignals.isPending || !application.jd_text}
-              className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
             >
-              {extractSignals.isPending ? "Extracting..." : "Extract Signals"}
+              {extractSignals.isPending ? "Extracting…" : "Extract signals"}
             </button>
             {extractSignals.isError && (
-              <p className="mt-2 text-sm text-red-600">
+              <p className="mt-2 font-body text-sm text-reject">
                 {formatApiError(extractSignals.error)}
               </p>
             )}
           </div>
         ) : (
-          <div className="space-y-2 rounded border border-gray-200 p-4 text-sm">
+          <div className="border border-border bg-card p-4 font-body text-sm text-ink">
             {application.jd_signals.screening_summary && (
               <ScreeningSummaryPanel
                 summary={application.jd_signals.screening_summary}
@@ -305,14 +315,14 @@ export function ApplicationDetail() {
               type="button"
               onClick={() => extractSignals.mutate(application.id)}
               disabled={extractSignals.isPending}
-              className="mt-2 text-xs text-gray-600 underline disabled:opacity-50"
+              className="mt-2 font-body text-xs text-ink-dim underline disabled:opacity-50"
             >
               {extractSignals.isPending
-                ? "Re-extracting..."
+                ? "Re-extracting…"
                 : "Re-extract signals"}
             </button>
             {extractSignals.isError && (
-              <p className="text-sm text-red-600">
+              <p className="font-body text-sm text-reject">
                 {formatApiError(extractSignals.error)}
               </p>
             )}
@@ -320,29 +330,31 @@ export function ApplicationDetail() {
         )}
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">Fit Report</h2>
-        <div className="rounded border border-gray-200 p-4">
+      <section className="mb-6">
+        <h2 className="mb-2 font-display text-lg font-bold text-ink">
+          Fit report
+        </h2>
+        <div className="border border-border bg-card p-4">
           <button
             type="button"
             onClick={() => runFitEvaluation.mutate(application.id)}
             disabled={runFitEvaluation.isPending || !application.jd_signals}
-            className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
           >
             {runFitEvaluation.isPending
-              ? "Running..."
+              ? "Running…"
               : latestFitReport
-                ? "Re-run Fit Gate"
-                : "Run Fit Gate"}
+                ? "Re-run fit gate"
+                : "Run fit gate"}
           </button>
           {runFitEvaluation.isError && (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 font-body text-sm text-reject">
               {formatApiError(runFitEvaluation.error)}
             </p>
           )}
 
           {latestFitReport && (
-            <div className="mt-4 space-y-3 text-sm">
+            <div className="mt-4 space-y-3 font-body text-sm text-ink">
               {/*
                 Advisory only, and shown only when there's something to say.
                 A standing "passed" badge would be noise now that nothing is
@@ -350,15 +362,15 @@ export function ApplicationDetail() {
               */}
               {latestFitReport.dealbreaker_hits &&
                 latestFitReport.dealbreaker_hits.length > 0 && (
-                  <div className="rounded border border-amber-300 bg-amber-50 p-3">
-                    <p className="font-medium text-amber-900">
+                  <div className="border border-flag bg-flag-highlight p-3">
+                    <p className="font-mono text-[10px] tracking-widest text-flag uppercase">
                       Dealbreaker flag
                     </p>
-                    <p className="text-xs text-amber-800">
+                    <p className="font-body text-xs text-ink-dim">
                       Matched against your hard-exclude preferences.
                       Informational — it does not block generation.
                     </p>
-                    <ul className="mt-1 list-inside list-disc text-amber-900">
+                    <ul className="mt-1 list-inside list-disc font-body text-sm text-ink">
                       {latestFitReport.dealbreaker_hits.map((hit) => (
                         <li key={hit.id}>{hit.label}</li>
                       ))}
@@ -366,7 +378,12 @@ export function ApplicationDetail() {
                   </div>
                 )}
               <p>
-                <span className="font-medium">Capability score:</span>{" "}
+                <span className="font-mono text-[10px] tracking-widest text-rail uppercase">
+                  Capability score
+                </span>{" "}
+                {/* Null means nothing was assessed, which is not zero and not
+                    100 — the em dash has to stay distinguishable from a real
+                    score of any value. */}
                 {latestFitReport.capability_score === null
                   ? "—"
                   : `${latestFitReport.capability_score}/100`}
@@ -375,8 +392,10 @@ export function ApplicationDetail() {
               {latestFitReport.capability_gaps &&
                 latestFitReport.capability_gaps.length > 0 && (
                   <div>
-                    <span className="font-medium">Capability gaps:</span>
-                    <ul className="ml-4 list-disc text-gray-700">
+                    <p className="font-mono text-[10px] tracking-widest text-rail uppercase">
+                      Capability gaps
+                    </p>
+                    <ul className="ml-4 list-disc font-body text-sm text-ink-dim">
                       {latestFitReport.capability_gaps.map((gap) => (
                         <li key={gap}>{gap}</li>
                       ))}
@@ -390,20 +409,20 @@ export function ApplicationDetail() {
                 findings is exactly the confusion the separate lists prevent.
               */}
               <PreferenceList
-                label="Preferences matched:"
+                label="Preferences matched"
                 entries={latestFitReport.preference_matches}
               />
               <PreferenceList
-                label="Preference conflicts:"
+                label="Preference conflicts"
                 entries={latestFitReport.preference_conflicts}
                 tone="conflict"
               />
               <PreferenceList
-                label="Preferences not mentioned:"
+                label="Preferences not mentioned"
                 entries={latestFitReport.preference_gaps}
               />
               {latestFitReport.narrative && (
-                <p className="text-gray-700 italic">
+                <p className="border-t border-dashed border-rail pt-3 font-body text-sm text-ink italic">
                   {latestFitReport.narrative}
                 </p>
               )}
@@ -412,33 +431,33 @@ export function ApplicationDetail() {
         </div>
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">
-          Resume Versions
+      <section className="mb-6">
+        <h2 className="mb-2 font-display text-lg font-bold text-ink">
+          Resume versions
         </h2>
-        <div className="rounded border border-gray-200 p-4">
+        <div className="border border-border bg-card p-4">
           <button
             type="button"
             onClick={() => generateResume.mutate(application.id)}
             disabled={generateResume.isPending || !canGenerate}
-            className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
             title={!canGenerate ? "Run the fit evaluation first" : undefined}
           >
-            {generateResume.isPending ? "Generating..." : "Generate Resume"}
+            {generateResume.isPending ? "Writing…" : "Generate resume"}
           </button>
           {!canGenerate && (
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 font-body text-xs text-ink-dim">
               Run the fit evaluation first to see scores before generating.
             </p>
           )}
           {generateResume.isError && (
-            <p className="mt-2 text-sm text-red-600">
+            <p className="mt-2 font-body text-sm text-reject">
               {formatApiError(generateResume.error)}
             </p>
           )}
 
           {versions && versions.length > 0 && (
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4">
               {versions.map((version) => (
                 <ResumeVersionRow
                   key={version.id}

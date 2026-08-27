@@ -5,6 +5,7 @@ import {
   useExtractSignals,
 } from "../hooks/useApplications";
 import { formatApiError } from "../lib/api-client";
+import { Field, QuietLink, SubmitButton } from "../components/AuthCard";
 
 export function ApplicationNew() {
   const navigate = useNavigate();
@@ -43,85 +44,82 @@ export function ApplicationNew() {
   }
 
   return (
-    <div className="mx-auto mt-12 max-w-2xl px-4">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">
-        New Application
+    <div className="mx-auto max-w-3xl px-6 py-10">
+      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
+        Applications · New
+      </p>
+      <h1 className="mb-1 font-display text-2xl font-bold text-ink">
+        Paste a job description
       </h1>
+      <p className="mb-6 font-body text-[13px] text-ink-dim">
+        This reads the posting for what it asks for — requirements, the
+        capabilities behind them, seniority, and how the role describes itself —
+        and stores those signals against the application. Nothing is compared
+        against your career until you run the fit gate.
+      </p>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="companyName"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Company
-          </label>
-          <input
-            id="companyName"
-            type="text"
-            required
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="roleTitle"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Role title
-          </label>
-          <input
-            id="roleTitle"
-            type="text"
-            required
-            value={roleTitle}
-            onChange={(e) => setRoleTitle(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="jdUrl"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Job posting URL <span className="text-gray-400">(optional)</span>
-          </label>
-          <input
-            id="jdUrl"
-            type="url"
-            value={jdUrl}
-            onChange={(e) => setJdUrl(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
+      <form onSubmit={handleSubmit}>
+        <Field
+          id="companyName"
+          label="Company"
+          type="text"
+          required
+          value={companyName}
+          onChange={setCompanyName}
+        />
+        <Field
+          id="roleTitle"
+          label="Role title"
+          type="text"
+          required
+          value={roleTitle}
+          onChange={setRoleTitle}
+        />
+        <Field
+          id="jdUrl"
+          label="Job posting URL"
+          type="url"
+          optional
+          value={jdUrl}
+          onChange={setJdUrl}
+        />
+
+        <div className="mb-4">
           <label
             htmlFor="jdText"
-            className="block text-sm font-medium text-gray-700"
+            className="mb-1 block font-mono text-[10px] tracking-widest text-rail uppercase"
           >
             Job description text
           </label>
           <textarea
             id="jdText"
             required
-            rows={12}
+            rows={16}
             value={jdText}
             onChange={(e) => setJdText(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
+            disabled={submitting}
+            className="w-full border border-border bg-surface p-3 font-body text-sm text-ink disabled:opacity-60"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? "Creating..." : "Create & Extract Signals"}
-        </button>
+        <div className="flex items-center gap-3">
+          <SubmitButton
+            pending={submitting}
+            pendingLabel="Reading the posting…"
+          >
+            Create and extract signals
+          </SubmitButton>
+          <QuietLink to="/applications">Cancel</QuietLink>
+        </div>
+
+        {submitting && (
+          <p className="mt-3 font-body text-sm text-ink-dim">
+            Reading the posting in one pass. If extraction fails the application
+            is still created, and you can retry it from its own page.
+          </p>
+        )}
       </form>
     </div>
   );
