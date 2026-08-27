@@ -145,18 +145,68 @@ func TestRateLimitDoesNotAccumulateClientsAcrossWindows(t *testing.T) {
 	}
 }
 
-// The counter is shared across every request the server handles, so it is
-// reached concurrently by construction. Run with -race.
+// The limiter is the only piece of shared mutable request-path state in the
+// service, so it is the one place a data race can live. Run with -race.
+//
+// Deliberately adversarial rather than merely concurrent. An earlier version
+// of this test used 50 goroutines against a limit of 100 with a one-minute
+// window, which never crossed the refusal path and never rolled the window —
+// so it exercised the uncontended happy path and proved close to nothing.
+//
+// The window roll is the case worth proving: it REPLACES the map
+// (rl.counts = make(...)) while other goroutines are inside allow(). A short
+// window and a low limit make that happen many times under load.
 func TestRateLimitIsSafeUnderConcurrency(t *testing.T) {
-	h := middleware.NewRateLimit(100, time.Minute).Handler(okHandler())
+	const (
+		goroutines = 64
+		perG       = 40
+	)
+	// Low enough that most calls are refused, short enough that the window
+	// rolls repeatedly while every goroutine is still running.
+	rl := middleware.NewRateLimit(5, 2*time.Millisecond)
+	h := rl.Handler(okHandler())
 
-	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	var (
+		wg      sync.WaitGroup
+		mu      sync.Mutex
+		allowed int
+		refused int
+	)
+	for g := 0; g < goroutines; g++ {
 		wg.Add(1)
-		go func(i int) {
+		go func(g int) {
 			defer wg.Done()
-			request(h, "10.0.1."+strconv.Itoa(i%10)+":5000")
-		}(i)
+			for i := 0; i < perG; i++ {
+				// A mix of shared and distinct keys, so goroutines contend on
+				// the same bucket as well as inserting new ones into a map
+				// that is being swapped underneath them.
+				addr := "10.0.1." + strconv.Itoa(g%4) + ":5000"
+				if i%3 == 0 {
+					addr = "10.0.2." + strconv.Itoa(g) + ":5000"
+				}
+				code := request(h, addr).Code
+				mu.Lock()
+				if code == http.StatusOK {
+					allowed++
+				} else {
+					refused++
+				}
+				mu.Unlock()
+			}
+		}(g)
 	}
 	wg.Wait()
+
+	// Both paths have to have been taken, or the run proved only that the
+	// uncontended case is safe.
+	if allowed == 0 {
+		t.Error("no request was allowed; the limiter never took the accept path")
+	}
+	if refused == 0 {
+		t.Error("no request was refused; the limiter never took the reject path, " +
+			"so the contended counter was never actually contended")
+	}
+	if got := allowed + refused; got != goroutines*perG {
+		t.Errorf("counted %d outcomes, want %d — a request produced neither", got, goroutines*perG)
+	}
 }
