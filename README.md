@@ -168,28 +168,71 @@ uv run uvicorn main:app --reload --port 8000
 
 ## Status
 
-Both pipeline stages work end to end against the real API, output is validated against `schema/resume.v1.json` before storage, and the surrounding CRUD surface is built out:
+The path from a pasted job description to a downloaded `.docx` runs end to end
+without leaving the browser, and the whole stack comes up with one command.
 
-- **Backend:** full CRUD for employers, positions, and contributions; application CRUD; tags and tag categories; education, credentials, and projects; JWT auth (signup/login/me, 24h token, no refresh); JD signal extraction and resume generation (Stages 1–2); Stage 0 import (LLM-assisted extract + enrich, with human approve/reject) for pulling new contributions out of raw text; a fit-gate scoring pass, backed by skills and preferences tables, that flags weak job/candidate matches before spending a generation call; config-driven CORS.
-- **Frontend:** the auth shell (login, signup, session persistence, 401 handling) plus the application generation flow — paste a JD, review the fit assessment, generate, download the `.docx` — on Vite + React + TypeScript + TanStack Query, with test coverage (Vitest).
-- **Renderer:** `docx-renderer/`, a Python service (FastAPI + `python-docx`) with a single `POST /render` endpoint taking the intermediate resume JSON and returning a `.docx`. It never touches the database. Layout is explicit and compact rather than built on Word heading styles, with widow/orphan protection so section and role headers don't strand at a page break.
+- **Backend.** Full CRUD for employers, positions, contributions, applications,
+  tags and tag categories, education, credentials, projects, skills and
+  preferences. JWT auth (signup/login/me, 24h token, no refresh), with signup
+  closed by default outside development. Both LLM stages: JD signal extraction,
+  and generation split into a body call and a summary call scoped to the
+  bullets the body already selected. A deterministic fit gate over capability
+  coverage and stated preferences, where the LLM writes the narrative and
+  scores nothing. Two import paths — one that stages contributions against
+  positions you already have, one that stages the employers and positions too,
+  which is what a new account needs.
+- **Frontend.** Auth, a nav shell, the application flow (paste a JD, review the
+  fit report, generate, download), and review queues for both import paths, on
+  Vite + React + TypeScript + TanStack Query with Vitest coverage.
+- **Renderer.** `docx-renderer/`, a Python service (FastAPI + `python-docx`)
+  with a single `POST /render` endpoint taking the intermediate resume JSON and
+  returning a `.docx`. It never touches the database, and it is not exposed
+  outside the compose network. Layout is explicit and compact rather than built
+  on Word heading styles, with widow/orphan protection so section and role
+  headers don't strand at a page break.
 
-The path from a pasted job description to a downloaded `.docx` now runs end to end without leaving the UI.
+Output is validated against `schema/resume.v2.json` before storage. The
+document's shape — which sections print, in what order, under what heading —
+is a per-user manifest rather than a fixed contract, and the seniority ladder
+and depth scale are user-owned rows rather than enums, so the pipeline works
+for a career that is not software. `database/sample-clinical/` is the proof:
+a nurse's career, built through the import rather than written by hand.
 
-A job discovery worker (scraping public ATS feeds like Greenhouse and Ashby, fanning out via Kafka to extraction and notification consumers) is designed but not started.
+A job discovery worker (scraping public ATS feeds like Greenhouse and Ashby,
+fanning out via Kafka to extraction and notification consumers) is designed but
+not started.
 
-This README will grow as the system does.
+## Known gaps
 
-## Open Questions
-- Blob storage interface for rendered documents (local disk now, S3 later) — rendered files are currently returned to the caller, not persisted
-- Evaluation strategy for prompt quality across versions
-- Skills carry proficiency and years-of-experience, and both are populated with real values — but the fit scorer reads skills as a flat list of names and never sees either column, so a one-off prototype and a decade of production use score identically. The fix is plumbing the depth through to `internal/fitgate`, not more seeding
+Honest about what is missing, since the list is short and specific:
 
-## TODO
-[ ] Restore `applied_on` date parsing on the application update endpoint
-[ ] Build out the career-data views (employer/position/contribution browsing and editing)
-[ ] Weight technical fit scoring by skill proficiency and years (the schema and the data are both there; `internal/fitgate` reads names only)
-[ ] Human review gate for extracted JD signals before generation runs
+- **No career-data browsing or editing in the UI.** Import review is the only
+  way to inspect what was captured. Correcting a contribution afterwards means
+  the API or SQL.
+- **No UI for skills and preferences**, though both have a full API. The fit
+  gate scores against preferences, so this is the gap most worth closing next.
+- **No password reset in the app.** `make reset-password` is the stopgap.
+- **No review gate on extracted JD signals** before generation runs.
+- **Rendered documents are not persisted** — the `.docx` is streamed back to
+  the caller. A blob storage interface is the intended fix.
+- **Depth is only half-used.** A posting that asks for expert Kafka no longer
+  scores a novice Kafka as a clean match, but where a posting states no depth
+  — most postings — a one-off prototype and a decade of production use still
+  score the same. Changing that would rescore every stored application, so it
+  is a decision rather than a bug.
+
+## Documentation
+
+- [`SECURITY.md`](./SECURITY.md) — what to do before exposing an instance, what
+  is in place, and what deliberately is not
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — how to build and test it, and what
+  will get a patch sent back
+- [`CHANGELOG.md`](./CHANGELOG.md) — notable changes by release
+- [`CLAUDE.md`](./CLAUDE.md) — the conventions document: stack, architecture,
+  and the rules that hold, most of them written because the alternative was
+  tried and cost something
+- [`ROADMAP.md`](./ROADMAP.md) — architecture checkpoint and where this was
+  going
 
 ## License
 Apache License 2.0 — see [LICENSE](./LICENSE).

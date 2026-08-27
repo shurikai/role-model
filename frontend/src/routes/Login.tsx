@@ -46,9 +46,25 @@ export function Login() {
       eyebrow="Role Model"
       title="Log in"
       footer={
-        <p className="font-body text-sm text-ink-dim">
-          Don't have an account? <QuietLink to="/signup">Sign up</QuietLink>
-        </p>
+        <div className="font-body text-sm text-ink-dim">
+          <p>
+            Don't have an account? <QuietLink to="/signup">Sign up</QuietLink>
+          </p>
+          {/*
+            There is no reset flow yet, and a "Forgot password?" link to
+            nothing is worse than none — it promises a path that does not
+            exist. This says what to actually do instead, which needs shell
+            access on the host, so it is honest about who can do it.
+          */}
+          <p className="mt-2 text-xs">
+            Forgotten your password? This is self-hosted software with no reset
+            flow yet — on the server, run{" "}
+            <code className="font-mono">
+              make reset-password EMAIL=you@example.com
+            </code>
+            .
+          </p>
+        </div>
       }
     >
       {showExpiredBanner && (
