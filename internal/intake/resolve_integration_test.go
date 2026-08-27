@@ -5,13 +5,13 @@ package intake
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 // The whole point of Phase 8, exercised end to end: an account with NOTHING —
@@ -21,10 +21,7 @@ import (
 // unusable by every new user.
 func TestResolveBatchBuildsACareerFromNothing(t *testing.T) {
 	ctx := context.Background()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL required for intake integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
@@ -141,10 +138,7 @@ func TestResolveBatchBuildsACareerFromNothing(t *testing.T) {
 // drafts that named them are marked approved with no row behind them.
 func TestResolveBatchIsAllOrNothing(t *testing.T) {
 	ctx := context.Background()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL required for intake integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
@@ -213,10 +207,7 @@ func TestResolveBatchIsAllOrNothing(t *testing.T) {
 // substrate and the resolver, and nothing populated it but a test.
 func TestPlanStageResolveRoundTrip(t *testing.T) {
 	ctx := context.Background()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL required for intake integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
@@ -285,10 +276,7 @@ func TestPlanStageResolveRoundTrip(t *testing.T) {
 // extract_test.go.
 func TestResolveBatchCarriesPreferencesEducationAndCredentials(t *testing.T) {
 	ctx := context.Background()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL required for intake integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)

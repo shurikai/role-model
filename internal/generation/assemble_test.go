@@ -4,19 +4,16 @@ package generation_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 func TestAssembleContext(t *testing.T) {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL not set, skipping integration test.")
-	}
+	dsn := testenv.DatabaseURL(t)
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)

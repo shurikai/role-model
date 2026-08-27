@@ -29,7 +29,12 @@ go.work.sum
 *.local
 
 database/seed
-scripts
+# Local helper scripts stay out, but a check that CI runs has to be IN the
+# repository or the workflow fails on a missing file. Git cannot re-include a
+# path under an excluded DIRECTORY, so this excludes the contents rather than
+# the directory itself.
+scripts/*
+!scripts/check-migration-order.sh
 # Make sure that generated output isn't committed
 generated_resume*.json
 
