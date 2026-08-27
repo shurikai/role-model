@@ -3,6 +3,7 @@ package intake
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -18,6 +19,9 @@ type CareerExtraction struct {
 	Positions     []ExtractedPosition     `json:"positions"`
 	Contributions []ExtractedContribution `json:"contributions"`
 	Skills        []ExtractedSkill        `json:"skills"`
+	Preferences   []ExtractedPreference   `json:"preferences"`
+	Education     []ExtractedEducation    `json:"education"`
+	Credentials   []ExtractedCredential   `json:"credentials"`
 }
 
 type ExtractedEmployer struct {
@@ -52,6 +56,39 @@ type ExtractedSkill struct {
 	Tag             string   `json:"tag"`
 	Proficiency     string   `json:"proficiency"`
 	YearsExperience *float64 `json:"years_experience"`
+}
+
+// ExtractedPreference is what the person says they want and do not want.
+//
+// The extractor did not ask for this until #89, which meant the preference axis
+// of the fit gate scored against zero rows for every account that had not been
+// seeded by hand. A career narrative's "what I want next" paragraph is the most
+// quotable thing in it and the exact input the gate exists to consume.
+type ExtractedPreference struct {
+	PreferenceType string   `json:"preference_type"`
+	Label          string   `json:"label"`
+	Aliases        []string `json:"aliases"`
+	Sentiment      string   `json:"sentiment"`
+	Weight         int16    `json:"weight"`
+	IsHardGate     bool     `json:"is_hard_gate"`
+	Notes          *string  `json:"notes"`
+}
+
+type ExtractedEducation struct {
+	Institution  string  `json:"institution"`
+	Degree       *string `json:"degree"`
+	FieldOfStudy *string `json:"field_of_study"`
+	StartedOn    *string `json:"started_on"`
+	EndedOn      *string `json:"ended_on"`
+	Notes        *string `json:"notes"`
+}
+
+type ExtractedCredential struct {
+	Name          string  `json:"name"`
+	Issuer        *string `json:"issuer"`
+	IssuedOn      *string `json:"issued_on"`
+	ExpiresOn     *string `json:"expires_on"`
+	CredentialURL *string `json:"credential_url"`
 }
 
 // PlannedDraft is one row destined for entity_drafts, with its dependencies
@@ -156,6 +193,46 @@ func PlanDrafts(x CareerExtraction) ([]PlannedDraft, error) {
 		if err := add(KindSkill, uuid.New(), skillPayload{
 			Category: s.Category, Tag: s.Tag,
 			Proficiency: s.Proficiency, YearsExperience: s.YearsExperience,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	// Preferences, education and credentials depend on nothing either. A
+	// preference is a claim about what the person wants rather than about any
+	// one job, and a degree outlives the employer it was earned around.
+	for _, pr := range x.Preferences {
+		if strings.TrimSpace(pr.Label) == "" {
+			return nil, fmt.Errorf("preference of type %q has no label", pr.PreferenceType)
+		}
+		if err := add(KindPreference, uuid.New(), preferencePayload{
+			PreferenceType: pr.PreferenceType, Label: pr.Label, Aliases: pr.Aliases,
+			Sentiment: pr.Sentiment, Weight: pr.Weight,
+			IsHardGate: pr.IsHardGate, Notes: pr.Notes,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, e := range x.Education {
+		if strings.TrimSpace(e.Institution) == "" {
+			return nil, errors.New("education entry has no institution")
+		}
+		if err := add(KindEducation, uuid.New(), educationPayload{
+			Institution: e.Institution, Degree: e.Degree, FieldOfStudy: e.FieldOfStudy,
+			StartedOn: e.StartedOn, EndedOn: e.EndedOn, Notes: e.Notes,
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, c := range x.Credentials {
+		if strings.TrimSpace(c.Name) == "" {
+			return nil, errors.New("credential entry has no name")
+		}
+		if err := add(KindCredential, uuid.New(), credentialPayload{
+			Name: c.Name, Issuer: c.Issuer,
+			IssuedOn: c.IssuedOn, ExpiresOn: c.ExpiresOn, CredentialURL: c.CredentialURL,
 		}); err != nil {
 			return nil, err
 		}

@@ -28,6 +28,8 @@ const KIND_LABEL: Record<string, string> = {
   contribution: "Contribution",
   skill: "Skill",
   preference: "Preference",
+  education: "Education",
+  credential: "Credential",
 };
 
 const STATUS_STYLE: Record<
@@ -50,7 +52,8 @@ function draftTitle(draft: EntityDraft): string {
     return null;
   };
   return (
-    first("name", "title", "summary", "label", "tag") ?? `${draft.kind} draft`
+    first("name", "title", "summary", "label", "tag", "institution") ??
+    `${draft.kind} draft`
   );
 }
 
@@ -166,6 +169,8 @@ export function EntityDraftReview() {
       "contribution",
       "skill",
       "preference",
+      "education",
+      "credential",
     ]);
     const unplaced = [
       ...orphanPositions,
@@ -179,6 +184,8 @@ export function EntityDraftReview() {
       contributionsByPosition,
       skills: drafts.filter((d) => d.kind === "skill"),
       preferences: drafts.filter((d) => d.kind === "preference"),
+      education: drafts.filter((d) => d.kind === "education"),
+      credentials: drafts.filter((d) => d.kind === "credential"),
       unplaced,
     };
   }, [drafts]);
@@ -272,6 +279,18 @@ export function EntityDraftReview() {
         <FlatGroup
           title="Preferences"
           drafts={grouped.preferences}
+          all={drafts}
+          batchID={batchID}
+        />
+        <FlatGroup
+          title="Education"
+          drafts={grouped.education}
+          all={drafts}
+          batchID={batchID}
+        />
+        <FlatGroup
+          title="Credentials"
+          drafts={grouped.credentials}
           all={drafts}
           batchID={batchID}
         />
