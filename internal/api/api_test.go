@@ -10,10 +10,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/shurikai/role-model/internal/api"
+	"github.com/shurikai/role-model/internal/api/handlers"
 	"github.com/shurikai/role-model/internal/config"
 	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
@@ -57,6 +59,10 @@ func testServer(t *testing.T) (*httptest.Server, *config.Config) {
 		ContribSvc: contribSvc,
 		ProjectSvc: projectSvc,
 		JWTSecret:  cfg.JWTSecret,
+		// These tests create their own accounts, so the instance under test
+		// has to accept them. The default is deliberately the other way —
+		// see config.Load — and TestSignupCanBeDisabled covers that side.
+		SignupEnabled: true,
 	})
 	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
@@ -205,4 +211,70 @@ func createAndGetID(t *testing.T, srv *httptest.Server, token, path string, body
 		t.Fatalf("decode id from %s: %v", path, err)
 	}
 	return out.ID
+}
+
+// An open signup route on a reachable instance lets anyone create an account
+// and spend the operator's Anthropic key. This is single-user software by
+// default, so the second account is the unusual case rather than the first.
+func TestSignupCanBeDisabled(t *testing.T) {
+	dsn := os.Getenv("DATABASE_URL")
+	secret := os.Getenv("JWT_SECRET")
+	if dsn == "" || secret == "" {
+		t.Skip("DATABASE_URL and JWT_SECRET required for API integration tests")
+	}
+
+	pool, err := db.NewPool(context.Background(), &config.Config{DatabaseURL: dsn})
+	if err != nil {
+		t.Fatalf("connect db: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	// The same router the server builds, with signup closed.
+	router := api.NewRouter(api.RouterDeps{
+		Pool:          pool,
+		Queries:       db.New(pool),
+		JWTSecret:     secret,
+		SignupEnabled: false,
+	})
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/auth/signup", "", map[string]any{
+		"email":    "uninvited-" + uuid.NewString() + "@test.local",
+		"password": "password123",
+	})
+	assertStatus(t, resp, http.StatusForbidden, "signup on a closed instance")
+
+	// Login must still work: closing signup locks the door, it does not
+	// evict the people already inside.
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/auth/login", "", map[string]any{
+		"email":    "nobody-" + uuid.NewString() + "@test.local",
+		"password": "password123",
+	})
+	assertStatus(t, resp, http.StatusUnauthorized, "login on a closed instance")
+}
+
+// The universal decoder had no cap at all, so an authenticated caller could
+// POST an arbitrarily large body — and on the import routes that body goes to
+// a model as the user message, where input tokens are the expensive half.
+func TestOversizedRequestBodyIsRefused(t *testing.T) {
+	srv, _ := testServer(t)
+
+	suffix := uuid.NewString()
+	token := signupUser(t, srv, "toobig-"+suffix+"@test.local", "password123")
+
+	huge := strings.Repeat("x", handlers.MaxRequestBody+1024)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/employers", token, map[string]any{
+		"name": huge,
+	})
+	// 413, not 400: "send less" and "fix your syntax" send the caller to
+	// different places, and reporting the first as the second sends them
+	// hunting a quoting bug that is not there.
+	assertStatus(t, resp, http.StatusRequestEntityTooLarge, "oversized body")
+
+	// A body just under the cap is ordinary and must still work.
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/employers", token, map[string]any{
+		"name": strings.Repeat("y", 1024),
+	})
+	assertStatus(t, resp, http.StatusCreated, "a large but legal body")
 }

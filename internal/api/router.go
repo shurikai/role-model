@@ -1,6 +1,8 @@
 package api
 
 import (
+	"time"
+
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -32,6 +34,7 @@ type RouterDeps struct {
 	RendererClient *renderer.Client
 	JWTSecret      string
 	AllowedOrigins []string
+	SignupEnabled  bool
 }
 
 func NewRouter(deps RouterDeps) *chi.Mux {
@@ -53,9 +56,18 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		authHandler := handlers.NewAuthHandler(deps.Pool, deps.Queries, deps.JWTSecret)
-		r.Post("/auth/signup", authHandler.Signup)
-		r.Post("/auth/login", authHandler.Login)
+		authHandler := handlers.NewAuthHandler(deps.Pool, deps.Queries, deps.JWTSecret, deps.SignupEnabled)
+
+		// The auth routes are the only unauthenticated write surface, and
+		// /auth/login runs bcrypt at DefaultCost on every attempt — expensive
+		// by design, which makes it a denial-of-service lever as well as a
+		// password-guessing one. Twenty per minute is far above anyone typing
+		// a password and far below anything worth calling an attempt.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.NewRateLimit(20, time.Minute).Handler)
+			r.Post("/auth/signup", authHandler.Signup)
+			r.Post("/auth/login", authHandler.Login)
+		})
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.RequireAuth(deps.JWTSecret))
@@ -89,9 +101,20 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Get("/applications/{id}", applicationHandler.Get)
 			r.Patch("/applications/{id}", applicationHandler.Update)
 
+			// The five endpoints below that carry llmLimit are the ones that
+			// spend the operator's Anthropic key. They sit behind a valid JWT,
+			// but a token is not a budget: one scripted loop against
+			// POST /import/career, which is capped at 16384 output tokens,
+			// drains a key with no limit in the way.
+			//
+			// Ten a minute is well above real use — a full pass over one
+			// posting is three calls, and an import is one — and well below
+			// anything that costs real money before someone notices.
+			llmLimit := middleware.NewRateLimit(10, time.Minute).Handler
+
 			generationHandler := handlers.NewGenerationHandler(deps.Queries, deps.GenSvc)
-			r.Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
-			r.Post("/applications/{id}/generate", generationHandler.Generate)
+			r.With(llmLimit).Post("/applications/{id}/extract-signals", generationHandler.ExtractSignals)
+			r.With(llmLimit).Post("/applications/{id}/generate", generationHandler.Generate)
 
 			resumeVersionHandler := handlers.NewResumeVersionHandler(deps.Queries, deps.RendererClient)
 			r.Get("/applications/{id}/versions", resumeVersionHandler.ListByApplication)
@@ -99,12 +122,12 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/resume-versions/{id}/render", resumeVersionHandler.Render)
 
 			fitHandler := handlers.NewFitHandler(deps.Queries, deps.FitSvc)
-			r.Post("/applications/{applicationID}/fit", fitHandler.Run)
+			r.With(llmLimit).Post("/applications/{applicationID}/fit", fitHandler.Run)
 			r.Get("/applications/{applicationID}/fit", fitHandler.ListByApplication)
 			r.Get("/applications/{applicationID}/fit/{reportID}", fitHandler.Get)
 
 			importHandler := handlers.NewImportHandler(deps.Queries, deps.Stage0Svc)
-			r.Post("/import", importHandler.Create)
+			r.With(llmLimit).Post("/import", importHandler.Create)
 			r.Get("/import/{batchID}", importHandler.GetBatch)
 			r.Get("/import/{batchID}/drafts", importHandler.ListDrafts)
 			r.Get("/import/drafts/{draftID}", importHandler.GetDraft)
@@ -113,7 +136,7 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/import/drafts/{draftID}/reject", importHandler.Reject)
 
 			intakeHandler := handlers.NewIntakeHandler(deps.Queries, deps.IntakeSvc, deps.GenClient)
-			r.Post("/import/career", intakeHandler.StartCareerImport)
+			r.With(llmLimit).Post("/import/career", intakeHandler.StartCareerImport)
 			r.Get("/import/{batchID}/entities", intakeHandler.ListEntityDrafts)
 			r.Post("/import/{batchID}/resolve", intakeHandler.ResolveBatch)
 			r.Post("/import/entities/{draftID}/approve", intakeHandler.ApproveEntityDraft)
