@@ -26,6 +26,8 @@ const (
 	KindContribution = "contribution"
 	KindSkill        = "skill"
 	KindPreference   = "preference"
+	KindEducation    = "education"
+	KindCredential   = "credential"
 )
 
 // ErrUnresolved is returned when a batch still holds pending drafts that could
@@ -226,6 +228,10 @@ func (s *Service) resolveOne(
 		return resolveSkill(ctx, q, userID, d)
 	case KindPreference:
 		return resolvePreference(ctx, q, userID, d)
+	case KindEducation:
+		return resolveEducation(ctx, q, userID, d)
+	case KindCredential:
+		return resolveCredential(ctx, q, userID, d)
 	default:
 		return uuid.Nil, fmt.Errorf("no resolver for kind %q", d.Kind)
 	}
@@ -452,11 +458,103 @@ func resolvePreference(ctx context.Context, q *db.Queries, userID uuid.UUID, d d
 		PreferenceType: p.PreferenceType, Label: p.Label,
 		Sentiment: p.Sentiment, Weight: p.Weight,
 		IsHardGate: p.IsHardGate, Notes: p.Notes,
+		Aliases: p.Aliases,
 	})
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create preference %q: %w", p.Label, err)
 	}
 	return row.ID, nil
+}
+
+// Education and credentials are the simplest kind of draft: no dependency on
+// anything else in the batch, and no vocabulary to resolve. They exist because
+// extraction was dropping them (#89) — a licensed professional's CREDENTIALS
+// section rendered empty because the certifications she listed were filed as
+// skills, which is the failure the renderer fix closed downstream and this
+// reintroduced upstream.
+
+type educationPayload struct {
+	Institution  string  `json:"institution"`
+	Degree       *string `json:"degree"`
+	FieldOfStudy *string `json:"field_of_study"`
+	StartedOn    *string `json:"started_on"`
+	EndedOn      *string `json:"ended_on"`
+	Notes        *string `json:"notes"`
+}
+
+func resolveEducation(ctx context.Context, q *db.Queries, userID uuid.UUID, d db.EntityDraft) (uuid.UUID, error) {
+	var p educationPayload
+	if err := payloadOf(d, &p); err != nil {
+		return uuid.Nil, err
+	}
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
+	}
+	started, err := optionalDate(p.StartedOn)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("started_on: %w", err)
+	}
+	ended, err := optionalDate(p.EndedOn)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("ended_on: %w", err)
+	}
+
+	row, err := q.CreateEducation(ctx, db.CreateEducationParams{
+		ID: uuid.New(), UserID: userID,
+		Institution: p.Institution, Degree: p.Degree, FieldOfStudy: p.FieldOfStudy,
+		StartedOn: started, EndedOn: ended, Notes: p.Notes,
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("create education %q: %w", p.Institution, err)
+	}
+	return row.ID, nil
+}
+
+type credentialPayload struct {
+	Name          string  `json:"name"`
+	Issuer        *string `json:"issuer"`
+	IssuedOn      *string `json:"issued_on"`
+	ExpiresOn     *string `json:"expires_on"`
+	CredentialURL *string `json:"credential_url"`
+}
+
+func resolveCredential(ctx context.Context, q *db.Queries, userID uuid.UUID, d db.EntityDraft) (uuid.UUID, error) {
+	var p credentialPayload
+	if err := payloadOf(d, &p); err != nil {
+		return uuid.Nil, err
+	}
+	if err := p.validate(); err != nil {
+		return uuid.Nil, err
+	}
+	issued, err := optionalDate(p.IssuedOn)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("issued_on: %w", err)
+	}
+	expires, err := optionalDate(p.ExpiresOn)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("expires_on: %w", err)
+	}
+
+	row, err := q.CreateCredential(ctx, db.CreateCredentialParams{
+		ID: uuid.New(), UserID: userID,
+		Name: p.Name, Issuer: p.Issuer,
+		IssuedOn: issued, ExpiresOn: expires, CredentialUrl: p.CredentialURL,
+	})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("create credential %q: %w", p.Name, err)
+	}
+	return row.ID, nil
+}
+
+// optionalDate parses a date that may legitimately be absent. An absent date is
+// a NULL column, not an error: a credential with no stated issue date is
+// ordinary, and refusing it would push the reviewer into inventing one.
+func optionalDate(s *string) (pgtype.Date, error) {
+	var out pgtype.Date
+	if s == nil || strings.TrimSpace(*s) == "" {
+		return out, nil
+	}
+	return parseDate(*s)
 }
 
 // parseDate accepts "2006-01" and "2006-01-02". Extraction writes the first,
@@ -621,6 +719,18 @@ func ValidatePayload(kind string, raw json.RawMessage) error {
 			return err
 		}
 		return p.validate()
+	case KindEducation:
+		var p educationPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
+	case KindCredential:
+		var p credentialPayload
+		if err := decode(&p); err != nil {
+			return err
+		}
+		return p.validate()
 	default:
 		return fmt.Errorf("no resolver for kind %q", kind)
 	}
@@ -670,6 +780,32 @@ func (p skillPayload) validate() error {
 func (p preferencePayload) validate() error {
 	if strings.TrimSpace(p.Label) == "" {
 		return errors.New("label is required")
+	}
+	return nil
+}
+
+func (p educationPayload) validate() error {
+	if strings.TrimSpace(p.Institution) == "" {
+		return errors.New("institution is required")
+	}
+	if _, err := optionalDate(p.StartedOn); err != nil {
+		return fmt.Errorf("started_on: %w", err)
+	}
+	if _, err := optionalDate(p.EndedOn); err != nil {
+		return fmt.Errorf("ended_on: %w", err)
+	}
+	return nil
+}
+
+func (p credentialPayload) validate() error {
+	if strings.TrimSpace(p.Name) == "" {
+		return errors.New("name is required")
+	}
+	if _, err := optionalDate(p.IssuedOn); err != nil {
+		return fmt.Errorf("issued_on: %w", err)
+	}
+	if _, err := optionalDate(p.ExpiresOn); err != nil {
+		return fmt.Errorf("expires_on: %w", err)
 	}
 	return nil
 }

@@ -54,6 +54,34 @@ func TestValidatePayload(t *testing.T) {
 			wantErr: "ended_on",
 		},
 		{
+			name:    "credential round-trips with every date absent",
+			kind:    KindCredential,
+			payload: `{"name":"RN Licence","issuer":null,"issued_on":null,"expires_on":null,"credential_url":null}`,
+		},
+		{
+			name:    "credential rejects a date that is not a date",
+			kind:    KindCredential,
+			payload: `{"name":"ACLS","issued_on":"last spring"}`,
+			wantErr: "issued_on",
+		},
+		{
+			name:    "credential without a name is refused",
+			kind:    KindCredential,
+			payload: `{"name":"  ","issuer":"AHA"}`,
+			wantErr: "name is required",
+		},
+		{
+			name:    "education round-trips",
+			kind:    KindEducation,
+			payload: `{"institution":"Rush University","degree":"BSN","field_of_study":"Nursing","started_on":"2010-09","ended_on":"2014-05","notes":null}`,
+		},
+		{
+			name:    "education without an institution is refused",
+			kind:    KindEducation,
+			payload: `{"institution":"","degree":"BSN"}`,
+			wantErr: "institution is required",
+		},
+		{
 			name:    "contribution needs both a summary and a description",
 			kind:    KindContribution,
 			payload: `{"summary":"Ran the floor","full_description":""}`,
@@ -132,5 +160,21 @@ func TestResolversUseTheSameValidation(t *testing.T) {
 	}
 	if err := (positionPayload{StartedOn: "nonsense"}).validate(); err == nil {
 		t.Error("position: expected an unparseable started_on to be refused")
+	}
+	if err := (educationPayload{}).validate(); err == nil {
+		t.Error("education: expected a missing institution to be refused")
+	}
+	if err := (credentialPayload{}).validate(); err == nil {
+		t.Error("credential: expected a missing name to be refused")
+	}
+
+	// An absent date is a NULL column, not an error. A credential with no
+	// stated issue date is ordinary, and refusing it pushes the reviewer into
+	// inventing one — which is the no-invention rule the whole import keeps.
+	if err := (credentialPayload{Name: "RN Licence"}).validate(); err != nil {
+		t.Errorf("credential: an undated credential should validate, got: %v", err)
+	}
+	if err := (educationPayload{Institution: "Rush University"}).validate(); err != nil {
+		t.Errorf("education: an undated degree should validate, got: %v", err)
 	}
 }

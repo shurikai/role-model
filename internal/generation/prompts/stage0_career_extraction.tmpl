@@ -7,8 +7,9 @@ litigation, kitchen work, software. Do not assume an industry, a job family, or
 a vocabulary the text does not establish, and do not translate what they did
 into the language of some other field.
 
-Return ONE JSON object with these four arrays and nothing else. No preamble, no
-explanation, no markdown fence.
+Return ONE JSON object with these seven arrays and nothing else. No preamble,
+no explanation, no markdown fence. An array with nothing to put in it is an
+empty array, never an omitted key.
 
 {
   "employers": [
@@ -47,6 +48,36 @@ explanation, no markdown fence.
       "tag": "the specific thing",
       "proficiency": "one of the depth values below",
       "years_experience": 8.5
+    }
+  ],
+  "preferences": [
+    {
+      "preference_type": "one of: domain, role_shape, culture, dealbreaker, core_practice",
+      "label": "what they want or do not want, in their own terms",
+      "aliases": ["other wordings a job posting would use for the same thing"],
+      "sentiment": "positive or negative",
+      "weight": 7,
+      "is_hard_gate": false,
+      "notes": "what they said that this came from, or null"
+    }
+  ],
+  "education": [
+    {
+      "institution": "the school as they name it",
+      "degree": "or null",
+      "field_of_study": "or null",
+      "started_on": "YYYY-MM, or null",
+      "ended_on": "YYYY-MM, or null",
+      "notes": "or null"
+    }
+  ],
+  "credentials": [
+    {
+      "name": "the certification or licence as they name it",
+      "issuer": "the body that grants it, or null",
+      "issued_on": "YYYY-MM, or null",
+      "expires_on": "YYYY-MM, or null",
+      "credential_url": "or null"
     }
   ]
 }
@@ -92,6 +123,78 @@ RULES
 - Copy the person's own words for titles and organisation names. The reviewer is
   checking your work against their memory, and a paraphrase makes that harder
   for no gain.
+
+PREFERENCES
+
+- A preference comes ONLY from what the person says about what they want, will
+  not do, or has had enough of. Never infer one from their history. Ten years in
+  a field is evidence they worked there, not evidence they want to stay — and a
+  preference you invented is one they will have to find and delete before it
+  starts silently scoring job postings against them.
+
+- If the text says nothing about what they want next, return an empty array.
+  That is the common case for a plain resume, and it is the correct answer.
+
+- preference_type routes the row at the part of a job posting it is about, so a
+  row typed wrongly is checked against a field that can never answer it:
+    domain        — the subject matter or industry. "paediatric oncology",
+                    "freight logistics", "public sector".
+    role_shape    — the shape of the job itself. "small team with high
+                    ownership", "no on-call rotation", "direct patient contact".
+    culture       — how the organisation works. "remote-first", "async and
+                    low-ego", "up-or-out consulting".
+    dealbreaker   — a thing whose PRESENCE is the objection. "night shifts",
+                    "commission-only pay", "crypto".
+    core_practice — a thing whose PROMINENCE is the objection: they can tolerate
+                    it present, not central. "Python as the primary language",
+                    "grant writing as the main duty".
+
+- The dealbreaker / core_practice distinction is the one that goes wrong most
+  often. Ask which sentence the person said. "I will not work anywhere that does
+  X" is a dealbreaker. "I do not mind some X, but I do not want a job that is
+  mostly X" is core_practice. A prominence label filed as a dealbreaker fires on
+  any posting that mentions the thing at all.
+
+- sentiment is "positive" or "negative" and follows the label as written. A
+  dealbreaker is negative. Write the label as the thing itself — "night shifts",
+  negative — not as its negation ("no night shifts", positive), because two
+  labels that share vocabulary with their own opposite both match the same
+  posting.
+
+- weight is 1-10 and records how much they care, from how strongly they said it.
+  "I would rather not" is a 3; "I have had enough of" is an 8.
+
+- is_hard_gate is true only where they state a disqualifier — something that
+  rules a job out rather than counting against it. A gate does not block
+  anything; it is reported as a named finding. Most rows are false.
+
+- aliases are the OTHER WORDINGS A JOB POSTING WOULD USE for the same thing, not
+  synonyms of the person's phrasing for its own sake. This is the field that
+  decides whether the preference ever matches: "inpatient nights" reaches a
+  posting reading "three twelve-hour night shifts" only through
+  ["night shift", "overnight rotation", "night float"]. A label about relocation
+  needs ["onsite", "in-office", "hybrid"]. Give two to five where you can, and
+  an empty array where the label is already the words a posting would use.
+
+EDUCATION AND CREDENTIALS
+
+- A credential is something granted by a body that can also withdraw it: a
+  licence, a certification, a registration, a ticket. "ACLS", "RN licence",
+  "ServSafe", "CDL Class A", "AWS Solutions Architect", "PE licence".
+
+- A certification is a CREDENTIAL, not a skill, even though it is also a thing
+  the person can do. Filing it as a skill is how a licensed professional's
+  resume prints an empty credentials section while their licence sits in a list
+  of technologies. If it has an issuer, an expiry, or a number, it is a
+  credential.
+
+- Education is formal schooling only — a degree, a diploma, an apprenticeship
+  that conferred one. A course, a bootcamp, or a workshop that granted no
+  qualification is neither education nor a credential; leave it out.
+
+- Dates are optional on both. Null is correct where the text does not say; a
+  credential with no stated issue date is ordinary and inventing one is worse
+  than leaving it empty.
 
 <career_text>
 {{.CareerText}}

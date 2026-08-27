@@ -300,6 +300,57 @@ describe("EntityDraftReview", () => {
     ).toBeInTheDocument();
   });
 
+  // #89: the extractor now proposes education and credentials, and before this
+  // screen knew the kinds they landed under "Not attached to anything" —
+  // technically reviewable, but reading as a bug to the person reviewing it. A
+  // licensed professional's credentials are the point of the section, not
+  // leftovers.
+  it("groups education and credentials rather than treating them as unplaced", async () => {
+    const { fetchMock } = stubFetch([
+      ...careerDrafts(),
+      draft({
+        id: "draft-education",
+        kind: "education",
+        payload: {
+          institution: "Rush University",
+          degree: "BSN",
+          field_of_study: "Nursing",
+        },
+      }),
+      draft({
+        id: "draft-credential",
+        kind: "credential",
+        payload: { name: "ACLS", issuer: "American Heart Association" },
+      }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    // By heading role, not by text: KIND_LABEL puts "Education" on the draft
+    // card's own badge too, and the payload editor repeats each value, so a
+    // bare text query matches several nodes. Scope to the section instead.
+    const educationHeading = await screen.findByRole("heading", {
+      name: "Education",
+    });
+    const educationSection = educationHeading.closest("section")!;
+    expect(
+      within(educationSection).getAllByText("Rush University").length,
+    ).toBeGreaterThan(0);
+
+    const credentialSection = screen
+      .getByRole("heading", { name: "Credentials" })
+      .closest("section")!;
+    expect(
+      within(credentialSection).getAllByText("ACLS").length,
+    ).toBeGreaterThan(0);
+
+    // The bucket exists for kinds this screen genuinely has no place for.
+    // Neither of these is one any more.
+    expect(
+      screen.queryByText("Not attached to anything"),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows drafts it has no place for rather than dropping them", async () => {
     const { fetchMock } = stubFetch([
       ...careerDrafts(),
