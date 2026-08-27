@@ -32,7 +32,7 @@ test:
 # into a failure, so this cannot report success having silently run nothing.
 test-all:
 	go test ./...
-	REQUIRE_INTEGRATION=1 go test -tags integration ./...
+	REQUIRE_INTEGRATION=1 go test -count=1 -tags integration ./...
 	cd frontend && npm run test
 	cd docx-renderer && uv run pytest
 
@@ -40,7 +40,7 @@ test-all:
 # test-all because that requirement is not universal; CI runs it always.
 test-race:
 	CGO_ENABLED=1 go test -race ./...
-	CGO_ENABLED=1 REQUIRE_INTEGRATION=1 go test -race -tags integration ./...
+	CGO_ENABLED=1 REQUIRE_INTEGRATION=1 go test -race -count=1 -tags integration ./...
 
 # Refuses a migration numbered at or below one already on the base branch.
 # golang-migrate skips those forever and reports "no change" -- see #92.
@@ -50,7 +50,7 @@ check-migrations:
 BASE_REF ?= origin/main
 
 test-integration:
-	go test -tags integration ./...
+	go test -count=1 -tags integration ./...
 
 # The renderer is a separate process with its own toolchain, so its tests are
 # a separate target rather than part of `make test`.

@@ -99,9 +99,16 @@ jobs:
       - name: Unit tests
         run: go test ./...
 
-      # The 24 test functions across 10 files that #99 reports had never run.
+      # -count=1 disables the test cache, and that is not belt-and-braces.
+      # These tests depend on state the cache cannot see -- the database, the
+      # migrations applied to it, the seed loaded into it -- so a cached PASS
+      # is a statement about a previous run's database, not this one's. #93
+      # records the same trap biting during #78, where a cached PASS survived
+      # a source mutation because the test read a .sql file off disk.
+      #
+      # The unit tests above are hermetic and may cache freely.
       - name: Integration tests
-        run: go test -tags integration ./...
+        run: go test -count=1 -tags integration ./...
 
       # The rate limiter's mutex is currently the only synchronisation
       # primitive in the service, and it is on the request path. Everything
@@ -111,7 +118,7 @@ jobs:
       - name: Race detector
         run: |
           go test -race ./...
-          go test -race -tags integration ./...
+          go test -race -count=1 -tags integration ./...
 
   renderer:
     name: DOCX Renderer (Python)
