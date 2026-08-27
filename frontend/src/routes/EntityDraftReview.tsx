@@ -195,7 +195,7 @@ export function EntityDraftReview() {
   const working = batch ? isBatchWorking(batch.status) : false;
 
   return (
-    <div className="min-h-screen bg-paper">
+    <div>
       <div className="mx-auto max-w-4xl px-6 py-10">
         <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
           Career import · Review

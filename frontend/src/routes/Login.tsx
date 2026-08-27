@@ -1,7 +1,13 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatApiError } from "../lib/api-client";
+import {
+  AuthCard,
+  Field,
+  QuietLink,
+  SubmitButton,
+} from "../components/AuthCard";
 
 export function Login() {
   const { login } = useAuth();
@@ -36,16 +42,24 @@ export function Login() {
   }
 
   return (
-    <div className="mx-auto mt-24 max-w-sm">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Log in</h1>
-
+    <AuthCard
+      eyebrow="Role Model"
+      title="Log in"
+      footer={
+        <p className="font-body text-sm text-ink-dim">
+          Don't have an account? <QuietLink to="/signup">Sign up</QuietLink>
+        </p>
+      }
+    >
       {showExpiredBanner && (
-        <div className="mb-4 flex items-start justify-between gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <span>Your session expired. Please log in again.</span>
+        <div className="mb-4 flex items-start justify-between gap-2 border border-flag bg-flag-highlight px-3 py-2">
+          <span className="font-body text-sm text-ink">
+            Your session expired. Please log in again.
+          </span>
           <button
             type="button"
             onClick={() => setBannerDismissed(true)}
-            className="text-amber-600 hover:text-amber-900"
+            className="font-mono text-sm text-ink-dim"
             aria-label="Dismiss"
           >
             &times;
@@ -53,57 +67,32 @@ export function Login() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
+      <form onSubmit={handleSubmit}>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          required
+          autoComplete="username"
+          value={email}
+          onChange={setEmail}
+        />
+        <Field
+          id="password"
+          label="Password"
+          type="password"
+          required
+          autoComplete="current-password"
+          value={password}
+          onChange={setPassword}
+        />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? "Logging in..." : "Log in"}
-        </button>
+        <SubmitButton pending={submitting} pendingLabel="Logging in…" full>
+          Log in
+        </SubmitButton>
       </form>
-
-      <p className="mt-4 text-sm text-gray-600">
-        Don't have an account?{" "}
-        <Link to="/signup" className="text-gray-900 underline">
-          Sign up
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   );
 }

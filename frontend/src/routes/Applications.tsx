@@ -7,42 +7,42 @@ import {
 import { formatApiError } from "../lib/api-client";
 import type { Application } from "../lib/types";
 
+/**
+ * How far an application has travelled through the pipeline.
+ *
+ * The four states are stages, not verdicts, so they read on one scale rather
+ * than as good/bad: rail for untouched, verify for signals read, stamp for
+ * evaluated, ink for the end of the line. There is deliberately no pass/fail
+ * colour — the fit gate is advisory and nothing is blocked on it, so a red
+ * badge here would assert a judgment the backend does not make.
+ */
 function PipelineStatusBadge({ application }: { application: Application }) {
   const { data: fitReports } = useFitReports(application.id);
   const { data: versions } = useResumeVersions(application.id);
 
-  if (!application.jd_signals) {
-    return (
-      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-        Draft
-      </span>
-    );
+  // Order preserved from the original: no signals reads as Draft whatever
+  // else exists, because everything downstream is derived from them.
+  let label = "Draft";
+  let tone = "bg-rail";
+
+  if (application.jd_signals) {
+    if (versions && versions.length > 0) {
+      label = "Generated";
+      tone = "bg-ink";
+    } else if (fitReports?.[0]) {
+      label = "Fit evaluated";
+      tone = "bg-stamp";
+    } else {
+      label = "Signals extracted";
+      tone = "bg-verify";
+    }
   }
 
-  if (versions && versions.length > 0) {
-    return (
-      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">
-        Generated
-      </span>
-    );
-  }
-
-  const latestFitReport = fitReports?.[0];
-
-  if (!latestFitReport) {
-    return (
-      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-        Signals extracted
-      </span>
-    );
-  }
-
-  // No pass/fail here anymore — the anti-pattern check is advisory, so a
-  // report existing is the whole status. Its scores are what matter, and
-  // they live on the detail page.
   return (
-    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-      Fit evaluated
+    <span
+      className={`flex-shrink-0 px-2 py-1 font-mono text-[10px] tracking-wider text-surface uppercase ${tone}`}
+    >
+      {label}
     </span>
   );
 }
@@ -51,40 +51,43 @@ export function Applications() {
   const { data: applications, isLoading, error } = useApplications();
 
   return (
-    <div className="mx-auto mt-12 max-w-3xl px-4">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Applications</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/import/career/new"
-            className="rounded border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
-          >
-            Import career history
-          </Link>
-          <Link
-            to="/applications/new"
-            className="rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white"
-          >
-            New Application
-          </Link>
-        </div>
+    <div className="mx-auto max-w-4xl px-6 py-10">
+      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
+        Applications
+      </p>
+      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
+        <h1 className="font-display text-2xl font-bold text-ink">
+          Everywhere you have applied
+        </h1>
+        <Link
+          to="/applications/new"
+          className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface"
+        >
+          New application
+        </Link>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-600">Loading...</p>}
-      {error && <p className="text-sm text-red-600">{formatApiError(error)}</p>}
+      {isLoading && <p className="font-body text-sm text-ink-dim">Loading…</p>}
+      {error && (
+        <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
+          {formatApiError(error)}
+        </p>
+      )}
 
       {applications && applications.length === 0 && (
-        <div className="text-sm text-gray-600">
-          <p>No applications yet. Paste a job description to get started.</p>
+        <div className="border border-border bg-card p-4">
+          <p className="font-body text-sm text-ink-dim">
+            No applications yet. Paste a job description to get started.
+          </p>
           {/*
             An account with no applications is usually an account with no
             career in it either, and a job description is not much use without
             one. There is no "does this user have career data" signal to gate
             on, so this offers the import rather than asserting it is needed.
           */}
-          <p className="mt-2">
+          <p className="mt-2 font-body text-sm text-ink-dim">
             If you have not brought your career in yet,{" "}
-            <Link to="/import/career/new" className="underline">
+            <Link to="/import/career/new" className="text-ink underline">
               start there
             </Link>
             .
@@ -93,18 +96,23 @@ export function Applications() {
       )}
 
       {applications && applications.length > 0 && (
-        <ul className="divide-y divide-gray-200 rounded border border-gray-200">
+        <ul>
           {applications.map((application) => (
-            <li key={application.id}>
+            <li key={application.id} className="mb-2">
               <Link
                 to={`/applications/${application.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
+                className="flex items-start justify-between gap-3 border-y border-r border-l-[6px] border-border border-l-rail bg-card px-4 py-2.5"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {application.role_title} — {application.company_name}
+                  <p className="font-mono text-[10px] tracking-widest text-rail uppercase">
+                    {application.company_name}
                   </p>
-                  <p className="text-xs text-gray-500">{application.status}</p>
+                  <p className="font-display text-[15px] font-bold text-ink">
+                    {application.role_title}
+                  </p>
+                  <p className="font-body text-xs text-ink-dim">
+                    {application.status}
+                  </p>
                 </div>
                 <PipelineStatusBadge application={application} />
               </Link>
