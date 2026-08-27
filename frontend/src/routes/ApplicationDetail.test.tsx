@@ -146,7 +146,7 @@ describe("ApplicationDetail", () => {
       renderDetail();
 
       const button = await screen.findByRole("button", {
-        name: "Generate Resume",
+        name: "Generate resume",
       });
       expect(button).toBeEnabled();
       expect(
@@ -159,7 +159,7 @@ describe("ApplicationDetail", () => {
       renderDetail();
 
       const button = await screen.findByRole("button", {
-        name: "Generate Resume",
+        name: "Generate resume",
       });
       expect(button).toBeDisabled();
       expect(
@@ -192,16 +192,14 @@ describe("ApplicationDetail", () => {
       expect(
         await screen.findByText("This is the narrative."),
       ).toBeInTheDocument();
-      expect(screen.getByText("Capability score:")).toBeInTheDocument();
+      expect(screen.getByText("Capability score")).toBeInTheDocument();
       // Preference fit is four lists and no score. Gaps and matches render as
       // their own labelled lists; the hard-gate hits are the anti-pattern
       // callout above and are deliberately not repeated down here.
-      expect(screen.queryByText("Preference score:")).not.toBeInTheDocument();
-      expect(screen.getByText("Preferences matched:")).toBeInTheDocument();
+      expect(screen.queryByText(/Preference score/)).not.toBeInTheDocument();
+      expect(screen.getByText("Preferences matched")).toBeInTheDocument();
       expect(screen.getByText("distributed systems")).toBeInTheDocument();
-      expect(
-        screen.getByText("Preferences not mentioned:"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Preferences not mentioned")).toBeInTheDocument();
       expect(screen.getByText("remote-first")).toBeInTheDocument();
     });
 
@@ -271,13 +269,13 @@ describe("ApplicationDetail", () => {
       expect(await screen.findByText("Dealbreaker flag")).toBeInTheDocument();
       expect(screen.queryByText(/\/100/)).not.toBeInTheDocument();
       expect(
-        screen.getByText("Capability score:").closest("p"),
-      ).toHaveTextContent("Capability score: —");
+        screen.getByText("Capability score").closest("p"),
+      ).toHaveTextContent("Capability score —");
       // An empty preference list renders as nothing at all rather than as a
       // dash. There is no score to be absent — a heading with no entries under
       // it would be the only thing pretending otherwise.
       expect(
-        screen.queryByText("Preferences not mentioned:"),
+        screen.queryByText("Preferences not mentioned"),
       ).not.toBeInTheDocument();
     });
 
@@ -307,14 +305,14 @@ describe("ApplicationDetail", () => {
       renderDetail();
 
       expect(
-        await screen.findByText("Below the level asked for:"),
+        await screen.findByText("Below the level asked for"),
       ).toBeInTheDocument();
       expect(
         screen.getByText(/posting asks for expert, yours is novice/),
       ).toBeInTheDocument();
       // Present, not missing: it must not have been filed under gaps.
       expect(
-        screen.getByText("Capability gaps:").closest("div"),
+        screen.getByText("Capability gaps").closest("div"),
       ).not.toHaveTextContent("Kafka");
     });
 
@@ -326,7 +324,7 @@ describe("ApplicationDetail", () => {
         await screen.findByText("This is the narrative."),
       ).toBeInTheDocument();
       expect(
-        screen.queryByText("Below the level asked for:"),
+        screen.queryByText("Below the level asked for"),
       ).not.toBeInTheDocument();
     });
 

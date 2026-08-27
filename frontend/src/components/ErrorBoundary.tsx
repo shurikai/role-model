@@ -31,17 +31,23 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     return (
-      <div className="mx-auto mt-12 max-w-3xl px-4">
-        <div className="rounded border border-red-300 bg-red-50 p-4">
-          <h1 className="mb-1 text-lg font-semibold text-red-800">
+      <div className="flex min-h-screen flex-col bg-paper">
+        <div className="mx-auto w-full max-w-3xl px-6 py-20">
+          <p className="mb-2 font-mono text-[11px] tracking-widest text-reject uppercase">
+            Error
+          </p>
+          <h1 className="mb-1 font-display text-2xl font-bold text-ink">
             Something went wrong
           </h1>
-          <p className="text-sm text-red-700">{error.message}</p>
-          <p className="mt-3 text-sm">
-            <Link to="/applications" className="text-red-800 underline">
-              Back to applications
-            </Link>
+          <p className="mb-4 border border-reject bg-card p-4 font-body text-sm text-ink">
+            {error.message}
           </p>
+          <Link
+            to="/applications"
+            className="font-body text-sm text-ink-dim underline"
+          >
+            Back to applications
+          </Link>
         </div>
       </div>
     );

@@ -1,7 +1,13 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { formatApiError } from "../lib/api-client";
+import {
+  AuthCard,
+  Field,
+  QuietLink,
+  SubmitButton,
+} from "../components/AuthCard";
 
 export function Signup() {
   const { signup } = useAuth();
@@ -33,60 +39,42 @@ export function Signup() {
   }
 
   return (
-    <div className="mx-auto mt-24 max-w-sm">
-      <h1 className="mb-6 text-2xl font-semibold text-gray-900">Sign up</h1>
+    <AuthCard
+      eyebrow="Role Model"
+      title="Sign up"
+      intro="One account holds your career history, what you want from a role, and every application you tailor against it."
+      footer={
+        <p className="font-body text-sm text-ink-dim">
+          Already have an account? <QuietLink to="/login">Log in</QuietLink>
+        </p>
+      }
+    >
+      <form onSubmit={handleSubmit}>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          required
+          autoComplete="username"
+          value={email}
+          onChange={setEmail}
+        />
+        <Field
+          id="password"
+          label="Password"
+          type="password"
+          required
+          autoComplete="new-password"
+          value={password}
+          onChange={setPassword}
+        />
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700"
-          >
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full rounded border border-gray-300 px-3 py-2 text-sm"
-          />
-        </div>
+        {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-gray-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? "Signing up..." : "Sign up"}
-        </button>
+        <SubmitButton pending={submitting} pendingLabel="Signing up…" full>
+          Sign up
+        </SubmitButton>
       </form>
-
-      <p className="mt-4 text-sm text-gray-600">
-        Already have an account?{" "}
-        <Link to="/login" className="text-gray-900 underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthCard>
   );
 }
