@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -50,7 +51,7 @@ func (q *Queries) CreateSkill(ctx context.Context, arg CreateSkillParams) (Skill
 	return i, err
 }
 
-const deleteSkill = `-- name: DeleteSkill :exec
+const deleteSkill = `-- name: DeleteSkill :execrows
 DELETE FROM skills
 WHERE id = $1 AND user_id = $2
 `
@@ -60,9 +61,12 @@ type DeleteSkillParams struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) DeleteSkill(ctx context.Context, arg DeleteSkillParams) error {
-	_, err := q.db.Exec(ctx, deleteSkill, arg.ID, arg.UserID)
-	return err
+func (q *Queries) DeleteSkill(ctx context.Context, arg DeleteSkillParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSkill, arg.ID, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const getSkill = `-- name: GetSkill :one
@@ -307,6 +311,64 @@ func (q *Queries) ListSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Ski
 			&i.ID,
 			&i.UserID,
 			&i.TagID,
+			&i.Proficiency,
+			&i.YearsExperience,
+			&i.IsActive,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSkillsWithTagsByUser = `-- name: ListSkillsWithTagsByUser :many
+SELECT s.id, s.tag_id, t.name, t.category, s.proficiency, s.years_experience,
+       s.is_active, s.created_at, s.updated_at
+FROM skills s
+JOIN tags t ON t.id = s.tag_id AND t.user_id = s.user_id
+WHERE s.user_id = $1
+ORDER BY t.category, t.name
+`
+
+type ListSkillsWithTagsByUserRow struct {
+	ID              uuid.UUID      `json:"id"`
+	TagID           uuid.UUID      `json:"tag_id"`
+	Name            string         `json:"name"`
+	Category        string         `json:"category"`
+	Proficiency     string         `json:"proficiency"`
+	YearsExperience pgtype.Numeric `json:"years_experience"`
+	IsActive        bool           `json:"is_active"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
+// Every claimed skill with the tag behind it, for the management API.
+//
+// Distinct from ListActiveSkillProfileByUser, which is the generation prompt's
+// view: this one carries the id (nothing can be edited without it) and does
+// NOT filter on is_active, because deactivating a skill is the main thing the
+// screen is for and a list that hides what you just deactivated cannot show
+// you how to put it back.
+func (q *Queries) ListSkillsWithTagsByUser(ctx context.Context, userID uuid.UUID) ([]ListSkillsWithTagsByUserRow, error) {
+	rows, err := q.db.Query(ctx, listSkillsWithTagsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSkillsWithTagsByUserRow
+	for rows.Next() {
+		var i ListSkillsWithTagsByUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TagID,
+			&i.Name,
+			&i.Category,
 			&i.Proficiency,
 			&i.YearsExperience,
 			&i.IsActive,
