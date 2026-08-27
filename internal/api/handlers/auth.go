@@ -19,10 +19,18 @@ type AuthHandler struct {
 	pool      *pgxpool.Pool
 	queries   *db.Queries
 	jwtSecret string
+	// signupEnabled gates account creation. See config.Load: true in
+	// development, false anywhere else unless SIGNUP_ENABLED says otherwise.
+	signupEnabled bool
 }
 
-func NewAuthHandler(pool *pgxpool.Pool, queries *db.Queries, jwtSecret string) *AuthHandler {
-	return &AuthHandler{pool: pool, queries: queries, jwtSecret: jwtSecret}
+func NewAuthHandler(pool *pgxpool.Pool, queries *db.Queries, jwtSecret string, signupEnabled bool) *AuthHandler {
+	return &AuthHandler{
+		pool:          pool,
+		queries:       queries,
+		jwtSecret:     jwtSecret,
+		signupEnabled: signupEnabled,
+	}
 }
 
 type authRequest struct {
@@ -42,6 +50,15 @@ type userDTO struct {
 }
 
 func (h *AuthHandler) Signup(w http.ResponseWriter, r *http.Request) {
+	// Checked before the body is read, so a closed instance does no work on
+	// behalf of an unauthenticated caller — including the bcrypt hash below,
+	// which is deliberately expensive.
+	if !h.signupEnabled {
+		httputil.WriteError(w, http.StatusForbidden, "signup_disabled",
+			"this instance is not accepting new accounts")
+		return
+	}
+
 	var req authRequest
 	if !decodeJSON(w, r, &req) {
 		return

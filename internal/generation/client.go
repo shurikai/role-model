@@ -3,10 +3,24 @@ package generation
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
+
+// RequestTimeout bounds a single model call.
+//
+// There was none: the SDK was constructed with an API key and nothing else,
+// and Complete passes a request context that carried no deadline of its own.
+//
+// Sized for the slowest legitimate call rather than the typical one. Career
+// extraction is capped at 16384 output tokens, and the fit narrative and the
+// 2a/2b generation pair are smaller but still measured in tens of seconds. A
+// tight timeout here does not protect anything — it just fails the pipeline's
+// normal path. It must stay below the server's WriteTimeout so a stalled call
+// surfaces as an error from here.
+const RequestTimeout = 3 * time.Minute
 
 type Client struct {
 	api   anthropic.Client
@@ -15,7 +29,10 @@ type Client struct {
 
 func NewClient(apiKey string) *Client {
 	return &Client{
-		api:   anthropic.NewClient(option.WithAPIKey(apiKey)),
+		api: anthropic.NewClient(
+			option.WithAPIKey(apiKey),
+			option.WithRequestTimeout(RequestTimeout),
+		),
 		model: anthropic.ModelClaudeSonnet4_5_20250929,
 	}
 }

@@ -6,7 +6,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
+
+// RequestTimeout bounds a single /render call.
+//
+// The client was a bare &http.Client{}, which has NO timeout, and Render
+// passes the request's context — which carried no deadline either while the
+// server set no WriteTimeout. A renderer that accepted a connection and then
+// stopped responding held the API request open forever.
+//
+// Generous for the work: python-docx builds a document in well under a
+// second, so anything approaching this is a hung process rather than a slow
+// one. It must stay comfortably below the server's WriteTimeout so this
+// client reports the failure rather than the connection simply dying.
+const RequestTimeout = 60 * time.Second
 
 // Client calls the docx-renderer service's /render endpoint, which takes the
 // intermediate resume JSON document (see /schema/resume.v2.json) and returns
@@ -20,7 +34,7 @@ type Client struct {
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
-		http:    &http.Client{},
+		http:    &http.Client{Timeout: RequestTimeout},
 	}
 }
 
