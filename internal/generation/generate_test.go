@@ -97,7 +97,7 @@ func TestGenerate(t *testing.T) {
 	if err := json.Unmarshal(*rv.StructuredOutput, &out); err != nil {
 		t.Fatalf("unmarshal structured_output: %v", err)
 	}
-	// "Lakeside State is seeded" was the old assertion, and Lakeside State is in the private
+	// The old assertion named one institution, which exists in the private
 	// dataset only — the same hardcoding as the user id (#90). What the
 	// document must actually do is carry the education this account has, so
 	// the expectation is read from the account rather than named.

@@ -38,7 +38,11 @@
 //
 // Usage:
 //
-//	go run ./cmd/vocabaudit --file notes/canonical-context.md --email you@example.com
+//	go run ./cmd/vocabaudit --file path/to/career.md --email you@example.com
+//
+// --file has no default. The document it reads is a personal career record
+// and is not kept in this repository; defaulting to a path that cannot exist
+// reports a missing file as though the tool were misconfigured.
 package main
 
 import (
@@ -59,12 +63,15 @@ import (
 
 func main() {
 	var (
-		file  = flag.String("file", "notes/canonical-context.md", "path to the canonical career document")
+		file  = flag.String("file", "", "path to the canonical career document (required)")
 		email = flag.String("email", "", "email of the account to audit")
 		user  = flag.String("user", "", "user UUID, if you would rather not look it up by email")
 	)
 	flag.Parse()
 
+	if *file == "" {
+		log.Fatal("-file is required: the canonical career document lives outside this repo")
+	}
 	if *email == "" && *user == "" {
 		log.Fatal("one of -email or -user is required")
 	}

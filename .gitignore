@@ -48,3 +48,12 @@ generated_resume*.json
 
 # Database dumps (make db-dump). Real career data — never commit.
 backups/
+
+# Private working material — see the separate role-model-notes repo.
+# These were tracked until 2026-08-27; they carry an employment history, a
+# self-assessed skill inventory, and a set of job-search filters, none of
+# which belong in a public repository.
+notes/canonical-context.md
+notes/vocab-audit-*.md
+notes/hard-exclude-preference-audit.md
+prompts/cc_sessions/

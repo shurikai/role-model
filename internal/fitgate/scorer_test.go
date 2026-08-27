@@ -23,9 +23,11 @@ var testLevels = NewLevelScale([]db.ProficiencyLevel{
 	{Value: "expert", Rank: 3},
 })
 
-// Real label text from the seeded preference rows. The exact wording is what
-// produces the collisions these tests exist to catch, so approximations would
-// defeat the point.
+// Fixed label text, shared across the cases below. The exact wording is
+// load-bearing rather than illustrative: token count, punctuation and the
+// "X as a primary language" shape are what produce the collisions these
+// tests exist to catch, so approximations would defeat the point. Change one
+// and read every case that uses it.
 const (
 	consultingLabel = "IT consulting / staff augmentation model"
 	defenseLabel    = "defense / aerospace"
@@ -147,9 +149,10 @@ func TestHardGateMatching(t *testing.T) {
 			wantPassed: true,
 		},
 		{
-			// The Citi case. Angular appeared once, in a "nice to have"
-			// bullet, and that was enough to disqualify the role with a
-			// narrative asserting a requirement the JD never stated.
+			// A real posting this misfired on: Angular appeared once, in a
+			// "nice to have" bullet, and that was enough to disqualify the
+			// role with a narrative asserting a requirement the JD never
+			// stated.
 			name: "angular as a preferred skill only does not trip the angular exclude",
 			pref: hardGate(angularLabel, "core_practice"),
 			signals: JDSignals{

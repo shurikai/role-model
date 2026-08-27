@@ -240,7 +240,7 @@ row can dominate on weight alone.
 `preference_type` is doing double duty: it names both the *subject* of the
 preference and (via `anti_pattern`) a kind of sentiment. That overlap is what the
 `gateFieldsFor` routing in `internal/fitgate/scorer.go` has to work around, and
-it's documented at length in `notes/hard-exclude-preference-audit.md`.
+the reasoning is summarised in the **Fit gate** section of `CLAUDE.md`.
 
 ---
 
@@ -442,7 +442,7 @@ The stale claims in `CLAUDE.md` and `README.md` should be corrected.
 
 Carried forward from the session 030 ROADMAP refresh, and confirmed here — the
 `preferences` table has 24 rows, while the ROADMAP's Hard-Pass Filters list has
-entries with no corresponding row at all (Ruby/Rails, C#/.NET, the location-based onsite
+entries with no corresponding row at all (two languages, and the location
 constraint), and at least one direct contradiction (crypto/blockchain is a hard
 pass in the doc, a `positive` at weight 5 in the seed).
 

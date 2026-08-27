@@ -66,12 +66,12 @@ func TestAssembleContext(t *testing.T) {
 // assertActiveContributionRule checks both directions of AssembleContext's
 // inclusion rule against what the database actually holds.
 //
-// This used to be one line naming a company: "Kestrel Consulting must NOT appear — its
-// only contributions are inactive." That is an employer in the private seed,
-// so against either public dataset the check passed by finding nothing called
-// Kestrel Consulting — reporting success for a rule it had not tested. A hardcoded
-// company name is the same defect as a hardcoded user id (#90), one layer
-// down and harder to notice, because it fails open.
+// This used to be one line naming a specific employer: "X must NOT appear —
+// its only contributions are inactive." That employer exists only in the
+// private seed, so against either public dataset the check passed by finding
+// nothing by that name — reporting success for a rule it had not tested. A
+// hardcoded company name is the same defect as a hardcoded user id (#90),
+// one layer down and harder to notice, because it fails open.
 //
 // Derived from the data instead: whichever employers have no active
 // contribution behind them must be absent, and whichever do must be present.

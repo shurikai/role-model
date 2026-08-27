@@ -62,7 +62,7 @@ Tags are the current mechanism for retrieval relevance. 54 tags exist across 9 c
 - Guarded deletes: deleting a resource with children returns `409 has_dependents` rather than cascading silently.
 - Transactional join-table cleanup on contribution and project deletes.
 - Parent-ownership is verified on every nested create (no orphaned children across tenants).
-- `is_active` flag on contributions: `FALSE` means invisible to generation but still queryable (used for Kestrel Consulting and a few other low-signal entries).
+- `is_active` flag on contributions: `FALSE` means invisible to generation but still queryable (used for short engagements and other low-signal entries).
 - JSONB columns use sqlc column-level overrides with `pointer: true` for nullable columns — the `db_type` override alone was insufficient in sqlc 1.31.1.
 
 ## 4. Known Gap: Feedback Loop Schema (partially designed, not yet built)
@@ -85,7 +85,7 @@ A prior design session established the conceptual shape of the feedback loop but
 Two things Role Model currently has no first-class representation for:
 
 - **Skills** — these are emergent only from tag aggregation across contributions. There's no row that says "Jason has expert-level Java, 25 years" with a proficiency level or years-of-experience figure. A skill only exists as the side effect of contributions being tagged with it.
-- **Preferences** — domain interests, work-type preferences, culture fit, and hard anti-patterns (e.g. "no Big Four consulting," "defense/aerospace avoided") currently live only in conversational memory across chat sessions. Nothing in the database encodes them, and nothing in the pipeline can query them.
+- **Preferences** — domain interests, work-type preferences, culture fit, and hard anti-patterns (e.g. "no agency work," "a whole industry ruled out") currently live only in conversational memory across chat sessions. Nothing in the database encodes them, and nothing in the pipeline can query them.
 
 This matters because the next roadmap item — a preference-fit scoring pipeline — needs both to be queryable by SQL, the same way contribution relevance already is. Without this, fit scoring can't follow the same auditable-retrieval pattern as the rest of the system; it would have to either re-derive preferences from prose each run (fragile, non-deterministic) or hardcode them (defeats the point of a database-backed system).
 
@@ -147,7 +147,7 @@ CREATE TABLE preferences (
   id                UUID PRIMARY KEY,
   user_id           UUID NOT NULL REFERENCES users(id),
   preference_type   TEXT NOT NULL,
-  label             TEXT NOT NULL,   -- e.g. "IoT/telemetry", "remote-first", "Big Four consulting"
+  label             TEXT NOT NULL,   -- e.g. "IoT/telemetry", "remote-first", "agency culture"
   sentiment         TEXT NOT NULL,
   weight            SMALLINT,        -- nullable; relative importance within its type, 1-10
   context_type      TEXT,            -- nullable; e.g. "permanent", "contract", "fractional"; NULL = applies globally

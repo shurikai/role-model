@@ -730,7 +730,6 @@ Rules:
 /migrations                      — golang-migrate SQL migration files
 /schema                          — JSON schema documents
 /tests/fixtures                  — JD, resume JSON, and .docx regression fixtures
-/prompts/cc_sessions             — per-session task specs (scaffolding record)
 /notes                           — working notes
 
 ## Key Files
