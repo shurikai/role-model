@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +17,7 @@ import (
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/httputil"
 	"github.com/shurikai/role-model/internal/intake"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 // These run against a real database because what they are testing is a
@@ -38,10 +38,7 @@ type intakeFixture struct {
 
 func newIntakeFixture(t *testing.T, extractor intake.Extractor) *intakeFixture {
 	t.Helper()
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL required for intake handler integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {

@@ -10,8 +10,39 @@ jobs:
   backend:
     name: Backend (Go)
     runs-on: ubuntu-latest
+
+    services:
+      # The integration suites run against a live, migrated database. Without
+      # this they were skipping -- see the integration job's own note and #99.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rolemodel
+          POSTGRES_PASSWORD: rolemodel
+          POSTGRES_DB: role_model
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rolemodel -d role_model"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    env:
+      DATABASE_URL: postgres://rolemodel:rolemodel@localhost:5432/role_model?sslmode=disable
+      JWT_SECRET: ci-secret-long-enough-to-pass-validation
+      # Turns "DATABASE_URL not set, skipping" into a failure. Without it a job
+      # that lost an environment variable would report a green `ok` for a
+      # package in which nothing ran, which is the subtle half of #99: wiring
+      # the integration tests up wrong looks exactly like wiring them up right.
+      REQUIRE_INTEGRATION: "1"
+
     steps:
       - uses: actions/checkout@v4
+        with:
+          # check-migration-order.sh compares this branch against the base, so
+          # it needs the base to exist locally.
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
@@ -26,11 +57,61 @@ jobs:
             exit 1
           fi
 
+      - name: go vet
+        run: |
+          go vet ./...
+          go vet -tags integration ./...
+
       - name: Build
         run: go build ./...
 
-      - name: Test
+      # Fails a migration numbered at or below one already on main. Those are
+      # skipped forever by golang-migrate, which reports "no change" rather
+      # than an error -- it has already happened once here (#92).
+      - name: Migration ordering
+        run: |
+          git fetch --no-tags --depth=1 origin "${GITHUB_BASE_REF:-main}"
+          scripts/check-migration-order.sh "origin/${GITHUB_BASE_REF:-main}"
+
+      - name: Install migrate
+        run: |
+          curl -sSL https://github.com/golang-migrate/migrate/releases/download/v4.18.1/migrate.linux-amd64.tar.gz \
+            | tar xvz migrate
+          sudo mv migrate /usr/local/bin/
+
+      # Applying every migration from scratch, on every run, is itself a test:
+      # nothing else verifies that the directory is coherent end to end.
+      - name: Apply migrations
+        run: migrate -path migrations -database "$DATABASE_URL" up
+
+      # Seeded because the assembly tests need a career to assemble. An
+      # unseeded database is not a neutral starting point here: the API suite
+      # creates accounts and leaves an employer whose only contribution it
+      # deleted, so "no career anywhere" stops being true while still not
+      # being a career -- and TestAssembleContext then picks that account and
+      # fails on an employer assembly correctly drops.
+      - name: Seed the sample dataset
+        run: |
+          for f in database/sample/0*.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Unit tests
         run: go test ./...
+
+      # The 24 test functions across 10 files that #99 reports had never run.
+      - name: Integration tests
+        run: go test -tags integration ./...
+
+      # The rate limiter's mutex is currently the only synchronisation
+      # primitive in the service, and it is on the request path. Everything
+      # else at package level is a read-only lookup, an embed.FS or a
+      # template.Must. The next piece of shared mutable state will arrive
+      # without anyone announcing it.
+      - name: Race detector
+        run: |
+          go test -race ./...
+          go test -race -tags integration ./...
 
   renderer:
     name: DOCX Renderer (Python)
@@ -89,3 +170,27 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  images:
+    name: Container images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The self-host path is `docker compose up --build`, so a Dockerfile that
+      # stopped building would break the documented way in while every other
+      # job stayed green.
+      - name: Build all three images
+        run: |
+          docker build -t rolemodel-server:ci .
+          docker build -t rolemodel-renderer:ci ./docx-renderer
+          docker build -t rolemodel-web:ci ./frontend
+
+      # A compose file that does not parse fails at `up`, which is the worst
+      # place to find out. The dummy values stand in for the required-variable
+      # guards; `config` resolves them without starting anything.
+      - name: Validate the compose file
+        env:
+          JWT_SECRET: ci-secret-long-enough-to-pass-validation
+          ANTHROPIC_API_KEY: sk-ant-not-a-real-key
+        run: docker compose config --quiet

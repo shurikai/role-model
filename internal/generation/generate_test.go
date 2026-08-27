@@ -5,24 +5,18 @@ package generation_test
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 func TestGenerate(t *testing.T) {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL not set, skipping integration test")
-	}
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		t.Skip("ANTHROPIC_API_KEY not set, skipping integration test")
-	}
+	dsn := testenv.DatabaseURL(t)
+	apiKey := testenv.AnthropicAPIKey(t)
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)

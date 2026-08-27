@@ -4,18 +4,15 @@ package db_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/shurikai/role-model/internal/config"
 	"github.com/shurikai/role-model/internal/db"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 func TestNewPool_Connect(t *testing.T) {
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		t.Skip("DATABASE_URL not set, skipping DB pool integration test.")
-	}
+	dsn := testenv.DatabaseURL(t)
 
 	cfg := &config.Config{DatabaseURL: dsn}
 

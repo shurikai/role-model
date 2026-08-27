@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/project"
+	"github.com/shurikai/role-model/internal/testenv"
 )
 
 // testServer spins up the real router against the test database and returns
@@ -28,11 +28,8 @@ import (
 func testServer(t *testing.T) (*httptest.Server, *config.Config) {
 	t.Helper()
 
-	dsn := os.Getenv("DATABASE_URL")
-	secret := os.Getenv("JWT_SECRET")
-	if dsn == "" || secret == "" {
-		t.Skip("DATABASE_URL and JWT_SECRET required for API integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
+	secret := testenv.JWTSecret(t)
 
 	cfg := &config.Config{
 		DatabaseURL: dsn,
@@ -217,11 +214,8 @@ func createAndGetID(t *testing.T, srv *httptest.Server, token, path string, body
 // and spend the operator's Anthropic key. This is single-user software by
 // default, so the second account is the unusual case rather than the first.
 func TestSignupCanBeDisabled(t *testing.T) {
-	dsn := os.Getenv("DATABASE_URL")
-	secret := os.Getenv("JWT_SECRET")
-	if dsn == "" || secret == "" {
-		t.Skip("DATABASE_URL and JWT_SECRET required for API integration tests")
-	}
+	dsn := testenv.DatabaseURL(t)
+	secret := testenv.JWTSecret(t)
 
 	pool, err := db.NewPool(context.Background(), &config.Config{DatabaseURL: dsn})
 	if err != nil {

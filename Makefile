@@ -7,7 +7,7 @@ export
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all setup build clean test db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
+.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -20,6 +20,34 @@ clean:
 
 test:
 	go test ./...
+
+# Everything, in one command.
+#
+# `make test` is Go unit tests only, which is roughly 40% of the suite -- a
+# contributor running it before pushing was exercising less than half of what
+# CI would. The three languages each had their own target and nothing tied
+# them together.
+#
+# REQUIRE_INTEGRATION turns the integration suites' "no DATABASE_URL, skipping"
+# into a failure, so this cannot report success having silently run nothing.
+test-all:
+	go test ./...
+	REQUIRE_INTEGRATION=1 go test -tags integration ./...
+	cd frontend && npm run test
+	cd docx-renderer && uv run pytest
+
+# The race detector needs cgo, and therefore a C toolchain. Separate from
+# test-all because that requirement is not universal; CI runs it always.
+test-race:
+	CGO_ENABLED=1 go test -race ./...
+	CGO_ENABLED=1 REQUIRE_INTEGRATION=1 go test -race -tags integration ./...
+
+# Refuses a migration numbered at or below one already on the base branch.
+# golang-migrate skips those forever and reports "no change" -- see #92.
+check-migrations:
+	@scripts/check-migration-order.sh $(BASE_REF)
+
+BASE_REF ?= origin/main
 
 test-integration:
 	go test -tags integration ./...
