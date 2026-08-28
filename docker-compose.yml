@@ -11,7 +11,15 @@
 services:
   db:
     image: postgres:16
-    container_name: role_model_db
+    # Deliberately no container_name. Compose namespaces containers and volumes
+    # by project, so `docker compose -p something-else up` gets its own
+    # database with its own data — which is how you run a clean instance beside
+    # a working one. A fixed container_name defeats exactly that: the volume
+    # would be namespaced but the container name would collide, and the second
+    # project simply refuses to start.
+    #
+    # Nothing refers to the container by name; the Makefile talks to the
+    # service (`docker compose exec -T db …`), which is project-agnostic.
     environment:
       POSTGRES_USER: rolemodel
       POSTGRES_PASSWORD: rolemodel
