@@ -12,8 +12,7 @@ document is design history and describes 18 tables; this one describes what is
 actually deployed.
 
 **22 application tables + 1 view.** (`schema_migrations` is golang-migrate's own
-bookkeeping table and is excluded from that count, which is how the ROADMAP
-counts it too.)
+bookkeeping table and is excluded from that count.)
 
 ---
 
@@ -347,7 +346,8 @@ Resolving those strings to real FK rows is what approval does.
 Adds `flags` (JSONB, for flagged inferences) and `status` with CHECK `pending`,
 `approved`, `rejected`.
 
-Note: these two tables differ from the ROADMAP's proposed DDL — the shipped
+Note: these two tables differ from an earlier ROADMAP revision's proposed DDL
+(see git history) — the shipped
 version uses `batch_id` (not `import_batch_id`), `status` (not `review_status`),
 and drops `raw_text`/`suggested_text`/`confidence`/`contribution_id` in favor of
 the contribution-shaped fields above.
@@ -441,10 +441,11 @@ The stale claims in `CLAUDE.md` and `README.md` should be corrected.
 ### 2. The hard-pass list and the `preferences` rows disagree
 
 Carried forward from the session 030 ROADMAP refresh, and confirmed here — the
-`preferences` table has 24 rows, while the ROADMAP's Hard-Pass Filters list has
-entries with no corresponding row at all (two languages, and the location
-constraint), and at least one direct contradiction (crypto/blockchain is a hard
-pass in the doc, a `positive` at weight 5 in the seed).
+`preferences` table has 24 rows, while an earlier ROADMAP revision's Hard-Pass
+Filters list (see git history) had entries with no corresponding row at all (two
+languages, and the location constraint), and at least one direct contradiction
+(crypto/blockchain is a hard pass in that list, a `positive` at weight 5 in the
+seed).
 
 `fitgate` can only act on rows that exist. Anything on that list without a
 `preferences` row is documentation, not behavior.

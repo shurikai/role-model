@@ -812,14 +812,25 @@ issue or PR interaction rather than constructing raw `gh api` calls from scratch
 - Close only on explicit human confirmation: `gh issue close N`
 
 ### Labels in use
+- `stage-0` — LLM-assisted import pipeline
+- `stage-1` — JD signal extraction / fit assessment
 - `stage-2` — resume generation pipeline work
 - `renderer` — DOCX/PDF rendering
+- `frontend` — frontend UI work
+- `mcp` — MCP server surface
 - `infra` — tooling, migrations, dev environment
 - `backlog` — deferred, not forgotten
 - `in-progress` — actively being worked in the current or most recent session
 
 Apply an existing label rather than inventing a new one. Ask if a new label
 seems genuinely warranted.
+
+### Milestones are phases
+The roadmap phases (`Phase 1 …` through `Phase 4 …`, plus `Phase 2.5 — MCP
+Server`) are GitHub **milestones**, not labels. Assign every planned issue to
+its phase milestone; each milestone's description is that phase's gate. The
+phase is the *only* thing milestones track — do not add `phase-*` labels beside
+them. `ROADMAP.md` is the human-readable index of the same structure.
 
 ### What belongs in Issues vs. here
 - Issues are the source of truth for *what's planned and tracked*.
