@@ -1,4 +1,5 @@
 # Role Model
+
 ![CI](https://github.com/shurikai/role-model/actions/workflows/ci.yml/badge.svg)
 
 A career knowledge base that generates tailored, traceable resumes. Built in Go, backed by Postgres, reasoned over by Claude.
@@ -27,7 +28,7 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 
 ## Why it's structured this way
 
-**Contributions are atoms, not bullets.** Each one captures a piece of work in more detail than would ever fit on a resume — the resume bullet is a *projection* of the atom, generated per-application, not the atom itself. This is what makes tailoring possible without rewriting from scratch every time.
+**Contributions are atoms, not bullets.** Each one captures a piece of work in more detail than would ever fit on a resume — the resume bullet is a _projection_ of the atom, generated per-application, not the atom itself. This is what makes tailoring possible without rewriting from scratch every time.
 
 **Positions are split by title within long-tenure employers.** Seventeen years at one company isn't one job; it's several jobs that happened to share a building. Splitting on title change keeps the level and scope of each role honest.
 
@@ -35,7 +36,7 @@ Architecturally, this makes Role Model a bespoke retrieval-augmented system: str
 
 **Career data enters through review, not through a form.** The main path in is
 the career import: paste a résumé, a CV, or free-form notes about what you did,
-and an LLM pass turns it into staged *drafts* — employers, positions,
+and an LLM pass turns it into staged _drafts_ — employers, positions,
 contributions, skills, preferences, education, credentials — which you approve
 or reject one at a time. Nothing reaches your record unreviewed, and a draft
 whose parent is still pending is refused by name rather than cascaded, because
@@ -101,6 +102,22 @@ An instance exposed to a network should drop that line from
 at all — the renderer in particular has no authentication and is meant to sit
 behind the API on a private network.
 
+**Compose reuses whatever database its project already has.** Data lives in a
+named volume, so `docker compose up` attaches to the existing one rather than
+starting empty — which is what you want for your own instance, and not what
+you want when you meant to start fresh. A different project name gets its own
+volume and therefore its own database, migrated and empty:
+
+```bash
+docker compose -p rolemodel-demo up --build   # a clean instance, alongside yours
+docker compose -p rolemodel-demo down -v      # and gone again, volume included
+```
+
+Set `WEB_PORT` in that project's environment if the default 8080 is taken by
+the other one. To wipe the database an instance already has, `down -v` on its
+own project — `-v` is what removes the volume, and without it a rebuild comes
+back with the same data.
+
 To try the pipeline without a career of your own:
 
 ```bash
@@ -122,7 +139,7 @@ make dev        # API, frontend and renderer together; Ctrl-C stops all three
 
 `make dev` runs the three processes in one terminal; `make run`,
 `make run-frontend` and `make run-renderer` start them individually. Here the
-frontend is on `:5173` and the API on `:8080`, which *are* different origins —
+frontend is on `:5173` and the API on `:8080`, which _are_ different origins —
 so `CORS_ALLOWED_ORIGINS` matters on this path, and defaults to
 `http://localhost:5173`.
 
@@ -208,7 +225,7 @@ Honest about what is missing, since the list is short and specific:
 
 - **No career-data browsing or editing in the UI.** Import review is the only
   way to inspect what was captured. Correcting a contribution afterwards means
-  the API or SQL. Skills and preferences *are* editable — see Profile — but
+  the API or SQL. Skills and preferences _are_ editable — see Profile — but
   employers, positions and contributions are not.
 - **No password reset in the app.** `make reset-password` is the stopgap.
 - **No review gate on extracted JD signals** before generation runs.
@@ -234,4 +251,5 @@ Honest about what is missing, since the list is short and specific:
   going
 
 ## License
+
 Apache License 2.0 — see [LICENSE](./LICENSE).
