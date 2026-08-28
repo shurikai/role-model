@@ -30,6 +30,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           <nav className="flex items-center gap-4">
             <ShellLink to="/applications">Applications</ShellLink>
+            <ShellLink to="/profile">Profile</ShellLink>
             <ShellLink to="/import/career/new">Career import</ShellLink>
             {/*
               The narrow path: contributions against employers and positions

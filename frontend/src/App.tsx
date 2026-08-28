@@ -8,6 +8,7 @@ import { Signup } from "./routes/Signup";
 import { Applications } from "./routes/Applications";
 import { ApplicationNew } from "./routes/ApplicationNew";
 import { ApplicationDetail } from "./routes/ApplicationDetail";
+import { Profile } from "./routes/Profile";
 import { ImportStart } from "./routes/ImportStart";
 import { ImportReview } from "./routes/ImportReview";
 import { CareerImportStart } from "./routes/CareerImportStart";
@@ -36,6 +37,7 @@ function App() {
                   element={<Navigate to="/applications" replace />}
                 />
                 <Route path="/applications" element={<Applications />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="/applications/new" element={<ApplicationNew />} />
                 <Route
                   path="/applications/:id"

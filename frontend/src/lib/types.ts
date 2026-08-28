@@ -473,3 +473,95 @@ export interface ApproveEntityDraftResponse {
   draft_id: string;
   resolved_id: string;
 }
+
+/* ------------------------------------------------------------------ *
+ * Profile: the claims you make about yourself, as opposed to the
+ * record of what you did. Skills and preferences are what the fit gate
+ * scores a posting against.
+ * ------------------------------------------------------------------ */
+
+/**
+ * A rung on the account's own depth scale.
+ *
+ * Rows rather than an enum since migration 020, so a client must read them
+ * rather than assume novice/proficient/expert — that set is what a new
+ * account is seeded with, not what every account has.
+ */
+export interface ProficiencyLevel {
+  id: string;
+  value: string;
+  label: string;
+  rank: number;
+  aliases: string[] | null;
+  source: string;
+  sort_order: number;
+}
+
+/** A claimed skill, joined to the tag it keys on. */
+export interface Skill {
+  id: string;
+  tag_id: string;
+  /** The tag's name and category — a skill is not free text. */
+  name: string;
+  category: string;
+  proficiency: string;
+  /** NUMERIC(4,1) on the wire; null means unrecorded, not zero. */
+  years_experience: string | number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSkillRequest {
+  category: string;
+  tag: string;
+  proficiency: string;
+  years_experience: number | null;
+  is_active?: boolean;
+}
+
+/** Update changes depth and activity only; the tag is not editable. */
+export interface UpdateSkillRequest {
+  proficiency: string;
+  years_experience: number | null;
+  is_active: boolean;
+}
+
+/**
+ * Which part of a posting a preference is checked against.
+ *
+ * Closed, and unlike the level scales this one is not per-account: it names a
+ * property of the matcher rather than of anyone's industry, so hardcoding it
+ * here does not reintroduce the kind of enum the neutrality work removed.
+ */
+export type PreferenceType =
+  "domain" | "role_shape" | "culture" | "dealbreaker" | "core_practice";
+
+export type PreferenceSentiment = "positive" | "negative";
+
+export interface Preference {
+  id: string;
+  preference_type: PreferenceType;
+  label: string;
+  /** Other wordings a posting might use. This is what decides whether a
+   * preference ever matches. */
+  aliases: string[] | null;
+  sentiment: PreferenceSentiment;
+  weight: number;
+  is_hard_gate: boolean;
+  context_type: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PreferenceRequest {
+  preference_type: PreferenceType;
+  label: string;
+  aliases: string[];
+  sentiment: PreferenceSentiment;
+  weight: number;
+  is_hard_gate: boolean;
+  context_type?: string | null;
+  notes?: string | null;
+}

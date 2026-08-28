@@ -165,6 +165,12 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Patch("/preferences/{id}", preferenceHandler.Update)
 			r.Delete("/preferences/{id}", preferenceHandler.Delete)
 
+			// Read-only. A client cannot build a valid skill without knowing
+			// the account's own depth scale, which is rows rather than an enum.
+			vocabularyHandler := handlers.NewVocabularyHandler(deps.Queries)
+			r.Get("/vocabulary/proficiency-levels", vocabularyHandler.ListProficiencyLevels)
+			r.Get("/vocabulary/career-levels", vocabularyHandler.ListCareerLevels)
+
 			skillHandler := handlers.NewSkillHandler(deps.Queries)
 			r.Get("/skills", skillHandler.List)
 			r.Post("/skills", skillHandler.Create)
