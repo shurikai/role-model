@@ -298,3 +298,70 @@ func TestSkillProficiencyIsCheckedAgainstTheAccountsOwnScale(t *testing.T) {
 		}
 	}
 }
+
+// The skills form cannot be built without this. Proficiency is validated
+// against the account's own proficiency_levels rows rather than a hardcoded
+// scale, so a client that guessed novice/proficient/expert would be guessing
+// at a vocabulary that is per-account by design.
+func TestVocabularyEndpointsExposeTheAccountsOwnScales(t *testing.T) {
+	srv, _ := testServer(t)
+
+	suffix := uuid.NewString()
+	token := signupUser(t, srv, "vocab-"+suffix+"@test.local", "password123")
+
+	var levels []struct {
+		Value     string `json:"value"`
+		Label     string `json:"label"`
+		Rank      int    `json:"rank"`
+		SortOrder int    `json:"sort_order"`
+	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/vocabulary/proficiency-levels", token, nil)
+	decodeOK(t, resp, http.StatusOK, "list proficiency levels", &levels)
+
+	// vocabulary.Install seeds these in the same transaction as the user row,
+	// so a signup that returned a token has them.
+	if len(levels) == 0 {
+		t.Fatal("a fresh account must have a depth scale; signup installs one")
+	}
+	// Returned in sort order, because a client renders them as a list and a
+	// scale out of order reads as no scale at all.
+	for i := 1; i < len(levels); i++ {
+		if levels[i].SortOrder < levels[i-1].SortOrder {
+			t.Errorf("levels are not in sort order: %+v", levels)
+			break
+		}
+	}
+
+	// The values here are what SkillHandler validates against, so a skill
+	// created with the first one must be accepted. That is the whole contract
+	// between these two endpoints.
+	_ = createAndGetID(t, srv, token, "/api/v1/skills", map[string]any{
+		"category":    "Charting Systems",
+		"tag":         "Epic",
+		"proficiency": levels[0].Value,
+	})
+
+	var careerLevels []struct {
+		Value string `json:"value"`
+	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/vocabulary/career-levels", token, nil)
+	decodeOK(t, resp, http.StatusOK, "list career levels", &careerLevels)
+	if len(careerLevels) == 0 {
+		t.Error("a fresh account must have a seniority ladder too")
+	}
+}
+
+// Both are user-scoped like everything else; one account must not see
+// another's vocabulary even though the shipped default set is identical.
+func TestVocabularyIsScopedToTheAccount(t *testing.T) {
+	srv, _ := testServer(t)
+
+	suffix := uuid.NewString()
+	token := signupUser(t, srv, "vocabscope-"+suffix+"@test.local", "password123")
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/vocabulary/proficiency-levels", "", nil)
+	assertStatus(t, resp, http.StatusUnauthorized, "unauthenticated vocabulary read")
+
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/vocabulary/proficiency-levels", token, nil)
+	assertStatus(t, resp, http.StatusOK, "authenticated vocabulary read")
+}

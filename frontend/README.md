@@ -4,12 +4,13 @@ React + TypeScript client for [Role Model](../README.md), built on Vite. Talks t
 
 ## Status
 
-Ten routes, all inside a nav shell that also carries sign-out:
+Eleven routes, all inside a nav shell that also carries sign-out:
 
 | Route                     | What it is                                                                                                      |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `/login`, `/signup`       | auth, session persistence, 401-driven redirect                                                                  |
 | `/applications`           | the list, with a pipeline-stage badge per row                                                                   |
+| `/profile`                | skills and preferences — the two lists the fit gate scores a posting against                                    |
 | `/applications/new`       | paste a job description, create, extract signals                                                                |
 | `/applications/:id`       | signals, fit report, generate, download the `.docx`                                                             |
 | `/import/career/new`      | **the wide import** — paste a career, get a review queue                                                        |
@@ -18,13 +19,13 @@ Ten routes, all inside a nav shell that also carries sign-out:
 | `/import/:batchID`        | its review queue                                                                                                |
 
 Vitest covers login, signup, session storage, session expiry, the API client,
-the error boundary, the app shell, both review queues, `PositionPicker` and
-`ApplicationDetail`. `Applications`, `ApplicationNew`, `ImportStart`,
+the error boundary, the app shell, both review queues, `PositionPicker`,
+`Profile` and `ApplicationDetail`. `Applications`, `ApplicationNew`, `ImportStart`,
 `CareerImportStart`, `PayloadEditor` and the hooks have no tests of their own.
 
-**Not here yet:** browsing or editing career data after import, and any UI for
-skills and preferences. Both have a full API; the fit gate scores against
-preferences, so that screen is the gap most worth closing next.
+**Not here yet:** browsing or editing employers, positions and contributions
+after import. Skills and preferences are editable at `/profile`; the rest of
+the career data still needs the API or SQL.
 
 ## Stack
 

@@ -208,9 +208,8 @@ Honest about what is missing, since the list is short and specific:
 
 - **No career-data browsing or editing in the UI.** Import review is the only
   way to inspect what was captured. Correcting a contribution afterwards means
-  the API or SQL.
-- **No UI for skills and preferences**, though both have a full API. The fit
-  gate scores against preferences, so this is the gap most worth closing next.
+  the API or SQL. Skills and preferences *are* editable — see Profile — but
+  employers, positions and contributions are not.
 - **No password reset in the app.** `make reset-password` is the stopgap.
 - **No review gate on extracted JD signals** before generation runs.
 - **Rendered documents are not persisted** — the `.docx` is streamed back to
