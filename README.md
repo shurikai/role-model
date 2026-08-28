@@ -247,8 +247,8 @@ Honest about what is missing, since the list is short and specific:
 - [`CLAUDE.md`](./CLAUDE.md) — the conventions document: stack, architecture,
   and the rules that hold, most of them written because the alternative was
   tried and cost something
-- [`ROADMAP.md`](./ROADMAP.md) — architecture checkpoint and where this was
-  going
+- [`ROADMAP.md`](./ROADMAP.md) — the phase map and positioning statement;
+  planned work is tracked in GitHub Issues, grouped by milestone (one per phase)
 
 ## License
 
