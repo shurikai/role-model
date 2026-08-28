@@ -6,6 +6,13 @@
 **Companion docs:** `CLAUDE.md`, `notes/discovery-design.md`,
 `notes/role-model-schema-design.md`
 
+> **Which document is which.** [`README.md`](./README.md) is for someone
+> deciding whether to run this and how. [`CLAUDE.md`](./CLAUDE.md) is the
+> conventions document — stack, architecture, and the rules that hold, most of
+> them written because the alternative was tried and cost something. This file
+> is the checkpoint: what is built, what the schema looks like, and where it
+> was going. Where it disagrees with `CLAUDE.md`, `CLAUDE.md` is current.
+
 ---
 
 ## System Identity
@@ -750,20 +757,27 @@ CREATE TABLE career_thread_contributions (
 
 ---
 
-## Known Skill Gaps and Hard-Pass Filters
+## Skill gaps and hard passes as data
 
-Both lists have moved to a private repository. They were a self-assessed
-inventory of one person's weaknesses and a record of which roles they would
-refuse — job-search working material rather than anything about the system,
-and not something to publish under a real name beside an invitation to read
-the code.
+Two questions shape the fit gate, and the design point is that both are
+answered from stored rows rather than from memory:
 
-What they were *for* is still worth stating, because it shapes the design:
-the fit gate exists so that both questions get answered from stored rows
-rather than from memory, and `preferences` is where a hard pass lives. See
-the **Fit gate** section of `CLAUDE.md` for the mechanism, and
-`database/sample/` for a complete worked profile.
+- **What can this person actually do, and how deeply?** `skills` carries a
+  proficiency on a user-owned scale, and `jd_signals.skill_levels` carries the
+  depth a posting states for a specific requirement. Where a posting asks for
+  more than the evidence supports, the requirement earns half credit and is
+  reported as a *partial* — a third verdict, neither a match nor a gap.
+- **What would this person refuse?** A hard pass is a `preferences` row with
+  `is_hard_gate` set. It does not block: generation still runs, and the trip is
+  a named finding in `gateHits` rather than a veto, because a disqualifier and
+  an ordinary matched dislike are different kinds of finding and folding them
+  together makes an exclusion read as one more complaint.
 
+Both lists are personal data by nature, so no real set lives in this
+repository. `database/sample/` carries a complete fictional profile — every
+`preference_type`, both sentiments, and the hard gates — which is the worked
+example to read. The mechanism is documented in the **Fit gate** section of
+`CLAUDE.md`.
 
 ---
 
