@@ -56,10 +56,10 @@ for orientation.
 |---|---|---|
 | **Phase 1** — Usable by humans other than me | Two non-technical test users can enter career data and get a resume without touching the terminal | [milestone](https://github.com/shurikai/role-model/milestone/2) |
 | **Phase 2** — Complete end-to-end pipeline | JD input → `.docx` download without leaving the UI *(met; remaining work is review gates, feedback, correctness eval)* | [milestone](https://github.com/shurikai/role-model/milestone/3) |
-| **Phase 2.5** — MCP Server | Career data queryable by any MCP client through live tools, not a derived copy | [milestone](https://github.com/shurikai/role-model/milestone/4) |
-| **Phase 3** — Discovery and distributed systems | New postings from target companies appear automatically; the pipeline runs durably end to end | [milestone](https://github.com/shurikai/role-model/milestone/5) |
-| **Phase 3.5** — Career threads | Named narrative through-lines, system-proposed and human-confirmed, feed summaries and fit scoring | [milestone](https://github.com/shurikai/role-model/milestone/6) |
-| **Phase 4** — Richer features | At least one non-me user finds the system genuinely useful over time | [milestone](https://github.com/shurikai/role-model/milestone/7) |
+| **Phase 3** — MCP Server | Career data queryable by any MCP client through live tools, not a derived copy | [milestone](https://github.com/shurikai/role-model/milestone/4) |
+| **Phase 4** — Discovery and distributed systems | New postings from target companies appear automatically; the pipeline runs durably end to end | [milestone](https://github.com/shurikai/role-model/milestone/5) |
+| **Phase 5** — Career threads | Named narrative through-lines, system-proposed and human-confirmed, feed summaries and fit scoring | [milestone](https://github.com/shurikai/role-model/milestone/6) |
+| **Phase 6** — Richer features | At least one non-me user finds the system genuinely useful over time | [milestone](https://github.com/shurikai/role-model/milestone/7) |
 
 What is already built and verified is in `README.md` `## Status`; the schema of
 record is `migrations/` and `notes/data-model.md`.
@@ -86,7 +86,7 @@ cluster of known fit-gate and generation correctness defects: #43 #45 #46 #52
 #55 (scoring), #75 (term matching), #62 (summary length rules), #51 (eval
 fixture drift guard).
 
-### Phase 2.5 — MCP Server
+### Phase 3 — MCP Server
 
 Gate: career data is queryable by any MCP client through live parameterised
 tools, not a derived copy. Not a phase proper — infrastructure that depends on
@@ -94,7 +94,7 @@ Phase 2 and is depended on by later work.
 
 Open work: MCP server (#125).
 
-### Phase 3 — Discovery and distributed systems
+### Phase 4 — Discovery and distributed systems
 
 Gate: new postings from target companies appear automatically; the pipeline
 runs durably end to end. Kafka owns continuous-world fan-out (discovery →
@@ -105,15 +105,15 @@ Open work: discovery worker (#12), Temporal integration (#13), Kafka event
 pipeline (#126), notification consumer + channel decision (#127), application
 status / CRM pipeline (#128).
 
-### Phase 3.5 — Career threads
+### Phase 5 — Career threads
 
 Gate: named narrative through-lines, system-proposed and human-confirmed, feed
-resume summaries and fit scoring. Can be built alongside or after Phase 3;
+resume summaries and fit scoring. Can be built alongside or after Phase 4;
 depends on career data being well-seeded.
 
 Open work: career threads (#129).
 
-### Phase 4 — Richer features
+### Phase 6 — Richer features
 
 Gate: at least one non-me user finds the system genuinely useful over time.
 

@@ -826,9 +826,9 @@ Apply an existing label rather than inventing a new one. Ask if a new label
 seems genuinely warranted.
 
 ### Milestones are phases
-The roadmap phases (`Phase 1 …` through `Phase 4 …`, plus `Phase 2.5 — MCP
-Server`) are GitHub **milestones**, not labels. Assign every planned issue to
-its phase milestone; each milestone's description is that phase's gate. The
+The roadmap phases (`Phase 1 …` through `Phase 6 …`) are GitHub **milestones**,
+not labels. Assign every planned issue to its phase milestone; each milestone's
+description is that phase's gate. The
 phase is the *only* thing milestones track — do not add `phase-*` labels beside
 them. `ROADMAP.md` is the human-readable index of the same structure.
 
