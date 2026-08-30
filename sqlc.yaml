@@ -44,6 +44,8 @@ sql:
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "contribution_drafts.flags"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
+          - column: "contribution_drafts.suggested_tags"
+            go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.dealbreaker_hits"
             go_type: {import: "encoding/json", type: "RawMessage", pointer: true}
           - column: "fit_reports.capability_gaps"

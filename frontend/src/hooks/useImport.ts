@@ -94,13 +94,18 @@ export function useApproveDraft(batchID: string | undefined) {
     mutationFn: ({
       draftID,
       positionID,
+      tagIDs,
     }: {
       draftID: string;
       positionID: string;
+      tagIDs?: string[];
     }) =>
       apiFetch<ApproveDraftResponse>(`/import/drafts/${draftID}/approve`, {
         method: "POST",
-        body: JSON.stringify({ position_id: positionID }),
+        body: JSON.stringify({
+          position_id: positionID,
+          ...(tagIDs?.length ? { tag_ids: tagIDs } : {}),
+        }),
       }),
     onSuccess: () => {
       // Both, and on purpose: approving changes a draft's status AND moves a

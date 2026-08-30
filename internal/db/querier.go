@@ -174,6 +174,11 @@ type Querier interface {
 	UpdateApplicationSignals(ctx context.Context, arg UpdateApplicationSignalsParams) (Application, error)
 	UpdateContribution(ctx context.Context, arg UpdateContributionParams) (Contribution, error)
 	UpdateContributionDraft(ctx context.Context, arg UpdateContributionDraftParams) (ContributionDraft, error)
+	// Stage 0b writes only its own outputs: the review flags and the tag
+	// suggestions. UpdateContributionDraft above also rewrites summary /
+	// full_description / outcomes / scale_context, which enrichment only ever
+	// echoes back unchanged.
+	UpdateContributionDraftEnrichment(ctx context.Context, arg UpdateContributionDraftEnrichmentParams) (ContributionDraft, error)
 	UpdateContributionDraftStatus(ctx context.Context, arg UpdateContributionDraftStatusParams) (ContributionDraft, error)
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) (Credential, error)
 	UpdateEducation(ctx context.Context, arg UpdateEducationParams) (Education, error)

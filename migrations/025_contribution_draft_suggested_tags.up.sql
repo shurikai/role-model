@@ -1,0 +1,24 @@
+-- Stage 0b enrichment starts proposing tags, and needs somewhere to put them.
+--
+-- The narrow import path (internal/stage0, contribution_drafts) has never
+-- touched tags: a draft was approved into a bare contribution and tagged by
+-- hand afterward through the tag CRUD API. Stage 0b now reads the user's
+-- existing tag vocabulary and returns the ones a draft evidences, so the
+-- reviewer confirms a set rather than typing one.
+--
+-- suggested_tags is a point-in-time snapshot, shaped [{tag_id, name, category}].
+-- It carries the name and category alongside the id, denormalised, because the
+-- review screen renders it directly and the narrow-path frontend has no
+-- tag-fetch of its own -- resolving ids to names would be a second request per
+-- draft. A tag renamed or deleted between enrichment and approval leaves a
+-- stale label here; that is acceptable because the approve endpoint
+-- re-validates every tag_id it is handed and 404s a stale one.
+--
+-- Resolve-only: Stage 0b never invents a tag. A model-returned name that is not
+-- already in the vocabulary is dropped, not created. New-tag creation stays
+-- with the wide intake path (ResolveOrCreateTag) and manual tag CRUD.
+--
+-- JSONB rather than UUID[] for the reason above (names ride along) and to
+-- mirror contribution_drafts.flags, the sibling advisory column added in
+-- migration 006.
+ALTER TABLE contribution_drafts ADD COLUMN suggested_tags JSONB;

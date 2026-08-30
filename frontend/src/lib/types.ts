@@ -214,6 +214,20 @@ export const DRAFT_EDITABLE_FIELDS: readonly DraftEditableField[] = [
 
 export type ContributionDraftStatus = "pending" | "approved" | "rejected";
 
+/**
+ * One tag Stage 0b proposed for a draft, drawn from the user's existing
+ * vocabulary. A point-in-time snapshot: `name` and `category` ride along so the
+ * review screen renders it without a separate tags fetch, and every `tag_id` is
+ * a real tag (the approve endpoint re-validates each one). Stage 0b never
+ * invents a tag — a name it returns that is not already in the vocabulary is
+ * dropped, not created.
+ */
+export interface SuggestedTag {
+  tag_id: string;
+  name: string;
+  category: string;
+}
+
 export interface ContributionDraft {
   id: string;
   user_id: string;
@@ -225,6 +239,7 @@ export interface ContributionDraft {
   outcomes: string | null;
   scale_context: string | null;
   flags: DraftFlag[] | null;
+  suggested_tags: SuggestedTag[] | null;
   status: ContributionDraftStatus;
   created_at: string;
   updated_at: string;

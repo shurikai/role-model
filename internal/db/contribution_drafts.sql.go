@@ -52,7 +52,7 @@ INSERT INTO contribution_drafts (
     summary, full_description, outcomes, scale_context
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at
+RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags
 `
 
 type CreateContributionDraftParams struct {
@@ -94,12 +94,13 @@ func (q *Queries) CreateContributionDraft(ctx context.Context, arg CreateContrib
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuggestedTags,
 	)
 	return i, err
 }
 
 const getContributionDraft = `-- name: GetContributionDraft :one
-SELECT id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at FROM contribution_drafts
+SELECT id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags FROM contribution_drafts
 WHERE id = $1 AND user_id = $2
 `
 
@@ -125,12 +126,13 @@ func (q *Queries) GetContributionDraft(ctx context.Context, arg GetContributionD
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuggestedTags,
 	)
 	return i, err
 }
 
 const listContributionDraftsByBatch = `-- name: ListContributionDraftsByBatch :many
-SELECT id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at FROM contribution_drafts
+SELECT id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags FROM contribution_drafts
 WHERE batch_id = $1 AND user_id = $2
 ORDER BY created_at
 `
@@ -163,6 +165,7 @@ func (q *Queries) ListContributionDraftsByBatch(ctx context.Context, arg ListCon
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SuggestedTags,
 		); err != nil {
 			return nil, err
 		}
@@ -183,7 +186,7 @@ SET summary          = $3,
     flags             = $7,
     updated_at        = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at
+RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags
 `
 
 type UpdateContributionDraftParams struct {
@@ -221,6 +224,54 @@ func (q *Queries) UpdateContributionDraft(ctx context.Context, arg UpdateContrib
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuggestedTags,
+	)
+	return i, err
+}
+
+const updateContributionDraftEnrichment = `-- name: UpdateContributionDraftEnrichment :one
+UPDATE contribution_drafts
+SET flags          = $3,
+    suggested_tags = $4,
+    updated_at     = now()
+WHERE id = $1 AND user_id = $2
+RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags
+`
+
+type UpdateContributionDraftEnrichmentParams struct {
+	ID            uuid.UUID        `json:"id"`
+	UserID        uuid.UUID        `json:"user_id"`
+	Flags         *json.RawMessage `json:"flags"`
+	SuggestedTags *json.RawMessage `json:"suggested_tags"`
+}
+
+// Stage 0b writes only its own outputs: the review flags and the tag
+// suggestions. UpdateContributionDraft above also rewrites summary /
+// full_description / outcomes / scale_context, which enrichment only ever
+// echoes back unchanged.
+func (q *Queries) UpdateContributionDraftEnrichment(ctx context.Context, arg UpdateContributionDraftEnrichmentParams) (ContributionDraft, error) {
+	row := q.db.QueryRow(ctx, updateContributionDraftEnrichment,
+		arg.ID,
+		arg.UserID,
+		arg.Flags,
+		arg.SuggestedTags,
+	)
+	var i ContributionDraft
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.BatchID,
+		&i.EmployerName,
+		&i.PositionTitle,
+		&i.Summary,
+		&i.FullDescription,
+		&i.Outcomes,
+		&i.ScaleContext,
+		&i.Flags,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.SuggestedTags,
 	)
 	return i, err
 }
@@ -230,7 +281,7 @@ UPDATE contribution_drafts
 SET status     = $3,
     updated_at = now()
 WHERE id = $1 AND user_id = $2
-RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at
+RETURNING id, user_id, batch_id, employer_name, position_title, summary, full_description, outcomes, scale_context, flags, status, created_at, updated_at, suggested_tags
 `
 
 type UpdateContributionDraftStatusParams struct {
@@ -256,6 +307,7 @@ func (q *Queries) UpdateContributionDraftStatus(ctx context.Context, arg UpdateC
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SuggestedTags,
 	)
 	return i, err
 }
