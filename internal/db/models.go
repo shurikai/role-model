@@ -70,6 +70,7 @@ type ContributionDraft struct {
 	Status          string           `json:"status"`
 	CreatedAt       time.Time        `json:"created_at"`
 	UpdatedAt       time.Time        `json:"updated_at"`
+	SuggestedTags   *json.RawMessage `json:"suggested_tags"`
 }
 
 type ContributionFeedback struct {

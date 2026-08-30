@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,14 +21,25 @@ import (
 
 const (
 	extractionMaxTokens = 4096
-	enrichmentMaxTokens = 1024
+	// Stage 0b now returns tag suggestions alongside flags. A response truncated
+	// at the token cap is invalid JSON and loses both, so this carries more
+	// headroom than the flags-only pass needed.
+	enrichmentMaxTokens = 2048
 )
 
 var (
 	ErrDraftNotPending  = errors.New("draft is not pending")
 	ErrDraftIncomplete  = errors.New("draft summary and full_description must be set before approval")
 	ErrPositionNotFound = errors.New("position not found")
+	ErrTagNotFound      = errors.New("tag not found")
 )
+
+// completer is the slice of generation.Client this package calls. It exists so
+// RunEnrichment can be exercised against a canned response without a live LLM;
+// *generation.Client satisfies it.
+type completer interface {
+	Complete(ctx context.Context, systemPrompt, userContent string, maxTokens int64) (string, error)
+}
 
 // Service owns the Stage 0 lifecycle: extraction, enrichment, and the status
 // transitions of import_batches / contribution_drafts. It does not write to
@@ -35,7 +47,7 @@ var (
 type Service struct {
 	pool   *pgxpool.Pool
 	q      *db.Queries
-	client *generation.Client
+	client completer
 }
 
 func NewService(pool *pgxpool.Pool, q *db.Queries, client *generation.Client) *Service {
@@ -51,17 +63,62 @@ type extractedEntry struct {
 	ScaleContext    *string `json:"scale_context"`
 }
 
-type draftInput struct {
-	EmployerName    string  `json:"employer_name"`
-	PositionTitle   string  `json:"position_title"`
-	Summary         *string `json:"summary"`
-	FullDescription *string `json:"full_description"`
-	Outcomes        *string `json:"outcomes"`
-	ScaleContext    *string `json:"scale_context"`
+// enrichmentTagOption is one row of the user's existing tag vocabulary as the
+// enrichment prompt sees it. The id is withheld deliberately: the model copies
+// names, and resolveSuggestedTags maps them back to real rows in Go.
+type enrichmentTagOption struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+}
+
+type enrichmentInput struct {
+	EmployerName    string                `json:"employer_name"`
+	PositionTitle   string                `json:"position_title"`
+	Summary         *string               `json:"summary"`
+	FullDescription *string               `json:"full_description"`
+	Outcomes        *string               `json:"outcomes"`
+	ScaleContext    *string               `json:"scale_context"`
+	AvailableTags   []enrichmentTagOption `json:"available_tags"`
 }
 
 type enrichmentResult struct {
-	Flags []json.RawMessage `json:"flags"`
+	Flags         []json.RawMessage `json:"flags"`
+	SuggestedTags []string          `json:"suggested_tags"`
+}
+
+// suggestedTag is one resolved tag suggestion as persisted on
+// contribution_drafts.suggested_tags. Denormalised: the review screen renders
+// name and category directly, and the narrow import path has no tag fetch of
+// its own.
+type suggestedTag struct {
+	TagID    uuid.UUID `json:"tag_id"`
+	Name     string    `json:"name"`
+	Category string    `json:"category"`
+}
+
+// resolveSuggestedTags maps model-returned tag names to the user's real tag
+// rows. Matching is exact and case-insensitive on a trimmed name — no alias or
+// fuzzy match, because the model is handed the canonical names to copy. A name
+// that resolves to nothing is dropped (Stage 0b never invents a tag); a name
+// that resolves to an already-picked tag is dropped. Order follows the model's.
+// The result is always non-nil so it marshals to [] rather than null.
+func resolveSuggestedTags(available []db.Tag, names []string) []suggestedTag {
+	byName := make(map[string]db.Tag, len(available))
+	for _, t := range available {
+		byName[strings.ToLower(strings.TrimSpace(t.Name))] = t
+	}
+
+	out := make([]suggestedTag, 0, len(names))
+	seen := make(map[uuid.UUID]bool, len(names))
+	for _, n := range names {
+		t, ok := byName[strings.ToLower(strings.TrimSpace(n))]
+		if !ok || seen[t.ID] {
+			continue
+		}
+		seen[t.ID] = true
+		out = append(out, suggestedTag{TagID: t.ID, Name: t.Name, Category: t.Category})
+	}
+	return out
 }
 
 // RunExtraction drives Stage 0a (extraction) followed by Stage 0b (per-draft
@@ -158,8 +215,10 @@ func (s *Service) insertDrafts(ctx context.Context, batchID, userID uuid.UUID, e
 }
 
 // ApproveDraft verifies the target position belongs to userID, writes a new
-// contribution from the draft's fields, and marks the draft approved.
-func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID uuid.UUID) (db.Contribution, error) {
+// contribution from the draft's fields, links any tagIDs to it, and marks the
+// draft approved. tagIDs is optional; every id must name a tag the user owns,
+// and a bad one aborts before anything is written.
+func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID uuid.UUID, tagIDs []uuid.UUID) (db.Contribution, error) {
 	draft, err := s.q.GetContributionDraft(ctx, db.GetContributionDraftParams{ID: draftID, UserID: userID})
 	if err != nil {
 		return db.Contribution{}, err
@@ -183,6 +242,26 @@ func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID 
 			return db.Contribution{}, ErrPositionNotFound
 		}
 		return db.Contribution{}, fmt.Errorf("approve draft: verify position: %w", err)
+	}
+
+	// Same double-ownership rule the tag CRUD path applies: every tag must exist
+	// and belong to this user. Checked before the transaction opens so a bad id
+	// is a clean 404 rather than a rolled-back write. Deduped so the assign loop
+	// below runs once per tag.
+	uniqueTagIDs := make([]uuid.UUID, 0, len(tagIDs))
+	seenTag := make(map[uuid.UUID]bool, len(tagIDs))
+	for _, id := range tagIDs {
+		if seenTag[id] {
+			continue
+		}
+		seenTag[id] = true
+		if _, err := s.q.GetTag(ctx, db.GetTagParams{ID: id, UserID: userID}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return db.Contribution{}, ErrTagNotFound
+			}
+			return db.Contribution{}, fmt.Errorf("approve draft: verify tag: %w", err)
+		}
+		uniqueTagIDs = append(uniqueTagIDs, id)
 	}
 
 	tx, err := s.pool.Begin(ctx)
@@ -215,6 +294,15 @@ func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID 
 		return db.Contribution{}, fmt.Errorf("approve draft: update draft status: %w", err)
 	}
 
+	for _, id := range uniqueTagIDs {
+		if err := qtx.AssignTagToContribution(ctx, db.AssignTagToContributionParams{
+			ContributionID: contribution.ID,
+			TagID:          id,
+		}); err != nil {
+			return db.Contribution{}, fmt.Errorf("approve draft: assign tag: %w", err)
+		}
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return db.Contribution{}, fmt.Errorf("approve draft: commit tx: %w", err)
 	}
@@ -222,21 +310,33 @@ func (s *Service) ApproveDraft(ctx context.Context, userID, draftID, positionID 
 	return contribution, nil
 }
 
-// RunEnrichment runs Stage 0b for a single draft. Failures are returned to the
-// caller to log — a missing flags column is acceptable, a failed batch is not.
+// RunEnrichment runs Stage 0b for a single draft: review flags plus tag
+// suggestions drawn from the user's existing vocabulary. Failures are returned
+// to the caller to log — a draft without enrichment is acceptable, a failed
+// batch is not.
 func (s *Service) RunEnrichment(ctx context.Context, draft db.ContributionDraft) error {
 	prompt, err := generation.RawPrompt("stage0b_enrichment.txt")
 	if err != nil {
 		return fmt.Errorf("load enrichment prompt: %w", err)
 	}
 
-	input, err := json.Marshal(draftInput{
+	tags, err := s.q.ListTags(ctx, draft.UserID)
+	if err != nil {
+		return fmt.Errorf("list tags: %w", err)
+	}
+	options := make([]enrichmentTagOption, 0, len(tags))
+	for _, t := range tags {
+		options = append(options, enrichmentTagOption{Name: t.Name, Category: t.Category})
+	}
+
+	input, err := json.Marshal(enrichmentInput{
 		EmployerName:    draft.EmployerName,
 		PositionTitle:   draft.PositionTitle,
 		Summary:         draft.Summary,
 		FullDescription: draft.FullDescription,
 		Outcomes:        draft.Outcomes,
 		ScaleContext:    draft.ScaleContext,
+		AvailableTags:   options,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal draft input: %w", err)
@@ -252,22 +352,31 @@ func (s *Service) RunEnrichment(ctx context.Context, draft db.ContributionDraft)
 		return fmt.Errorf("parse enrichment response: %w (raw: %s)", err, raw)
 	}
 
+	resolved := resolveSuggestedTags(tags, result.SuggestedTags)
+	if len(resolved) < len(result.SuggestedTags) {
+		log.Printf("stage0: enrichment draft %s: dropped %d unresolved tag name(s)",
+			draft.ID, len(result.SuggestedTags)-len(resolved))
+	}
+
 	flagsJSON, err := json.Marshal(result.Flags)
 	if err != nil {
 		return fmt.Errorf("marshal flags: %w", err)
 	}
 	flagsRaw := json.RawMessage(flagsJSON)
 
-	if _, err := s.q.UpdateContributionDraft(ctx, db.UpdateContributionDraftParams{
-		ID:              draft.ID,
-		UserID:          draft.UserID,
-		Summary:         draft.Summary,
-		FullDescription: draft.FullDescription,
-		Outcomes:        draft.Outcomes,
-		ScaleContext:    draft.ScaleContext,
-		Flags:           &flagsRaw,
+	suggestedJSON, err := json.Marshal(resolved)
+	if err != nil {
+		return fmt.Errorf("marshal suggested tags: %w", err)
+	}
+	suggestedRaw := json.RawMessage(suggestedJSON)
+
+	if _, err := s.q.UpdateContributionDraftEnrichment(ctx, db.UpdateContributionDraftEnrichmentParams{
+		ID:            draft.ID,
+		UserID:        draft.UserID,
+		Flags:         &flagsRaw,
+		SuggestedTags: &suggestedRaw,
 	}); err != nil {
-		return fmt.Errorf("update draft flags: %w", err)
+		return fmt.Errorf("update draft enrichment: %w", err)
 	}
 
 	return nil

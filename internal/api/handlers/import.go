@@ -298,7 +298,8 @@ func (h *ImportHandler) UpdateDraft(w http.ResponseWriter, r *http.Request) {
 }
 
 type approveDraftRequest struct {
-	PositionID uuid.UUID `json:"position_id"`
+	PositionID uuid.UUID   `json:"position_id"`
+	TagIDs     []uuid.UUID `json:"tag_ids"`
 }
 
 // Approve validates the request and delegates draft approval to stage0.Service.
@@ -323,8 +324,14 @@ func (h *ImportHandler) Approve(w http.ResponseWriter, r *http.Request) {
 		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "position_id is required")
 		return
 	}
+	for _, tagID := range req.TagIDs {
+		if tagID == uuid.Nil {
+			httputil.WriteError(w, http.StatusBadRequest, "validation_error", "tag_ids must not contain a nil UUID")
+			return
+		}
+	}
 
-	contribution, err := h.stage0.ApproveDraft(r.Context(), userID, id, req.PositionID)
+	contribution, err := h.stage0.ApproveDraft(r.Context(), userID, id, req.PositionID, req.TagIDs)
 	if err != nil {
 		switch {
 		case errors.Is(err, pgx.ErrNoRows):
@@ -335,6 +342,8 @@ func (h *ImportHandler) Approve(w http.ResponseWriter, r *http.Request) {
 			httputil.WriteError(w, http.StatusUnprocessableEntity, "validation_error", err.Error())
 		case errors.Is(err, stage0.ErrPositionNotFound):
 			httputil.WriteError(w, http.StatusNotFound, "position_not_found", "position not found")
+		case errors.Is(err, stage0.ErrTagNotFound):
+			httputil.WriteError(w, http.StatusNotFound, "tag_not_found", "one or more tag_ids do not exist or are not yours")
 		default:
 			httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to approve draft")
 		}

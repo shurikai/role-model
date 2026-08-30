@@ -26,6 +26,18 @@ SET summary          = $3,
 WHERE id = $1 AND user_id = $2
 RETURNING *;
 
+-- name: UpdateContributionDraftEnrichment :one
+-- Stage 0b writes only its own outputs: the review flags and the tag
+-- suggestions. UpdateContributionDraft above also rewrites summary /
+-- full_description / outcomes / scale_context, which enrichment only ever
+-- echoes back unchanged.
+UPDATE contribution_drafts
+SET flags          = $3,
+    suggested_tags = $4,
+    updated_at     = now()
+WHERE id = $1 AND user_id = $2
+RETURNING *;
+
 -- name: UpdateContributionDraftStatus :one
 UPDATE contribution_drafts
 SET status     = $3,

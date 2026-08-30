@@ -36,6 +36,7 @@ function makeDraft(
     outcomes: null,
     scale_context: null,
     flags: null,
+    suggested_tags: null,
     status: "pending",
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z",
