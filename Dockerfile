@@ -19,9 +19,14 @@ COPY . .
 # CGO off produces a static binary that runs on the scratch-like base below.
 # -trimpath keeps build-host paths out of panics; the ldflags strip debug
 # symbols, which is worth ~30% of the binary and nothing at runtime.
+#
+# The account tools (adduser, resetpw) are built alongside the server so they
+# are runnable inside the deployed stack (`docker compose exec server
+# /usr/local/bin/adduser …`), where the database port is closed and there is no
+# host toolchain. adduser is how an account is created without reopening signup.
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -trimpath -ldflags="-s -w" \
-    -o /out/server ./cmd/server
+    -o /out/ ./cmd/server ./cmd/adduser ./cmd/resetpw
 
 FROM alpine:3.21
 # ca-certificates is not optional: the server calls the Anthropic API over
@@ -37,6 +42,8 @@ RUN adduser -D -u 10001 rolemodel
 USER rolemodel
 
 COPY --from=build /out/server /usr/local/bin/server
+COPY --from=build /out/adduser /usr/local/bin/adduser
+COPY --from=build /out/resetpw /usr/local/bin/resetpw
 
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/server"]

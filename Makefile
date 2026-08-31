@@ -87,7 +87,7 @@ endef
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password fmt fmt-check test-renderer
+.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password add-user fmt fmt-check test-renderer
 
 # Build
 all: build
@@ -295,6 +295,17 @@ ifndef EMAIL
 	$(error EMAIL is required, e.g. make reset-password EMAIL=you@example.com)
 endif
 	@go run ./cmd/resetpw -email "$(EMAIL)"
+
+# Create an account without opening signup: the users row plus the starting
+# vocabularies, the same pair a signup writes. Set PASSWORD to give it a
+# password; omit it for an OIDC-only account (or set one later with
+# reset-password). On a deployed instance, run the binary in the container
+# instead: `docker compose exec server /usr/local/bin/adduser -email ...`.
+add-user:
+ifndef EMAIL
+	$(error EMAIL is required, e.g. make add-user EMAIL=you@example.com)
+endif
+	@go run ./cmd/adduser -email "$(EMAIL)"
 
 # Formatting. Each language keeps its own pinned formatter:
 #   Go      -- gofmt (toolchain)

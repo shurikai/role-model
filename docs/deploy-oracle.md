@@ -214,29 +214,36 @@ docker compose -f docker-compose.yml -f compose.prod.yml up -d --build
 
 ---
 
-## 7. Create the first account
+## 7. Create accounts
 
-Signup is closed, so there is no way in yet. Until a `cmd/adduser` exists
-(tracked in [#120](https://github.com/shurikai/role-model/issues/120)), open
-the window briefly:
+Signup stays closed. Accounts are created with the `adduser` binary, which is
+built into the server image — it writes the same `users` row + starting
+vocabularies a signup would, without opening the route:
 
 ```bash
-# 1. flip it on
-sed -i 's/^SIGNUP_ENABLED=.*/SIGNUP_ENABLED=true/' .env
-docker compose -f docker-compose.yml -f compose.prod.yml up -d server
+COMPOSE="docker compose -f docker-compose.yml -f compose.prod.yml"
 
-# 2. create the account (or just use the sign-up form in the browser)
-curl -fsS -X POST https://resume.example.com/api/v1/auth/signup \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"<a real password>"}'
+# no password: the account signs in via OIDC (#120), or gets a password later
+$COMPOSE exec server /usr/local/bin/adduser -email you@example.com
 
-# 3. close it again
-sed -i 's/^SIGNUP_ENABLED=.*/SIGNUP_ENABLED=false/' .env
-docker compose -f docker-compose.yml -f compose.prod.yml up -d server
+# with a password now — passed through the environment, never argv. The leading
+# space keeps the line out of your own shell history too.
+ $COMPOSE exec -e PASSWORD='a real password' server \
+  /usr/local/bin/adduser -email you@example.com
 ```
 
-Repeat step 2 for each test user while the window is open, or add them one at a
-time. Then confirm `SIGNUP_ENABLED=false` is back and the server was recreated.
+Repeat per user. `SIGNUP_ENABLED` is never touched.
+
+- **Use the address the OIDC provider will assert.** #120 links an OIDC
+  identity to a pre-created account by email; if the provider says
+  `you@gmail.com` and the account was created as `you@work.com`, the login is
+  rejected as unknown.
+- A password can be set or changed afterwards with `resetpw`, also in the
+  server image: `$COMPOSE exec -e NEWPASS='a real password' server
+  /usr/local/bin/resetpw -email you@example.com`.
+- `adduser` prints the new account's UUID to stdout and a confirmation to
+  stderr; a duplicate email or a too-short `PASSWORD` exits non-zero without
+  writing anything.
 
 ---
 
