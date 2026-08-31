@@ -1,0 +1,25 @@
+# Terminates TLS for the public instance and hands everything to the web
+# container. Used only by compose.prod.yml; see docs/deploy-oracle.md.
+#
+# DOMAIN and ACME_EMAIL come from the environment (compose.prod.yml passes them
+# in from .env). Caddy obtains and renews the certificate on its own.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Caddy adds HSTS automatically on a TLS site. These cost nothing more.
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# The web container (nginx) already routes /api/v1 to the API and serves
+	# the SPA with a history-mode fallback. Caddy stays dumb and forwards the
+	# lot; it sets X-Forwarded-For / -Proto / -Host and preserves Host.
+	reverse_proxy web:80
+}

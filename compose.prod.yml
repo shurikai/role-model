@@ -1,0 +1,82 @@
+# Production override for a single public VM. Full walkthrough:
+# docs/deploy-oracle.md.
+#
+#   docker compose -f docker-compose.yml -f compose.prod.yml up -d --build
+#
+# What this changes, relative to docker-compose.yml:
+#
+#   - Adds `caddy`: the only container with published ports. It terminates TLS
+#     with an automatic Let's Encrypt certificate and forwards everything to the
+#     `web` container, which keeps doing the /api/v1 -> server routing and the
+#     SPA fallback it already does.
+#   - Stops publishing the database and the web container. Caddy is the sole
+#     entrance; nothing else needs a host port.
+#   - Pins ENVIRONMENT=production and a closed signup, and puts a memory ceiling
+#     on each service so one runaway cannot take the box down.
+#
+# Requires Docker Compose v2.24+ for the `!override` tag (anything current is
+# fine). Without it, `ports` lists MERGE rather than replace, and the dev
+# database publish would stay open.
+
+services:
+  db:
+    # docker-compose.yml publishes 5432 so psql, `make migrate-up` and the
+    # integration tests can reach it from the host. A public instance must not.
+    # `!override` replaces the list; a plain value would append and leave 5433
+    # listening on 0.0.0.0.
+    #
+    # The credentials stay at the dev default. That is safe ONLY because the
+    # port is now closed and nothing else shares this Docker network. To set a
+    # real password you must also change the two hard-coded DSNs in
+    # docker-compose.yml (the `server` environment and the `migrate` command) —
+    # see the doc.
+    ports: !override []
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  server:
+    environment:
+      ENVIRONMENT: production
+      # Closed. Open it briefly to create the first account, then set it back
+      # and `up -d` again. See "First account" in the doc.
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-false}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  renderer:
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  web:
+    # Caddy is the entrance now; the bundle/nginx container is internal.
+    ports: !override []
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3
+    environment:
+      # Both required — Caddy substitutes them into deploy/Caddyfile.
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env — the hostname this instance answers on}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env — Let's Encrypt sends expiry notices here}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Issued certificates and ACME account key. MUST persist: lose this and a
+      # redeploy re-issues, and Let's Encrypt rate-limits repeated issuance.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:

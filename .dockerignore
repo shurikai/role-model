@@ -33,3 +33,9 @@ docx-renderer/**/__pycache__
 # Local agent scratch
 .claude
 notes
+
+# Docs and deploy orchestration — never needed inside an image. The Caddyfile
+# under deploy/ is bind-mounted at runtime, not built in.
+docs
+deploy
+compose.prod.yml
