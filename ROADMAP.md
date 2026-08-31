@@ -70,8 +70,8 @@ Gate: two non-technical test users can enter career data and get a resume
 without touching the terminal.
 
 Open work: onboarding agent (#117), career-data browsing/editing UI (#118),
-Stage 0 import review UI (#119), Google OAuth (#120), Fly.io deployment (#20),
-Stage 0b tag suggestions (#19).
+Stage 0 import review UI (#119), OIDC login (#120), Oracle Cloud deployment
+(#20), Stage 0b tag suggestions (#19), Stage 0b tag-suggestion review UI (#137).
 
 ### Phase 2 — Complete end-to-end pipeline
 
