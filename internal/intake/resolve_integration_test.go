@@ -369,3 +369,81 @@ func TestResolveBatchCarriesPreferencesEducationAndCredentials(t *testing.T) {
 		t.Error("a credential with no issue date should store a NULL, not fail")
 	}
 }
+
+// #88: an extraction that scatters skills across a large, partly-redundant set
+// of new categories should leave the whole set on the cards for a group
+// review, not just a one-line "new category" note per draft. Only a staged row
+// read back out of the database shows what FlagDraft actually stored.
+func TestStageDraftsFlagsCrowdedCategories(t *testing.T) {
+	ctx := context.Background()
+	dsn := testenv.DatabaseURL(t)
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	defer pool.Close()
+
+	q := db.New(pool)
+	svc := NewService(pool, q)
+
+	userID := uuid.New()
+	if _, err := q.CreateUser(ctx, db.CreateUserParams{
+		ID: userID, Email: "crowded-" + userID.String() + "@test.local",
+	}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	batch, err := q.CreateImportBatch(ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: userID, RawText: "pasted career text", Status: "review",
+	})
+	if err != nil {
+		t.Fatalf("create batch: %v", err)
+	}
+
+	// Ten single-tag categories, two of them a "... Improvement" pair: over the
+	// limit on count and redundant on wording both.
+	x := CareerExtraction{Skills: []ExtractedSkill{
+		{Category: "Quality Improvement", Tag: "PDSA cycles", Proficiency: "expert"},
+		{Category: "Process Improvement", Tag: "Value stream mapping", Proficiency: "proficient"},
+		{Category: "Clinical Operations", Tag: "Triage", Proficiency: "expert"},
+		{Category: "Charting Systems", Tag: "Epic", Proficiency: "proficient"},
+		{Category: "Certifications", Tag: "ACLS", Proficiency: "expert"},
+		{Category: "Care Coordination", Tag: "Discharge planning", Proficiency: "proficient"},
+		{Category: "Staffing", Tag: "Acuity-based assignment", Proficiency: "proficient"},
+		{Category: "Committees", Tag: "Falls task force", Proficiency: "novice"},
+		{Category: "Education", Tag: "Preceptorship", Proficiency: "proficient"},
+		{Category: "Research", Tag: "IRB submissions", Proficiency: "novice"},
+	}}
+	planned, err := PlanDrafts(x)
+	if err != nil {
+		t.Fatalf("PlanDrafts: %v", err)
+	}
+	if _, err := svc.StageDrafts(ctx, userID, batch.ID, planned); err != nil {
+		t.Fatalf("StageDrafts: %v", err)
+	}
+
+	rows, err := q.ListEntityDraftsByBatch(ctx, db.ListEntityDraftsByBatchParams{
+		BatchID: batch.ID, UserID: userID,
+	})
+	if err != nil {
+		t.Fatalf("list drafts: %v", err)
+	}
+	if len(rows) != 10 {
+		t.Fatalf("staged %d drafts, want 10", len(rows))
+	}
+
+	for _, r := range rows {
+		if r.Flags == nil {
+			t.Fatalf("draft %s carries no flags; every one of these is a new category", r.ID)
+		}
+		var f DraftFlags
+		if err := json.Unmarshal(*r.Flags, &f); err != nil {
+			t.Fatalf("unmarshal flags for %s: %v", r.ID, err)
+		}
+		if len(f.NewCategories) != 1 {
+			t.Errorf("draft %s: new_categories = %v, want exactly one", r.ID, f.NewCategories)
+		}
+		if len(f.CrowdedCategories) != 10 {
+			t.Errorf("draft %s: crowded_categories = %v, want all ten proposed categories", r.ID, f.CrowdedCategories)
+		}
+	}
+}

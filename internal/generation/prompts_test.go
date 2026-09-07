@@ -18,6 +18,7 @@ func TestPromptFingerprintMatchesGitHashObject(t *testing.T) {
 
 	for _, name := range []string{
 		jdExtractionPrompt,
+		careerExtractPrompt,
 		resumeBodyPrompt,
 		resumeSummaryPrompt,
 	} {
@@ -74,11 +75,40 @@ func TestPromptCommentsDoNotLeak(t *testing.T) {
 	}
 }
 
+// #87: the career extraction prompt asked for industry_level but never told
+// the model what the rungs were, so it invented free text ("Charge/supervisory
+// level") that matched no career_levels row and dropped every position to the
+// ladder's fallback rung. Both vocabulary lists must reach the rendered prompt.
+func TestCareerExtractionPromptRendersVocabularies(t *testing.T) {
+	out, err := RenderCareerExtractionPrompt(CareerExtractionPromptData{
+		CareerText:        "twenty years on the wards",
+		ProficiencyValues: `"novice", "proficient", "expert"`,
+		CareerLevels:      `"staff nurse", "charge nurse", "nurse manager"`,
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	for _, want := range []string{
+		`"charge nurse"`,  // a ladder rung the model must choose from
+		`"nurse manager"`, // ...not invent around
+		`"proficient"`,    // the depth scale, still rendered
+		"twenty years on the wards",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("rendered career extraction prompt is missing %q", want)
+		}
+	}
+	if strings.Contains(out, "{{") {
+		t.Errorf("rendered prompt still contains an unexpanded template action:\n%s", out)
+	}
+}
+
 // Every prompt the pipeline names must actually be embedded. Catches a typo'd
 // or renamed template at test time instead of at the first generation call.
 func TestNamedPromptsExist(t *testing.T) {
 	for _, name := range []string{
 		jdExtractionPrompt,
+		careerExtractPrompt,
 		resumeBodyPrompt,
 		resumeSummaryPrompt,
 	} {

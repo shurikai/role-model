@@ -274,7 +274,7 @@ func (s *Service) StageDrafts(
 	// proposing the same label twice is exactly the case a per-draft pass
 	// would miss.
 	for i, row := range out {
-		if _, err := FlagDraft(ctx, qtx, userID, row); err != nil {
+		if _, err := FlagDraft(ctx, qtx, userID, row, out); err != nil {
 			return nil, fmt.Errorf("stage drafts: flag %s: %w", row.ID, err)
 		}
 		refreshed, err := qtx.GetEntityDraft(ctx, db.GetEntityDraftParams{ID: row.ID, UserID: userID})

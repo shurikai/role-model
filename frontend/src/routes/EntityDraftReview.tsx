@@ -69,6 +69,15 @@ function flagLines(draft: EntityDraft): string[] {
       `Would create a new category "${c}", which starts with no competency vocabulary behind it.`,
     );
   }
+  const crowded = flags.crowded_categories ?? [];
+  if (crowded.length > 0) {
+    lines.push(
+      `This import proposes ${crowded.length} new categories (${crowded.join(", ")}). ` +
+        `More than a handful, or two that share a word, usually means one idea has been split — ` +
+        `review them as a set and merge the redundant ones before approving. ` +
+        `Every tag belongs to exactly one category.`,
+    );
+  }
   return lines;
 }
 
