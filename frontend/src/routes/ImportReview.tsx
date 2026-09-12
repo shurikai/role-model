@@ -29,6 +29,7 @@ import {
   type DraftFlag,
   type DraftFlagType,
   type ImportBatch,
+  type SuggestedTag,
 } from "../lib/types";
 
 /*
@@ -315,6 +316,24 @@ function DraftCard({
   const [expanded, setExpanded] = useState(true);
   const [picking, setPicking] = useState(false);
 
+  // Default-checked: Stage 0b only ever suggests a tag that already resolved
+  // against the user's own vocabulary, so accepting all of them is the common
+  // case and unchecking one is the exception the reviewer opts into.
+  const [selectedTagIDs, setSelectedTagIDs] = useState<ReadonlySet<string>>(
+    () => new Set((draft.suggested_tags ?? []).map((t) => t.tag_id)),
+  );
+  function toggleTag(tagID: string) {
+    setSelectedTagIDs((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagID)) {
+        next.delete(tagID);
+      } else {
+        next.add(tagID);
+      }
+      return next;
+    });
+  }
+
   const updateDraft = useUpdateDraft(batchID);
   const approveDraft = useApproveDraft(batchID);
   const rejectDraft = useRejectDraft(batchID);
@@ -405,6 +424,13 @@ function DraftCard({
             )}
           />
 
+          <SuggestedTags
+            tags={draft.suggested_tags ?? []}
+            selected={selectedTagIDs}
+            disabled={decided}
+            onToggle={toggleTag}
+          />
+
           {actionError && (
             <p className="mt-3 font-body text-sm text-reject">
               {formatApiError(actionError)}
@@ -420,7 +446,11 @@ function DraftCard({
                 onCancel={() => setPicking(false)}
                 onResolved={(positionID) =>
                   approveDraft.mutate(
-                    { draftID: draft.id, positionID },
+                    {
+                      draftID: draft.id,
+                      positionID,
+                      tagIDs: [...selectedTagIDs],
+                    },
                     { onSuccess: () => setPicking(false) },
                   )
                 }
@@ -535,6 +565,73 @@ function DraftField({
         className="w-full border border-border bg-surface p-3 font-body text-sm text-ink disabled:opacity-70"
       />
       <FieldFlags flags={flags} />
+    </div>
+  );
+}
+
+/**
+ * Groups tags by category in first-seen order, matching how the Skills
+ * section itself is grouped — a stable Map iterates in insertion order, so
+ * this needs no separate sort.
+ */
+function groupByCategory(tags: SuggestedTag[]): Map<string, SuggestedTag[]> {
+  const groups = new Map<string, SuggestedTag[]>();
+  for (const tag of tags) {
+    const group = groups.get(tag.category);
+    if (group) {
+      group.push(tag);
+    } else {
+      groups.set(tag.category, [tag]);
+    }
+  }
+  return groups;
+}
+
+/**
+ * Stage 0b's tag suggestions, default-checked and grouped by category. Every
+ * suggestion already resolved against an existing tag (Stage 0b never invents
+ * one), so this is a confirm-and-prune step, not a create step.
+ */
+function SuggestedTags({
+  tags,
+  selected,
+  disabled,
+  onToggle,
+}: {
+  tags: SuggestedTag[];
+  selected: ReadonlySet<string>;
+  disabled: boolean;
+  onToggle: (tagID: string) => void;
+}) {
+  if (tags.length === 0) return null;
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-2 font-mono text-[10px] tracking-widest text-rail uppercase">
+        Suggested tags
+      </p>
+      {[...groupByCategory(tags)].map(([category, categoryTags]) => (
+        <div key={category} className="mb-2 last:mb-0">
+          <p className="mb-1 font-body text-[11px] text-ink-dim">{category}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {categoryTags.map((tag) => (
+              <label
+                key={tag.tag_id}
+                className="flex items-center gap-1.5 font-body text-xs text-ink"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(tag.tag_id)}
+                  disabled={disabled}
+                  onChange={() => onToggle(tag.tag_id)}
+                  className="h-3.5 w-3.5"
+                />
+                {tag.name}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
