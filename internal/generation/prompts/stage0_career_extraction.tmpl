@@ -25,7 +25,7 @@ empty array, never an omitted key.
       "employer_ref": "e1",
       "title": "the title as held, verbatim",
       "industry_role": "what this job is called in the wider field, or null",
-      "industry_level": "the rung of their ladder, or null",
+      "industry_level": "the closest rung of the ladder listed under RULES, or null",
       "location": "or null",
       "started_on": "YYYY-MM",
       "ended_on": "YYYY-MM, or null if current",
@@ -100,8 +100,16 @@ RULES
 
 - Categories are groupings the PERSON would recognise, not ones you import from
   another field. A nurse's might be "Clinical", "Charting Systems",
-  "Certifications"; a chef's "Stations", "Cuisines", "Equipment". Use as few as
-  the material supports. A category you invent for one item is noise.
+  "Certifications"; a chef's "Stations", "Cuisines", "Equipment".
+
+- Decide the whole set of categories before you tag anything, then tag against
+  that set. The set is small: typically four to eight for one career. More than
+  that almost always means one idea has been split — "Quality Improvement",
+  "Quality and Safety" and "Process Improvement" are one category, not three.
+  Two category names that share a word are the warning sign; a category holding
+  a single tag is another. Fold both back in unless the material genuinely
+  supports the split. Every tag sits in exactly one category, so a capability
+  spread across three categories is the evidence for it scattered three ways.
 
 - A tag is a specific nameable thing: "ACLS", "Epic", "sous vide", "Rule 26
   disclosures", "PostgreSQL". Not a quality ("hard-working"), not a
@@ -123,6 +131,13 @@ RULES
 - Copy the person's own words for titles and organisation names. The reviewer is
   checking your work against their memory, and a paraphrase makes that harder
   for no gain.
+
+- industry_level places a position on the person's career ladder, which has
+  these rungs: {{.CareerLevels}}. Pick the closest one. If the text gives you
+  nothing to judge seniority by, or the position sits outside that ladder, use
+  null — do not invent a rung or reword one of these. A rung that is not on
+  this list matches nothing downstream and silently drops the position to the
+  ladder's fallback level; null instead leaves it for the reviewer to set.
 
 PREFERENCES
 

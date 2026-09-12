@@ -74,7 +74,14 @@ function careerDrafts(): EntityDraft[] {
     draft({
       id: "draft-skill",
       kind: "skill",
-      flags: { new_categories: ["Clinical"] },
+      flags: {
+        new_categories: ["Clinical"],
+        crowded_categories: [
+          "Clinical",
+          "Quality Improvement",
+          "Process Improvement",
+        ],
+      },
       payload: { category: "Clinical", tag: "ACLS", proficiency: "expert" },
     }),
     draft({
@@ -218,6 +225,13 @@ describe("EntityDraftReview", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(/Would create a new category "Clinical"/),
+    ).toBeInTheDocument();
+    // #88: the whole proposed set is named, so the reviewer can merge the
+    // redundant ones rather than approve thirteen near-duplicates one by one.
+    expect(
+      screen.getByText(
+        /proposes 3 new categories.*Quality Improvement.*Process Improvement/,
+      ),
     ).toBeInTheDocument();
   });
 

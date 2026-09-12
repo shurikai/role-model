@@ -10,6 +10,7 @@ import (
 
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/generation"
+	"github.com/shurikai/role-model/internal/vocabulary"
 )
 
 // careerExtractionMaxTokens caps the response. A whole career is the largest
@@ -42,25 +43,47 @@ func (s *Service) ExtractCareer(
 		return nil, fmt.Errorf("extract career: no text to read")
 	}
 
-	// The depth scale the extractor is told to choose from is the user's own,
-	// for the same reason the JD prompt's seniority list is: the scale a skill
-	// is recorded on and the scale the fit gate ranks against have to be one
-	// scale. An account with no rows falls back to the shipped neutral set.
-	levels, err := s.q.ListProficiencyLevelsByUser(ctx, userID)
+	// The depth scale and the seniority ladder the extractor is told to choose
+	// from are both the user's own, for the same reason the JD prompt's
+	// seniority list is: the scale a value is recorded on and the scale its
+	// reader ranks against have to be one scale. proficiency feeds the fit
+	// gate; industry_level is resolved by pickCareerLevel against career_levels,
+	// and a rung the extractor invents matches no row and drops the position to
+	// the fallback level for every job (#87). An account with no rows of its
+	// own falls back to the shipped neutral sets.
+	profLevels, err := s.q.ListProficiencyLevelsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("extract career: list proficiency levels: %w", err)
 	}
-	values := make([]string, 0, len(levels))
-	for _, l := range levels {
-		values = append(values, `"`+l.Value+`"`)
+	careerLevels, err := s.q.ListCareerLevelsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("extract career: list career levels: %w", err)
 	}
-	if len(values) == 0 {
-		values = []string{`"novice"`, `"proficient"`, `"expert"`}
+
+	profValues := make([]string, 0, len(profLevels))
+	for _, l := range profLevels {
+		profValues = append(profValues, l.Value)
+	}
+	if len(profValues) == 0 {
+		for _, l := range vocabulary.DefaultProficiencyLevels() {
+			profValues = append(profValues, l.Value)
+		}
+	}
+
+	levelValues := make([]string, 0, len(careerLevels))
+	for _, l := range careerLevels {
+		levelValues = append(levelValues, l.Value)
+	}
+	if len(levelValues) == 0 {
+		for _, l := range vocabulary.DefaultCareerLevels() {
+			levelValues = append(levelValues, l.Value)
+		}
 	}
 
 	prompt, err := generation.RenderCareerExtractionPrompt(generation.CareerExtractionPromptData{
 		CareerText:        careerText,
-		ProficiencyValues: strings.Join(values, ", "),
+		ProficiencyValues: quoteJoin(profValues),
+		CareerLevels:      quoteJoin(levelValues),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("extract career: render prompt: %w", err)
@@ -81,6 +104,16 @@ func (s *Service) ExtractCareer(
 		return nil, fmt.Errorf("extract career: %w", err)
 	}
 	return s.StageDrafts(ctx, userID, batchID, planned)
+}
+
+// quoteJoin renders vocabulary values as the quoted, comma-separated list the
+// extraction prompt embeds: {"novice","proficient"} -> `"novice", "proficient"`.
+func quoteJoin(vals []string) string {
+	q := make([]string, len(vals))
+	for i, v := range vals {
+		q[i] = `"` + v + `"`
+	}
+	return strings.Join(q, ", ")
 }
 
 // stripFence removes a markdown code fence the model was asked not to emit.

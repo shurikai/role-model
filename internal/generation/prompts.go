@@ -50,13 +50,17 @@ func renderPrompt(name string, data any) (string, error) {
 }
 
 // CareerExtractionPromptData is what stage0_career_extraction.tmpl renders
-// against. ProficiencyValues comes from the user's own proficiency_levels rows,
-// for the same reason the JD extraction prompt's seniority list does: the scale
-// the extractor is told to choose from and the scale the fit gate ranks against
-// have to be one scale.
+// against. ProficiencyValues and CareerLevels both come from the user's own
+// vocabulary rows, for the same reason the JD extraction prompt's seniority
+// list does: the scales the extractor is told to choose from and the scales
+// its output is later resolved against have to be one scale each. A career
+// level the extractor invents matches no career_levels row, so pickCareerLevel
+// drops the position to the ladder's fallback rung — the defect migration 020
+// fixed, reappearing one layer up (#87).
 type CareerExtractionPromptData struct {
 	CareerText        string
 	ProficiencyValues string
+	CareerLevels      string
 }
 
 // RenderCareerExtractionPrompt renders the Stage 0 career extraction prompt.

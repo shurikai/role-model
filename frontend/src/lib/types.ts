@@ -381,6 +381,12 @@ export type EntityDraftStatus = "pending" | "approved" | "rejected";
 export interface EntityDraftFlags {
   preference_collisions?: string[];
   new_categories?: string[];
+  /**
+   * Every new category the whole import proposes, set only when that set is
+   * large or redundant enough to review as a group (#88). Identical on every
+   * flagged draft in the batch.
+   */
+  crowded_categories?: string[];
 }
 
 export interface EntityDraft {
