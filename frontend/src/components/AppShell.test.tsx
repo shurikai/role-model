@@ -21,6 +21,7 @@ function renderAt(path: string) {
               <Route path="/applications" element={<p>Applications page</p>} />
               <Route path="/applications/new" element={<p>New page</p>} />
               <Route path="/import/new" element={<p>Narrow import</p>} />
+              <Route path="/onboarding/new" element={<p>Onboarding</p>} />
             </Route>
           </Routes>
         </AuthProvider>
@@ -81,7 +82,12 @@ describe("AppShell", () => {
     const hrefs = screen
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    for (const href of ["/applications", "/import/career/new", "/import/new"]) {
+    for (const href of [
+      "/applications",
+      "/import/career/new",
+      "/import/new",
+      "/onboarding/new",
+    ]) {
       expect(hrefs).toContain(href);
     }
   });

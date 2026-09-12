@@ -19,6 +19,7 @@ type Config struct {
 	JWTSecret       string
 	AllowedOrigins  []string
 	RendererURL     string
+	OnboardingURL   string
 	// SignupEnabled controls whether /auth/signup accepts new accounts.
 	// Defaults to TRUE in development and FALSE anywhere else — see Load.
 	SignupEnabled bool
@@ -54,6 +55,15 @@ func Load() Config {
 		}
 	}
 
+	onboardingURL := os.Getenv("ONBOARDING_AGENT_URL")
+	if onboardingURL == "" {
+		if env == "development" {
+			onboardingURL = "http://localhost:8100"
+		} else {
+			log.Println("WARNING: ONBOARDING_AGENT_URL is not set; the onboarding interview will fail")
+		}
+	}
+
 	// Signup gating. An open signup route on an internet-reachable instance
 	// lets anyone create an account and spend the operator's Anthropic key,
 	// and this is single-user software by default — the second account is the
@@ -83,6 +93,7 @@ func Load() Config {
 		JWTSecret:       os.Getenv("JWT_SECRET"),
 		AllowedOrigins:  allowedOrigins,
 		RendererURL:     rendererURL,
+		OnboardingURL:   onboardingURL,
 		SignupEnabled:   signupEnabled,
 	}
 }

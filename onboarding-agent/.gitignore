@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+# LangGraph's SQLite checkpoint file, only ever a local dev artifact here —
+# the containerized service writes its own to /data (see Dockerfile), never
+# to the repo tree.
+onboarding_checkpoints.sqlite*

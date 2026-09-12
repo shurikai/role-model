@@ -14,6 +14,7 @@ import (
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/intake"
+	"github.com/shurikai/role-model/internal/onboarding"
 	"github.com/shurikai/role-model/internal/project"
 	"github.com/shurikai/role-model/internal/renderer"
 	"github.com/shurikai/role-model/internal/stage0"
@@ -27,14 +28,15 @@ type RouterDeps struct {
 	IntakeSvc *intake.Service
 	// The raw model client, for the one intake endpoint that calls a model
 	// directly rather than through a service that owns one.
-	GenClient      intake.Extractor
-	FitSvc         *fitgate.Service
-	ContribSvc     *contribution.Service
-	ProjectSvc     *project.Service
-	RendererClient *renderer.Client
-	JWTSecret      string
-	AllowedOrigins []string
-	SignupEnabled  bool
+	GenClient        intake.Extractor
+	FitSvc           *fitgate.Service
+	ContribSvc       *contribution.Service
+	ProjectSvc       *project.Service
+	RendererClient   *renderer.Client
+	OnboardingClient *onboarding.Client
+	JWTSecret        string
+	AllowedOrigins   []string
+	SignupEnabled    bool
 }
 
 func NewRouter(deps RouterDeps) *chi.Mux {
@@ -188,6 +190,15 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 
 			r.Post("/contributions/{id}/tags", tagHandler.AssignToContribution)
 			r.Delete("/contributions/{id}/tags/{tagId}", tagHandler.UnassignFromContribution)
+
+			// Conversational career-data entry (#117), parallel to Stage 0's
+			// paste-a-document path. This proxies to an internal-only Python
+			// service the same way resumeVersionHandler proxies to the
+			// renderer — behind RequireAuth like everything else in this
+			// group, which is the only authentication the onboarding
+			// service itself has.
+			onboardingHandler := handlers.NewOnboardingHandler(deps.OnboardingClient)
+			r.Post("/onboarding/turns", onboardingHandler.Turn)
 
 			projectHandler := handlers.NewProjectHandler(deps.Queries, deps.ProjectSvc)
 			r.Get("/projects", projectHandler.List)

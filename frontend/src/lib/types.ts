@@ -586,3 +586,22 @@ export interface PreferenceRequest {
   context_type?: string | null;
   notes?: string | null;
 }
+
+/**
+ * One message exchanged with the onboarding agent (#117) — the conversational
+ * alternative to Stage 0's paste-a-document import. session_id is omitted on
+ * the very first call of a new interview; the response's session_id is then
+ * sent back on every following turn. The bearer token is never part of this
+ * body — POST /onboarding/turns reads it off the same Authorization header
+ * every other request already carries, then relays it to the agent itself.
+ */
+export interface OnboardingTurnRequest {
+  session_id?: string;
+  message?: string;
+}
+
+export interface OnboardingTurnResponse {
+  session_id: string;
+  reply: string;
+  done: boolean;
+}

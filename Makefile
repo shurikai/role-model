@@ -87,7 +87,7 @@ endef
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer dev check-prompts reset-password add-user fmt fmt-check test-renderer
+.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer run-onboarding dev check-prompts reset-password add-user fmt fmt-check test-renderer test-onboarding
 
 # Build
 all: build
@@ -115,6 +115,7 @@ test-all:
 	REQUIRE_INTEGRATION=1 go test -count=1 -tags integration ./...
 	cd frontend && npm run test
 	cd docx-renderer && uv run pytest
+	cd onboarding-agent && uv run pytest
 
 # The race detector needs cgo, and therefore a C toolchain. Separate from
 # test-all because that requirement is not universal; CI runs it always.
@@ -136,6 +137,10 @@ test-integration:
 # a separate target rather than part of `make test`.
 test-renderer:
 	cd docx-renderer && uv run pytest
+
+# Same reasoning as test-renderer: its own toolchain, its own target.
+test-onboarding:
+	cd onboarding-agent && uv run pytest
 
 # Database
 db-up:
@@ -324,12 +329,14 @@ fmt:
 	gofmt -w $(shell find . -name '*.go' -not -path './frontend/*')
 	cd frontend && npm run format
 	cd docx-renderer && uv run ruff format . && uv run ruff check --fix .
+	cd onboarding-agent && uv run ruff format . && uv run ruff check --fix .
 
 fmt-check:
 	@out="$$(gofmt -l $$(find . -name '*.go' -not -path './frontend/*'))"; \
 		if [ -n "$$out" ]; then echo "gofmt needed:"; echo "$$out"; exit 1; fi
 	cd frontend && npm run format:check
 	cd docx-renderer && uv run ruff format --check . && uv run ruff check .
+	cd onboarding-agent && uv run ruff format --check . && uv run ruff check .
 
 sqlc:
 	sqlc generate
@@ -394,11 +401,15 @@ run-frontend:
 run-renderer:
 	cd docx-renderer && uv run uvicorn main:app --reload --port 8000
 
-# Runs backend, frontend, and renderer together in one terminal.
-# Ctrl-C stops all three.
+run-onboarding:
+	cd onboarding-agent && uv run uvicorn main:app --reload --port 8100
+
+# Runs backend, frontend, renderer, and the onboarding agent together in one
+# terminal. Ctrl-C stops all four.
 dev:
 	@trap 'kill $$(jobs -p) 2>/dev/null' EXIT INT TERM; \
 	$(MAKE) run & \
 	$(MAKE) run-frontend & \
 	$(MAKE) run-renderer & \
+	$(MAKE) run-onboarding & \
 	wait

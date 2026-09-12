@@ -16,6 +16,7 @@ import (
 	"github.com/shurikai/role-model/internal/fitgate"
 	"github.com/shurikai/role-model/internal/generation"
 	"github.com/shurikai/role-model/internal/intake"
+	"github.com/shurikai/role-model/internal/onboarding"
 	"github.com/shurikai/role-model/internal/project"
 	"github.com/shurikai/role-model/internal/renderer"
 	"github.com/shurikai/role-model/internal/stage0"
@@ -47,20 +48,22 @@ func main() {
 	contribSvc := contribution.NewService(pool, queries)
 	projectSvc := project.NewService(pool, queries)
 	rendererClient := renderer.NewClient(cfg.RendererURL)
+	onboardingClient := onboarding.NewClient(cfg.OnboardingURL)
 	router := api.NewRouter(api.RouterDeps{
-		Pool:           pool,
-		Queries:        queries,
-		GenSvc:         genSvc,
-		Stage0Svc:      stage0Svc,
-		IntakeSvc:      intakeSvc,
-		GenClient:      genClient,
-		FitSvc:         fitSvc,
-		ContribSvc:     contribSvc,
-		ProjectSvc:     projectSvc,
-		RendererClient: rendererClient,
-		JWTSecret:      cfg.JWTSecret,
-		AllowedOrigins: cfg.AllowedOrigins,
-		SignupEnabled:  cfg.SignupEnabled,
+		Pool:             pool,
+		Queries:          queries,
+		GenSvc:           genSvc,
+		Stage0Svc:        stage0Svc,
+		IntakeSvc:        intakeSvc,
+		GenClient:        genClient,
+		FitSvc:           fitSvc,
+		ContribSvc:       contribSvc,
+		ProjectSvc:       projectSvc,
+		RendererClient:   rendererClient,
+		OnboardingClient: onboardingClient,
+		JWTSecret:        cfg.JWTSecret,
+		AllowedOrigins:   cfg.AllowedOrigins,
+		SignupEnabled:    cfg.SignupEnabled,
 	})
 
 	// Timeouts, all of which were absent. Without ReadHeaderTimeout a client

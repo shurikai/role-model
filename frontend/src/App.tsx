@@ -13,6 +13,7 @@ import { ImportStart } from "./routes/ImportStart";
 import { ImportReview } from "./routes/ImportReview";
 import { CareerImportStart } from "./routes/CareerImportStart";
 import { EntityDraftReview } from "./routes/EntityDraftReview";
+import { Onboarding } from "./routes/Onboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,6 +60,13 @@ function App() {
                   element={<EntityDraftReview />}
                 />
                 <Route path="/import/:batchID" element={<ImportReview />} />
+                {/*
+                  #117: a third on-ramp, kept namespaced apart from both
+                  import paths the same deliberate way they're kept apart
+                  from each other — this one has no document to segment or
+                  entities to resolve, just a conversation.
+                */}
+                <Route path="/onboarding/new" element={<Onboarding />} />
               </Route>
             </Routes>
           </ErrorBoundary>

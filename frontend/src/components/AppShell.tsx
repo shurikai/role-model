@@ -39,6 +39,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               cannot distinguish them.
             */}
             <ShellLink to="/import/new">Add contributions</ShellLink>
+            {/*
+              #117: the other on-ramp, for someone with no document to paste
+              at all. Both write the same tables, through the same REST
+              endpoints — this one just gets there by conversation.
+            */}
+            <ShellLink to="/onboarding/new">Career interview</ShellLink>
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
