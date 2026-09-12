@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ImportReview } from "./ImportReview";
-import type { ContributionDraft, ImportBatch } from "../lib/types";
+import type {
+  ContributionDraft,
+  Employer,
+  ImportBatch,
+  Position,
+} from "../lib/types";
 
 const BATCH_ID = "batch-1";
 
@@ -44,6 +49,39 @@ function makeDraft(
   };
 }
 
+function makeEmployer(overrides: Partial<Employer> = {}): Employer {
+  return {
+    id: "employer-1",
+    user_id: "u1",
+    name: "Continental Freightways",
+    industry: null,
+    notes: null,
+    created_at: "2026-08-25T00:00:00Z",
+    updated_at: "2026-08-25T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function makePosition(overrides: Partial<Position> = {}): Position {
+  return {
+    id: "position-1",
+    user_id: "u1",
+    employer_id: "employer-1",
+    title: "Senior Backend Engineer",
+    industry_level: null,
+    industry_role: null,
+    level_rationale: null,
+    started_on: "2020-01",
+    ended_on: null,
+    context_narrative: null,
+    location: null,
+    sort_order: 0,
+    created_at: "2026-08-25T00:00:00Z",
+    updated_at: "2026-08-25T00:00:00Z",
+    ...overrides,
+  };
+}
+
 interface Recorded {
   method: string;
   path: string;
@@ -51,11 +89,21 @@ interface Recorded {
 }
 
 /**
- * Routes the two GETs the screen issues and records every write, so a test can
- * assert what was actually sent — the PUT body in particular, since the
- * handler 400s on any key outside the four editable fields.
+ * Routes every GET the screen and its position picker can issue, and records
+ * every write, so a test can assert what was actually sent — the PUT body in
+ * particular, since the handler 400s on any key outside the four editable
+ * fields, and the approve body, since that is what carries tag_ids.
+ *
+ * employers/positionsByEmployer default to empty, which is what every test
+ * before the approve flow needed: the picker never gets past "no employers
+ * yet" and no position is ever resolved.
  */
-function stubFetch(batch: ImportBatch, drafts: ContributionDraft[]) {
+function stubFetch(
+  batch: ImportBatch,
+  drafts: ContributionDraft[],
+  employers: Employer[] = [],
+  positionsByEmployer: Record<string, Position[]> = {},
+) {
   const calls: Recorded[] = [];
   const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
     const path = String(url);
@@ -69,8 +117,11 @@ function stubFetch(batch: ImportBatch, drafts: ContributionDraft[]) {
     let body: unknown = null;
     if (method === "GET" && path.endsWith("/drafts")) {
       body = drafts;
-    } else if (method === "GET" && path.includes("/employers")) {
-      body = [];
+    } else if (method === "GET" && path.includes("/positions")) {
+      const employerID = path.match(/\/employers\/([^/]+)\/positions/)?.[1];
+      body = (employerID && positionsByEmployer[employerID]) || [];
+    } else if (method === "GET" && path.endsWith("/employers")) {
+      body = employers;
     } else if (method === "GET") {
       body = batch;
     } else if (path.endsWith("/reject")) {
@@ -100,6 +151,21 @@ function renderReview() {
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
+  );
+}
+
+/**
+ * Drives the approve flow through PositionPicker to a resolved position: open
+ * the picker, pick the (only) employer, pick the (only) position. Every
+ * approve test uses exactly one of each, so there is nothing to disambiguate.
+ */
+async function approveThroughPicker(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /Approve/ }));
+  await user.click(
+    await screen.findByRole("button", { name: "Continental Freightways" }),
+  );
+  await user.click(
+    await screen.findByRole("button", { name: /Senior Backend Engineer/ }),
   );
 }
 
@@ -294,5 +360,133 @@ describe("ImportReview", () => {
 
     expect(await screen.findByText(/Import failed/)).toBeInTheDocument();
     expect(screen.getByText("model returned no entries")).toBeInTheDocument();
+  });
+
+  // #137: Stage 0b's suggested_tags carried a typed contract and a resolve
+  // endpoint (#19) with nothing in this screen rendering or using either.
+
+  it("renders no tag section when a draft has no suggested tags", async () => {
+    const { fetchMock } = stubFetch(makeBatch(), [
+      makeDraft({ suggested_tags: null }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    await screen.findByLabelText("Summary");
+    expect(screen.queryByText("Suggested tags")).not.toBeInTheDocument();
+  });
+
+  it("renders suggested tags checked by default, grouped by category", async () => {
+    const { fetchMock } = stubFetch(makeBatch(), [
+      makeDraft({
+        suggested_tags: [
+          { tag_id: "t-go", name: "Go", category: "Languages" },
+          {
+            tag_id: "t-k8s",
+            name: "Kubernetes",
+            category: "Cloud & Infrastructure",
+          },
+        ],
+      }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    expect(await screen.findByRole("checkbox", { name: "Go" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Kubernetes" })).toBeChecked();
+    expect(screen.getByText("Languages")).toBeInTheDocument();
+    expect(screen.getByText("Cloud & Infrastructure")).toBeInTheDocument();
+  });
+
+  it("sends the checked suggested tag ids in the approve body", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, calls } = stubFetch(
+      makeBatch(),
+      [
+        makeDraft({
+          suggested_tags: [
+            { tag_id: "t-go", name: "Go", category: "Languages" },
+            {
+              tag_id: "t-k8s",
+              name: "Kubernetes",
+              category: "Cloud & Infrastructure",
+            },
+          ],
+        }),
+      ],
+      [makeEmployer()],
+      { "employer-1": [makePosition()] },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    await screen.findByRole("checkbox", { name: "Go" });
+    await approveThroughPicker(user);
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(true);
+    });
+    const approve = calls.find((c) => c.path.endsWith("/approve"))!;
+    expect(approve.body).toEqual({
+      position_id: "position-1",
+      tag_ids: ["t-go", "t-k8s"],
+    });
+  });
+
+  it("drops an unchecked suggested tag id from the approve body", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, calls } = stubFetch(
+      makeBatch(),
+      [
+        makeDraft({
+          suggested_tags: [
+            { tag_id: "t-go", name: "Go", category: "Languages" },
+            {
+              tag_id: "t-k8s",
+              name: "Kubernetes",
+              category: "Cloud & Infrastructure",
+            },
+          ],
+        }),
+      ],
+      [makeEmployer()],
+      { "employer-1": [makePosition()] },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: "Kubernetes" }),
+    );
+    await approveThroughPicker(user);
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(true);
+    });
+    const approve = calls.find((c) => c.path.endsWith("/approve"))!;
+    expect(approve.body).toEqual({
+      position_id: "position-1",
+      tag_ids: ["t-go"],
+    });
+  });
+
+  it("omits tag_ids from the approve body when there were no suggestions", async () => {
+    const user = userEvent.setup();
+    const { fetchMock, calls } = stubFetch(
+      makeBatch(),
+      [makeDraft({ suggested_tags: null })],
+      [makeEmployer()],
+      { "employer-1": [makePosition()] },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    await approveThroughPicker(user);
+
+    await waitFor(() => {
+      expect(calls.some((c) => c.path.endsWith("/approve"))).toBe(true);
+    });
+    const approve = calls.find((c) => c.path.endsWith("/approve"))!;
+    expect(approve.body).toEqual({ position_id: "position-1" });
   });
 });
