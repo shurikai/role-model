@@ -20,6 +20,8 @@ agent/tags.py for why that boundary exists.
 
 from __future__ import annotations
 
+import re
+
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Checkpointer, RunnableConfig, interrupt
 
@@ -28,11 +30,26 @@ from agent.state import InterviewState
 from agent.tags import StructuredModel, extract_tag_candidates
 
 _DONE_WORDS = {"done", "no", "nothing", "nope", "that's it", "thats it", "no more"}
+_DONE_LEADING_WORDS = {"done", "no", "nope", "nothing"}
 
 
 def _sounds_done(answer: str) -> bool:
+    """Whole-utterance, not substring -- the same lesson the fit gate's
+    matcher already learned (internal/fitgate): a bare `"done" in normalized`
+    here misread "I made sure the migration was done before the cutover" as
+    "no more contributions" and silently truncated the interview.
+
+    This is a partial fix, not a complete one. "No new features, but I
+    optimized X" genuinely starts with "no" and there is no simple heuristic
+    that resolves that ambiguity -- what this closes is the common,
+    unambiguous case: the stop word appearing mid-answer rather than as the
+    answer.
+    """
     normalized = answer.strip().lower().rstrip(".!")
-    return normalized in _DONE_WORDS or "done" in normalized or "next job" in normalized
+    if normalized in _DONE_WORDS or normalized.startswith("next job"):
+        return True
+    leading_word = normalized.split(" ", 1)[0] if normalized else ""
+    return leading_word in _DONE_LEADING_WORDS
 
 
 def _configurable(config: RunnableConfig) -> dict:
@@ -57,29 +74,103 @@ async def resolve_employer(state: InterviewState, config: RunnableConfig) -> dic
     return {"employer_id": employer["id"], "reply": note}
 
 
-async def ask_position(state: InterviewState) -> dict:
+async def ask_position_title(state: InterviewState) -> dict:
     prior_note = state.get("reply", "")
-    answer = interrupt(
-        f"{prior_note} What was your title there, and when did you start (YYYY-MM)?"
-    )
+    answer = interrupt(f"{prior_note} What was your title there?")
     return {"position_title": answer}
+
+
+_YEAR_MONTH_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_YEAR_MONTH = re.compile(r"^\d{4}-\d{2}$")
+_YEAR_ONLY = re.compile(r"^\d{4}$")
+
+
+def _parse_started_on(answer: str) -> str | None:
+    """Accepts YYYY-MM-DD, YYYY-MM, or a bare YYYY, normalizing the latter two
+    to a full date -- the same tolerance jd_extraction.tmpl documents for
+    dates elsewhere in this codebase ("Where the text gives only a year, use
+    \"-01\" and let the reviewer correct it"). Returns None for anything else,
+    rather than guessing; the caller re-asks once on None."""
+    text = answer.strip()
+    if _YEAR_MONTH_DAY.match(text):
+        return text
+    if _YEAR_MONTH.match(text):
+        return f"{text}-01"
+    if _YEAR_ONLY.match(text):
+        return f"{text}-01-01"
+    return None
+
+
+# Used only when a second reprompt still doesn't parse -- see ask_position_start.
+# A recognisably-fake date, not today's date or a null: this is what made the
+# original bug (a silent 2000-01-01 for every position, always) invisible.
+_STARTED_ON_FALLBACK = "1900-01-01"
+
+
+async def ask_position_start(state: InterviewState) -> dict:
+    # _position_start_needs_retry drives routing (route_position_start below)
+    # and is set on EVERY return path here, unlike checking for
+    # position_started_on's presence in state -- that key, once set for one
+    # job, stays set for the rest of the thread, so presence alone can't tell
+    # "this job's date is in" from "a PREVIOUS job's date is still sitting
+    # there while this job's hasn't been asked yet".
+    reprompt = state.get("_position_start_needs_retry", False)
+    question = (
+        "I couldn't read that as a date -- try YYYY-MM, like 2019-03."
+        if reprompt
+        else "When did you start there (YYYY-MM)?"
+    )
+    answer = interrupt(question)
+    parsed = _parse_started_on(answer)
+    if parsed is not None:
+        return {
+            "position_started_on": parsed,
+            "position_started_on_note": None,
+            "_position_start_needs_retry": False,
+        }
+    if reprompt:
+        # Second bad answer in a row: fall back rather than loop forever --
+        # losing a clean date is the safe direction, the same rule skill-depth
+        # parsing already follows. The raw answer is kept in
+        # position_started_on_note (-> context_narrative) so it isn't silently
+        # discarded the way the original combined-question version discarded
+        # the date entirely, with nothing left for a human to correct later.
+        return {
+            "position_started_on": _STARTED_ON_FALLBACK,
+            "position_started_on_note": answer,
+            "_position_start_needs_retry": False,
+        }
+    return {"_position_start_needs_retry": True}
+
+
+def route_position_start(state: InterviewState) -> str:
+    if state.get("_position_start_needs_retry"):
+        return "ask_position_start"
+    return "resolve_position"
 
 
 async def resolve_position(state: InterviewState, config: RunnableConfig) -> dict:
     conf = _configurable(config)
-    # v1 asks title and start date together in one free-text answer; a real
-    # parse of "Staff Engineer, 2019-03" belongs in a dedicated parsing pass,
-    # not hand-rolled here. For now the whole answer becomes the title and the
-    # start date is left for the person to correct later in the UI, the same
-    # way a Stage 0 draft is corrected rather than trusted verbatim.
-    position = await tools.create_position(
+    date_note = state.get("position_started_on_note")
+    context_narrative = (
+        f'Start date as stated: "{date_note}" (could not be read as a date)'
+        if date_note
+        else None
+    )
+    position, created = await tools.resolve_or_create_position(
         conf["api_client"],
         conf["token"],
         state["employer_id"],
         state["position_title"],
-        conf.get("default_started_on", "2000-01-01"),
+        state["position_started_on"],
+        context_narrative,
     )
-    return {"position_id": position["id"]}
+    note = (
+        f"Got it -- adding {state['position_title']}."
+        if created
+        else f"Found {position['title']} at this employer already on file."
+    )
+    return {"position_id": position["id"], "reply": note}
 
 
 async def ask_contribution(state: InterviewState) -> dict:
@@ -199,7 +290,17 @@ def _parse_depth_answer(
 
     years: float | None = None
     for token in normalized.replace("+", " ").split():
-        cleaned = token.rstrip("years").rstrip("yrs").rstrip("year").rstrip("yr")
+        # removesuffix, not rstrip: rstrip("years") strips any trailing RUN
+        # of the characters y/e/a/r/s, not the substring "years" -- it
+        # happened to produce right answers here purely because those
+        # characters overlap with the unit words, not because it was doing
+        # the right thing.
+        cleaned = (
+            token.removesuffix("years")
+            .removesuffix("yrs")
+            .removesuffix("year")
+            .removesuffix("yr")
+        )
         try:
             years = float(cleaned)
             break
@@ -263,7 +364,8 @@ def build_graph(checkpointer: Checkpointer):
 
     builder.add_node("ask_employer", ask_employer)
     builder.add_node("resolve_employer", resolve_employer)
-    builder.add_node("ask_position", ask_position)
+    builder.add_node("ask_position_title", ask_position_title)
+    builder.add_node("ask_position_start", ask_position_start)
     builder.add_node("resolve_position", resolve_position)
     builder.add_node("ask_contribution", ask_contribution)
     builder.add_node("record_contribution", record_contribution)
@@ -281,8 +383,13 @@ def build_graph(checkpointer: Checkpointer):
 
     builder.add_edge(START, "ask_employer")
     builder.add_edge("ask_employer", "resolve_employer")
-    builder.add_edge("resolve_employer", "ask_position")
-    builder.add_edge("ask_position", "resolve_position")
+    builder.add_edge("resolve_employer", "ask_position_title")
+    builder.add_edge("ask_position_title", "ask_position_start")
+    builder.add_conditional_edges(
+        "ask_position_start",
+        route_position_start,
+        ["ask_position_start", "resolve_position"],
+    )
     builder.add_edge("resolve_position", "ask_contribution")
     builder.add_edge("ask_contribution", "record_contribution")
     builder.add_edge("record_contribution", "extract_tags")

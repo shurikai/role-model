@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -102,5 +103,52 @@ func TestOnboardingHandlerTurnReturns502WhenTheAgentIsUnreachable(t *testing.T) 
 
 	if rec.Code != http.StatusBadGateway {
 		t.Errorf("status = %d, want 502", rec.Code)
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.Code != "onboarding_unreachable" {
+		t.Errorf("code = %q, want onboarding_unreachable (connection never completed)", body.Code)
+	}
+}
+
+// The distinction TestOnboardingHandlerTurnReturns502WhenTheAgentIsUnreachable
+// checks the other side of: the agent was reached and answered with its own
+// error (e.g. a resumed session_id predating a checkpoint reset), which used
+// to collapse into the identical "failed to reach the onboarding agent"
+// message — actively misleading, since the agent was never unreachable.
+func TestOnboardingHandlerTurnDistinguishesAnAgentErrorFromUnreachable(t *testing.T) {
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"detail":"the interview could not continue"}`))
+	}))
+	defer agent.Close()
+
+	h := NewOnboardingHandler(onboarding.NewClient(agent.URL))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/onboarding/turns", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("Authorization", "Bearer the-users-jwt")
+	req = req.WithContext(httputil.WithUserID(req.Context(), uuid.New()))
+	rec := httptest.NewRecorder()
+
+	h.Turn(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502", rec.Code)
+	}
+	var body struct {
+		Error string `json:"error"`
+		Code  string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != "onboarding_failed" {
+		t.Errorf("code = %q, want onboarding_failed (agent was reached)", body.Code)
+	}
+	// The agent's own raw response body must not leak through verbatim.
+	if strings.Contains(body.Error, "the interview could not continue") {
+		t.Errorf("response echoed the agent's raw body: %q", body.Error)
 	}
 }

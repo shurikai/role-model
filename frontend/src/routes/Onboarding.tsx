@@ -11,20 +11,69 @@ interface Turn {
   text: string;
 }
 
+interface SavedSession {
+  sessionId: string;
+  transcript: Turn[];
+  done: boolean;
+}
+
+// Namespaced like session.ts's own key. sessionStorage, not localStorage: an
+// abandoned interview shouldn't resurrect itself in a new tab days later, but
+// a refresh in the SAME tab is exactly the case this exists for — before
+// this, a refresh mid-interview discarded sessionId and the transcript from
+// component state with nothing recording where to resume, orphaning the
+// interview (which the onboarding agent had already checkpointed
+// server-side) and silently starting a brand new one over it.
+const STORAGE_KEY = "role_model_onboarding";
+
+function loadSavedSession(): SavedSession | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as SavedSession) : null;
+  } catch {
+    // Private browsing, quota, storage disabled -- losing resume-on-refresh
+    // is an acceptable degradation, not worth surfacing as an error.
+    return null;
+  }
+}
+
+function saveSession(session: SavedSession): void {
+  try {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Same as above.
+  }
+}
+
+function clearSavedSession(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Same as above.
+  }
+}
+
 /**
  * The conversational on-ramp (#117), parallel to Stage 0's paste-a-document
  * path (ImportStart.tsx) for someone with nothing to paste.
  *
  * Unlike ImportReview's batch-status polling, there is no background job to
- * wait on here — a turn is a direct request/response, just a slower one. The
- * session id and the visible transcript both live in local component state;
- * refreshing the page loses the transcript on screen but not the interview
- * itself, which the onboarding agent has already checkpointed server-side.
+ * wait on here — a turn is a direct request/response, just a slower one.
  */
 export function Onboarding() {
-  const [transcript, setTranscript] = useState<Turn[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
+  // Read once, synchronously, at the first render of a real mount -- not in
+  // an effect -- so the very first render already knows whether to resume or
+  // start fresh, rather than flashing a fresh "What company did you work at?"
+  // for one frame before a restore kicks in.
+  const [restored] = useState(() => loadSavedSession());
+
+  const [transcript, setTranscript] = useState<Turn[]>(
+    () => restored?.transcript ?? [],
+  );
+  const [sessionId, setSessionId] = useState<string | null>(
+    () => restored?.sessionId ?? null,
+  );
+  const [done, setDone] = useState(() => restored?.done ?? false);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -35,19 +84,32 @@ export function Onboarding() {
   // as well, since that API only exists in a secure context (HTTPS or
   // localhost) and this app is routinely opened over plain HTTP on a LAN IP.
   const [instanceKey] = useState(() => `${Date.now()}-${Math.random()}`);
-  const start = useStartOnboarding(instanceKey);
+  const start = useStartOnboarding(instanceKey, restored === null);
   const sendTurn = useSendOnboardingTurn();
 
   // Copies the query's result into the transcript exactly once it arrives.
   // Idempotent by construction (setting state to the same values twice is a
   // no-op re-render), which is what a StrictMode double-invoke needs here,
-  // rather than a ref guard around an imperative call.
+  // rather than a ref guard around an imperative call. Never runs at all when
+  // a session was restored, since the query above is disabled in that case.
   useEffect(() => {
     if (!start.data || sessionId) return;
     setSessionId(start.data.session_id);
     setDone(start.data.done);
     setTranscript([{ role: "agent", text: start.data.reply }]);
   }, [start.data, sessionId]);
+
+  // Persists on every change, and stops persisting a finished interview —
+  // otherwise revisiting the screen after finishing would keep restoring the
+  // same completed conversation forever instead of starting a new one.
+  useEffect(() => {
+    if (!sessionId) return;
+    if (done) {
+      clearSavedSession();
+      return;
+    }
+    saveSession({ sessionId, transcript, done });
+  }, [sessionId, transcript, done]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();

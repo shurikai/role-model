@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
@@ -67,8 +68,11 @@ async def test_full_interview_attaches_a_confirmed_skill_to_its_contribution(fak
     assert "title" in _interrupt_text(r2).lower()
     assert "Acme Corp" in _interrupt_text(r2)  # the "adding it" note carries the name
 
-    r3 = await graph.ainvoke(Command(resume="Senior Engineer, 2019-01"), config)
-    assert "tell me about" in _interrupt_text(r3).lower()
+    r3 = await graph.ainvoke(Command(resume="Senior Engineer"), config)
+    assert "when did you start" in _interrupt_text(r3).lower()
+
+    r3b = await graph.ainvoke(Command(resume="2019-01"), config)
+    assert "tell me about" in _interrupt_text(r3b).lower()
 
     r4 = await graph.ainvoke(
         Command(resume="Migrated the billing system to Postgres"), config
@@ -92,6 +96,10 @@ async def test_full_interview_attaches_a_confirmed_skill_to_its_contribution(fak
     assert fake_api.employers[0]["name"] == "Acme Corp"
     assert len(fake_api.positions) == 1
     assert fake_api.positions[0]["employer_id"] == fake_api.employers[0]["id"]
+    assert fake_api.positions[0]["title"] == "Senior Engineer"
+    # The bug this hardening pass exists for: the date the person actually
+    # gave used to be discarded entirely in favor of a hardcoded placeholder.
+    assert fake_api.positions[0]["started_on"] == "2019-01-01"
     assert len(fake_api.contributions) == 1
     assert (
         fake_api.contributions[0]["full_description"]
@@ -129,7 +137,8 @@ async def test_declining_a_tag_attaches_nothing(fake_api):
         graph,
         config,
         "Acme Corp",
-        "Engineer, 2020-01",
+        "Engineer",
+        "2020-01",
         "Wrote a script once that touched MongoDB",
         "no",  # declines the tag
     )
@@ -157,7 +166,8 @@ async def test_a_one_off_mention_is_tagged_without_a_skill_depth_question(fake_a
         graph,
         config,
         "Acme Corp",
-        "Engineer, 2020-01",
+        "Engineer",
+        "2020-01",
         "Ran one playbook with Ansible for a one-time migration",
         "yes",
     )
@@ -179,7 +189,8 @@ async def test_no_tag_candidates_skips_straight_to_the_next_question(fake_api):
         graph,
         config,
         "Acme Corp",
-        "Engineer, 2020-01",
+        "Engineer",
+        "2020-01",
         "Helped organize the team offsite",
     )
 
@@ -204,7 +215,8 @@ async def test_a_second_contribution_gets_its_own_tag_extraction_call(fake_api):
         graph,
         config,
         "Acme Corp",
-        "Engineer, 2020-01",
+        "Engineer",
+        "2020-01",
         "Helped organize the team offsite",
         "Wrote the payments service in Go",  # answers "anything else?" directly
         "yes",
@@ -231,11 +243,13 @@ async def test_a_second_employer_reuses_resolve_employer_and_starts_fresh(fake_a
         graph,
         config,
         "Acme Corp",
-        "Engineer, 2020-01",
+        "Engineer",
+        "2020-01",
         "Helped organize the team offsite",
         "done",  # no more contributions at Acme
         "Widgets Inc",  # next employer, answers "any other jobs?" directly
-        "Support Lead, 2022-01",
+        "Support Lead",
+        "2022-01",
         "Ran the on-call rotation",
         "done",
         "done",
@@ -257,9 +271,73 @@ async def test_an_existing_employer_is_matched_case_insensitively_not_duplicated
     config = _config(str(uuid.uuid4()), fake_api, tag_model)
 
     result = await _drive(
-        graph, config, "acme corp", "Engineer, 2020-01", "Did some work"
+        graph, config, "acme corp", "Engineer", "2020-01", "Did some work"
     )
 
     assert "anything else" in _interrupt_text(result).lower()
     assert len(fake_api.employers) == 1  # not duplicated
     assert fake_api.positions[0]["employer_id"] == "existing-id"
+
+
+async def test_an_existing_position_at_the_same_employer_is_not_duplicated(fake_api):
+    fake_api.employers.append({"id": "e1", "name": "Acme Corp"})
+    fake_api.positions.append(
+        {
+            "id": "p1",
+            "employer_id": "e1",
+            "title": "Engineer",
+            "started_on": "2020-01-01",
+        }
+    )
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(graph, config, "Acme Corp", "engineer", "2020-01", "Did some work")
+
+    assert len(fake_api.positions) == 1
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected_started_on"),
+    [
+        ("2019-03-15", "2019-03-15"),
+        ("2019-03", "2019-03-01"),
+        ("2019", "2019-01-01"),
+    ],
+)
+async def test_position_start_date_accepts_several_formats(
+    fake_api, answer, expected_started_on
+):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(graph, config, "Acme Corp", "Engineer", answer, "Did some work")
+
+    assert fake_api.positions[0]["started_on"] == expected_started_on
+    assert fake_api.positions[0]["context_narrative"] is None
+
+
+async def test_an_unparseable_start_date_is_reprompted_once_then_falls_back(fake_api):
+    """The bug this replaces: the free-text date was silently discarded and
+    every position got the same hardcoded placeholder, with nothing kept for
+    a human to fix later. This still falls back after a second bad answer,
+    but keeps what the person actually said."""
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await graph.ainvoke({"reply": ""}, config)
+    await graph.ainvoke(Command(resume="Acme Corp"), config)
+    await graph.ainvoke(Command(resume="Engineer"), config)
+    bad_date_result = await graph.ainvoke(
+        Command(resume="sometime last spring"), config
+    )
+    assert "couldn't read that as a date" in _interrupt_text(bad_date_result).lower()
+
+    second_result = await graph.ainvoke(Command(resume="still not a date"), config)
+    assert "tell me about" in _interrupt_text(second_result).lower()
+
+    assert fake_api.positions[0]["started_on"] == "1900-01-01"
+    assert "still not a date" in fake_api.positions[0]["context_narrative"]

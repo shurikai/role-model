@@ -84,6 +84,7 @@ function renderOnboardingInStrictMode() {
 describe("Onboarding", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    sessionStorage.clear();
     cleanup();
   });
 
@@ -150,6 +151,51 @@ describe("Onboarding", () => {
       await screen.findByText(/that's everything for now/i),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Your answer")).not.toBeInTheDocument();
+  });
+
+  it("restores a saved session without starting a new interview", async () => {
+    sessionStorage.setItem(
+      "role_model_onboarding",
+      JSON.stringify({
+        sessionId: "s1",
+        transcript: [
+          { role: "agent", text: "What company did you work at?" },
+          { role: "user", text: "Acme Corp" },
+        ],
+        done: false,
+      }),
+    );
+    const { fetchMock } = stubFetch([]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderOnboarding();
+
+    expect(
+      await screen.findByText("What company did you work at?"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Acme Corp")).toBeInTheDocument();
+    expect(screen.getByLabelText("Your answer")).not.toBeDisabled();
+    // The restore is entirely local -- no request should have been made to
+    // start a fresh interview over the one already in progress.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("clears the saved session once the interview finishes", async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = stubFetch([
+      { session_id: "s1", reply: "Anything else?", done: false },
+      { session_id: "s1", reply: "Thanks.", done: true },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderOnboarding();
+
+    await screen.findByText("Anything else?");
+    expect(sessionStorage.getItem("role_model_onboarding")).not.toBeNull();
+
+    await user.type(screen.getByLabelText("Your answer"), "done");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await screen.findByText(/that's everything for now/i);
+    expect(sessionStorage.getItem("role_model_onboarding")).toBeNull();
   });
 
   it("surfaces a failed turn as readable text", async () => {

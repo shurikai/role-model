@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -61,7 +62,20 @@ func (h *OnboardingHandler) Turn(w http.ResponseWriter, r *http.Request) {
 	turn, err := h.client.SendTurn(r.Context(), token, req.SessionID, req.Message)
 	if err != nil {
 		log.Printf("onboarding turn: %v", err)
-		httputil.WriteError(w, http.StatusBadGateway, "onboarding_failed", "failed to reach the onboarding agent")
+		// A TurnError means the agent was reached and answered — with a
+		// problem of its own, not this API's — as distinct from a genuine
+		// connection failure. Collapsing both into "failed to reach" was
+		// actively misleading: the agent can be up and every request still
+		// fail this way if, say, a resumed session_id predates a checkpoint
+		// reset. Neither case echoes the agent's raw response body; only that
+		// it was reached.
+		var turnErr *onboarding.TurnError
+		if errors.As(err, &turnErr) {
+			httputil.WriteError(w, http.StatusBadGateway, "onboarding_failed",
+				"the onboarding agent could not continue this interview")
+			return
+		}
+		httputil.WriteError(w, http.StatusBadGateway, "onboarding_unreachable", "failed to reach the onboarding agent")
 		return
 	}
 
