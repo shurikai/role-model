@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useSendOnboardingTurn } from "../hooks/useOnboarding";
+import {
+  useSendOnboardingTurn,
+  useStartOnboarding,
+} from "../hooks/useOnboarding";
 import { formatApiError } from "../lib/api-client";
 
 interface Turn {
@@ -24,26 +27,23 @@ export function Onboarding() {
   const [done, setDone] = useState(false);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const sendTurn = useSendOnboardingTurn();
-  const started = useRef(false);
 
-  // Starts itself: the first question is the agent's, not something the
-  // person has to ask for by submitting anything.
+  // One real interview per real mount of this screen — see useStartOnboarding
+  // for why this has to be a query rather than a mutation-in-an-effect.
+  const [instanceKey] = useState(() => crypto.randomUUID());
+  const start = useStartOnboarding(instanceKey);
+  const sendTurn = useSendOnboardingTurn();
+
+  // Copies the query's result into the transcript exactly once it arrives.
+  // Idempotent by construction (setting state to the same values twice is a
+  // no-op re-render), which is what a StrictMode double-invoke needs here,
+  // rather than a ref guard around an imperative call.
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    sendTurn.mutate(
-      {},
-      {
-        onSuccess: (turn) => {
-          setSessionId(turn.session_id);
-          setDone(turn.done);
-          setTranscript([{ role: "agent", text: turn.reply }]);
-        },
-        onError: (err) => setError(formatApiError(err)),
-      },
-    );
-  }, []);
+    if (!start.data || sessionId) return;
+    setSessionId(start.data.session_id);
+    setDone(start.data.done);
+    setTranscript([{ role: "agent", text: start.data.reply }]);
+  }, [start.data, sessionId]);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +98,16 @@ export function Onboarding() {
           ))}
         </div>
 
+        {start.isPending && (
+          <p className="mb-3 font-body text-sm text-ink-dim">
+            Starting the interview…
+          </p>
+        )}
+        {start.isError && (
+          <p className="mb-3 font-body text-sm text-reject">
+            {formatApiError(start.error)}
+          </p>
+        )}
         {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
 
         {done ? (

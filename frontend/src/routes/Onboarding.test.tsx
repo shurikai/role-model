@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { StrictMode } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -55,6 +56,31 @@ function renderOnboarding() {
   );
 }
 
+// Deliberately separate from renderOnboarding: the real app renders under
+// <StrictMode> (main.tsx) and this suite otherwise never does, which is
+// exactly the gap that let the mount-time turn ship as a useMutation fired
+// from a useEffect — every other test here passed, and the button still
+// hung on "Sending…" forever in a real browser. StrictMode's dev-only
+// double-invoke of effects is what exposed it: useMutation's pending state
+// never resolved, even though the request itself completed. See
+// useStartOnboarding's docstring for the fix (a useQuery instead).
+function renderOnboardingInStrictMode() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/onboarding/new"]}>
+          <Routes>
+            <Route path="/onboarding/new" element={<Onboarding />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    </StrictMode>,
+  );
+}
+
 describe("Onboarding", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -72,6 +98,20 @@ describe("Onboarding", () => {
       await screen.findByText("What company did you work at?"),
     ).toBeInTheDocument();
     expect(calls[0].body).toEqual({});
+  });
+
+  it("still resolves the mount-time turn under StrictMode, exactly once", async () => {
+    const { fetchMock, calls } = stubFetch([
+      { session_id: "s1", reply: "What company did you work at?", done: false },
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderOnboardingInStrictMode();
+
+    expect(
+      await screen.findByText("What company did you work at?"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Sending…")).not.toBeInTheDocument();
+    expect(calls).toHaveLength(1);
   });
 
   it("sends the typed answer with the session id echoed back", async () => {
