@@ -53,6 +53,12 @@ services:
         limits:
           memory: 512m
 
+  onboarding:
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
   web:
     # Caddy is the entrance now; the bundle/nginx container is internal.
     ports: !override []

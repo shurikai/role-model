@@ -63,6 +63,7 @@ services:
     environment:
       DATABASE_URL: postgres://rolemodel:rolemodel@db:5432/role_model?sslmode=disable
       RENDERER_URL: http://renderer:8000
+      ONBOARDING_AGENT_URL: http://onboarding:8100
       PORT: "8080"
       ENVIRONMENT: ${ENVIRONMENT:-production}
       # Required. The server refuses to start without either of these — an
@@ -102,6 +103,25 @@ services:
       - "8000"
     restart: unless-stopped
 
+  onboarding:
+    build:
+      context: ./onboarding-agent
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in .env — you supply your own key}
+    # NOT published, the same security property renderer has: this service
+    # authenticates nothing itself, relying entirely on the API having
+    # already gated the call behind RequireAuth before proxying it here (see
+    # onboarding-agent/README.md). Publishing it would let anyone who can
+    # reach the host act as any user whose token they can guess or steal.
+    expose:
+      - "8100"
+    volumes:
+      # The LangGraph checkpoint file — an in-progress interview survives a
+      # container recreation. Never contains a bearer token; see
+      # onboarding-agent/agent/state.py for why.
+      - role_model_onboarding_checkpoints:/data
+    restart: unless-stopped
+
   web:
     build:
       context: ./frontend
@@ -118,3 +138,4 @@ services:
 
 volumes:
   role_model_pgdata:
+  role_model_onboarding_checkpoints:
