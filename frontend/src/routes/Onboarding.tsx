@@ -29,8 +29,12 @@ export function Onboarding() {
   const [error, setError] = useState<string | null>(null);
 
   // One real interview per real mount of this screen — see useStartOnboarding
-  // for why this has to be a query rather than a mutation-in-an-effect.
-  const [instanceKey] = useState(() => crypto.randomUUID());
+  // for why this has to be a query rather than a mutation-in-an-effect. Only
+  // ever used as a local React Query cache key, never sent anywhere, so it
+  // doesn't need crypto.randomUUID()'s uniqueness guarantee — which is just
+  // as well, since that API only exists in a secure context (HTTPS or
+  // localhost) and this app is routinely opened over plain HTTP on a LAN IP.
+  const [instanceKey] = useState(() => `${Date.now()}-${Math.random()}`);
   const start = useStartOnboarding(instanceKey);
   const sendTurn = useSendOnboardingTurn();
 
