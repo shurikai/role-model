@@ -24,8 +24,13 @@ import type {
  * resuming a cached one. staleTime: Infinity + retry: false +
  * refetchOnWindowFocus: false all exist for the same reason — this call
  * creates new server state, so it must never silently re-fire on its own.
+ *
+ * enabled is false when Onboarding.tsx has already restored a session from
+ * sessionStorage — a page refresh mid-interview otherwise had no way back to
+ * the session_id it needed, orphaning the (still-alive, still-checkpointed)
+ * server-side interview and silently starting a new one over it.
  */
-export function useStartOnboarding(instanceKey: string) {
+export function useStartOnboarding(instanceKey: string, enabled: boolean) {
   return useQuery({
     queryKey: ["onboarding", "start", instanceKey],
     queryFn: () =>
@@ -36,6 +41,7 @@ export function useStartOnboarding(instanceKey: string) {
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
+    enabled,
   });
 }
 

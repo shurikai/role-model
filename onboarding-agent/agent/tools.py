@@ -83,12 +83,19 @@ async def resolve_or_create_employer(
     return await create_employer(client, token, name), True
 
 
+async def list_positions(
+    client: httpx.AsyncClient, token: str, employer_id: str
+) -> list[dict]:
+    return await _list_request(client, token, f"/employers/{employer_id}/positions")
+
+
 async def create_position(
     client: httpx.AsyncClient,
     token: str,
     employer_id: str,
     title: str,
     started_on: str,
+    context_narrative: str | None = None,
 ) -> dict:
     return await _request(
         client,
@@ -104,10 +111,32 @@ async def create_position(
             "level_rationale": None,
             "started_on": started_on,
             "ended_on": None,
-            "context_narrative": None,
+            "context_narrative": context_narrative,
             "sort_order": 0,
         },
     )
+
+
+async def resolve_or_create_position(
+    client: httpx.AsyncClient,
+    token: str,
+    employer_id: str,
+    title: str,
+    started_on: str,
+    context_narrative: str | None = None,
+) -> tuple[dict, bool]:
+    """Case-insensitive match against this employer's own positions, else
+    create -- the same resolve-then-create shape as resolve_or_create_employer.
+    Without this, re-running the interview for the same job (or correcting a
+    typo'd employer name by starting the job over) duplicated the position
+    with no dedup at all."""
+    for position in await list_positions(client, token, employer_id):
+        if position["title"].strip().lower() == title.strip().lower():
+            return position, False
+    created = await create_position(
+        client, token, employer_id, title, started_on, context_narrative
+    )
+    return created, True
 
 
 async def create_contribution(

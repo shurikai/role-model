@@ -44,6 +44,14 @@ class FakeRoleModelAPI:
         if method == "POST" and path == "/employers":
             return self._create(self.employers, body)
 
+        if (
+            method == "GET"
+            and path.startswith("/employers/")
+            and path.endswith("/positions")
+        ):
+            employer_id = path.split("/")[2]
+            matches = [p for p in self.positions if p["employer_id"] == employer_id]
+            return httpx.Response(200, json=matches)
         if method == "POST" and path == "/positions":
             return self._create(self.positions, body)
 

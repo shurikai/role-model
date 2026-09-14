@@ -13,13 +13,14 @@ is never written into graph state -- see agent/state.py for why.
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from langchain_anthropic import ChatAnthropic
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
@@ -27,6 +28,8 @@ from pydantic import BaseModel
 
 from agent.graph import build_graph
 from agent.tags import build_tag_extraction_model
+
+logger = logging.getLogger(__name__)
 
 ROLE_MODEL_API_URL = os.environ.get(
     "ROLE_MODEL_API_URL", "http://localhost:8080/api/v1"
@@ -99,7 +102,20 @@ async def turns(req: TurnRequest) -> TurnResponse:
     else:
         graph_input = Command(resume=req.message or "")
 
-    result = await app.state.graph.ainvoke(graph_input, config)
+    try:
+        result = await app.state.graph.ainvoke(graph_input, config)
+    except Exception:
+        # Broad on purpose: this is the boundary between the graph and the
+        # outside world, and anything that reaches here -- a node's own bug,
+        # the Go API rejecting a write, or (new since sessions can now be
+        # resumed after a page refresh) a session_id the checkpointer has no
+        # record of at all -- must fail as a clean response, not an
+        # unhandled-exception traceback leaking to the Go proxy and then to
+        # the browser.
+        logger.exception("turn failed for session %s", session_id)
+        raise HTTPException(
+            status_code=502, detail="the interview could not continue"
+        ) from None
 
     interrupt_value = _interrupt_value(result)
     if interrupt_value is not None:
