@@ -73,6 +73,26 @@ def test_parse_depth_answer_does_not_misparse_a_non_year_token():
     assert years is None
 
 
+def test_parse_depth_answer_does_not_treat_a_calendar_year_as_a_duration():
+    """Found by cmd/onboardingeval's first real run: "I got my ACLS in 2012"
+    parsed "2012" as 2012.0 years of experience -- unbounded, since nothing
+    checked plausibility before this fix -- which skills.years_experience
+    (NUMERIC(4,1)) can't even store, so POST /skills 500'd on a numeric field
+    overflow and took the whole interview down. A calendar year mentioned
+    alongside a real duration must not stop the real duration from being
+    found either."""
+    levels = [{"value": "proficient"}, {"value": "expert"}]
+    proficiency, years = _parse_depth_answer("expert, I got certified in 2012", levels)
+    assert proficiency == "expert"
+    assert years is None
+
+    proficiency, years = _parse_depth_answer(
+        "proficient, since 2012 about 5 years", levels
+    )
+    assert proficiency == "proficient"
+    assert years == 5.0
+
+
 @pytest.mark.parametrize(
     ("answer", "expected"),
     [

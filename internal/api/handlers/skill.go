@@ -75,6 +75,15 @@ func (h *SkillHandler) checkProficiency(r *http.Request, userID uuid.UUID, value
 	return "proficiency must be one of: " + strings.Join(allowed, ", "), nil
 }
 
+// maxYearsExperience is the largest value skills.years_experience
+// (NUMERIC(4,1)) can hold at all. A caller sending more than that used to
+// reach Postgres and come back as a raw "numeric field overflow" — a real
+// constraint violation, but reported as a 500 rather than the validation
+// error it actually is, which is what let one bad value take an entire
+// onboarding-agent interview down (found by cmd/onboardingeval's first run
+// against a bug that read "since 2012" as 2012 years of experience).
+const maxYearsExperience = 999.9
+
 // parseYears converts the request's number to the NUMERIC the column holds.
 // Nil stays NULL: an unrecorded duration is not evidence of a short one, which
 // is why ListActiveSkillProfileByUser sorts NULLs last rather than as zero.
@@ -85,6 +94,9 @@ func parseYears(v *float64) (pgtype.Numeric, error) {
 	}
 	if *v < 0 {
 		return out, errors.New("years_experience cannot be negative")
+	}
+	if *v > maxYearsExperience {
+		return out, fmt.Errorf("years_experience cannot exceed %g", maxYearsExperience)
 	}
 	if err := out.Scan(fmt.Sprintf("%.1f", *v)); err != nil {
 		return out, err
@@ -133,7 +145,7 @@ func (h *SkillHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	years, err := parseYears(req.YearsExperience)
 	if err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "years_experience must be a non-negative number or null")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
 
@@ -207,7 +219,7 @@ func (h *SkillHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	years, err := parseYears(req.YearsExperience)
 	if err != nil {
-		httputil.WriteError(w, http.StatusBadRequest, "validation_error", "years_experience must be a non-negative number or null")
+		httputil.WriteError(w, http.StatusBadRequest, "validation_error", err.Error())
 		return
 	}
 
