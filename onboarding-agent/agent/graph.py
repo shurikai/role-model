@@ -302,10 +302,20 @@ def _parse_depth_answer(
             .removesuffix("yr")
         )
         try:
-            years = float(cleaned)
-            break
+            candidate_years = float(cleaned)
         except ValueError:
             continue
+        # Found by onboardingeval's first real run: an answer like "I got my
+        # ACLS in 2012" parsed "2012" as 2012.0 years of experience, which
+        # skills.years_experience (NUMERIC(4,1)) can't even store -- POST
+        # /skills 500'd on a numeric field overflow and took the whole
+        # interview down with it. A calendar year is not a duration; nobody
+        # has anywhere near 76 years of experience either way, so this is a
+        # plausibility bound, not a narrow one.
+        if not (0 <= candidate_years <= 75):
+            continue
+        years = candidate_years
+        break
     return proficiency, years
 
 
