@@ -87,7 +87,7 @@ endef
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer run-onboarding dev check-prompts reset-password add-user fmt fmt-check test-renderer test-onboarding
+.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer run-onboarding dev check-prompts reset-password add-user clear-history fmt fmt-check test-renderer test-onboarding
 
 # Build
 all: build
@@ -311,6 +311,22 @@ ifndef EMAIL
 	$(error EMAIL is required, e.g. make add-user EMAIL=you@example.com)
 endif
 	@go run ./cmd/adduser -email "$(EMAIL)"
+
+# Deletes an account's career and application history -- employers, positions,
+# contributions, tags, skills, education, credentials, preferences, projects,
+# applications, resume versions, fit reports, pending imports -- while leaving
+# the account, its password, and its starting vocabulary rows untouched. For
+# resetting a test account between manual passes. Defaults to a dry run (real
+# row counts, nothing committed); pass CONFIRM=1 to actually delete.
+clear-history:
+ifndef EMAIL
+	$(error EMAIL is required, e.g. make clear-history EMAIL=you@example.com)
+endif
+ifdef CONFIRM
+	@go run ./cmd/clearhistory -email "$(EMAIL)" -yes
+else
+	@go run ./cmd/clearhistory -email "$(EMAIL)"
+endif
 
 # Formatting. Each language keeps its own pinned formatter:
 #   Go      -- gofmt (toolchain)
