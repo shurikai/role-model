@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { StrictMode } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -82,10 +82,20 @@ function renderOnboardingInStrictMode() {
 }
 
 describe("Onboarding", () => {
+  // Unmount BEFORE clearing storage, and clear again before each test. The
+  // screen saves its session from a passive effect, which can flush after a
+  // test's last assertion: cleared-then-unmounted let the previous test's
+  // session be written back, and the next test restored it instead of
+  // fetching -- "What company did you work at?" on screen with no recorded
+  // call (#157).
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
     sessionStorage.clear();
-    cleanup();
   });
 
   it("asks the first question on mount, with no session id yet", async () => {
@@ -193,13 +203,19 @@ describe("Onboarding", () => {
     renderOnboarding();
 
     await screen.findByText("Anything else?");
-    expect(sessionStorage.getItem("role_model_onboarding")).not.toBeNull();
+    // Saving happens in a passive effect, which can land after the text does;
+    // wait for it rather than assume it already ran (#157).
+    await waitFor(() =>
+      expect(sessionStorage.getItem("role_model_onboarding")).not.toBeNull(),
+    );
 
     await user.type(screen.getByLabelText("Your answer"), "done");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     await screen.findByText(/that's everything for now/i);
-    expect(sessionStorage.getItem("role_model_onboarding")).toBeNull();
+    await waitFor(() =>
+      expect(sessionStorage.getItem("role_model_onboarding")).toBeNull(),
+    );
   });
 
   it("surfaces a failed turn as readable text", async () => {
