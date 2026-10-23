@@ -157,7 +157,7 @@ func printCaptured(c *capturedCareer) {
 	for _, e := range c.employers {
 		fmt.Printf("  %s\n", e.Name)
 		for _, p := range c.positionsByEmployer[e.ID] {
-			fmt.Printf("    - %s (%s)\n", p.Title, formatDate(p.StartedOn))
+			fmt.Printf("    - %s (%s – %s)\n", p.Title, formatDate(p.StartedOn), formatEnd(p.EndedOn))
 			for _, contrib := range c.contributionsByPosition[p.ID] {
 				fmt.Printf("        * %s\n", contrib.Summary)
 			}
@@ -221,12 +221,19 @@ func diffCareer(mine, known *capturedCareer) {
 		knownTitles := positionTitles(known.positionsByEmployer[knownEmployer.ID])
 		mineTitles := positionTitles(mine.positionsByEmployer[mineEmployer.ID])
 		matchedTitles := 0
-		for title := range knownTitles {
-			if mineTitles[title] {
-				matchedTitles++
+		var dateMismatches []string
+		for title, kp := range knownTitles {
+			mp, ok := mineTitles[title]
+			if !ok {
+				continue
 			}
+			matchedTitles++
+			dateMismatches = append(dateMismatches, diffPositionDates(kp, mp)...)
 		}
 		fmt.Printf("  %s: %d/%d known positions captured\n", knownEmployer.Name, matchedTitles, len(knownTitles))
+		for _, m := range dateMismatches {
+			fmt.Printf("    DATE:    %s\n", m)
+		}
 	}
 
 	mineTags := mine.tagNames()
@@ -240,12 +247,43 @@ func diffCareer(mine, known *capturedCareer) {
 	fmt.Printf("  tags: %d/%d known tags captured\n", tagMatches, len(knownTags))
 }
 
-func positionTitles(positions []db.Position) map[string]bool {
-	out := make(map[string]bool, len(positions))
+func positionTitles(positions []db.Position) map[string]db.Position {
+	out := make(map[string]db.Position, len(positions))
 	for _, p := range positions {
-		out[strings.ToLower(p.Title)] = true
+		out[strings.ToLower(p.Title)] = p
 	}
 	return out
+}
+
+// diffPositionDates compares a captured position's dates with the known
+// one's, to the month: the interview normalizes "2019-03" to the 1st, so a
+// day-level comparison would report every correct answer as wrong. An end
+// date is compared too, including null against a date -- null means "still
+// there", and an interview that never asked for an end stored it on every
+// position without this diff ever noticing (#161).
+func diffPositionDates(known, mine db.Position) []string {
+	var out []string
+	if month(known.StartedOn) != month(mine.StartedOn) {
+		out = append(out, fmt.Sprintf("%s started %s, known %s", mine.Title, month(mine.StartedOn), month(known.StartedOn)))
+	}
+	if month(known.EndedOn) != month(mine.EndedOn) {
+		out = append(out, fmt.Sprintf("%s ended %s, known %s", mine.Title, formatEnd(mine.EndedOn), formatEnd(known.EndedOn)))
+	}
+	return out
+}
+
+func month(d pgtype.Date) string {
+	if !d.Valid {
+		return ""
+	}
+	return d.Time.Format("2006-01")
+}
+
+func formatEnd(d pgtype.Date) string {
+	if !d.Valid {
+		return "present"
+	}
+	return d.Time.Format("2006-01-02")
 }
 
 func formatDate(d pgtype.Date) string {

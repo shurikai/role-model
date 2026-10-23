@@ -95,6 +95,7 @@ async def create_position(
     employer_id: str,
     title: str,
     started_on: str,
+    ended_on: str | None = None,
     context_narrative: str | None = None,
 ) -> dict:
     return await _request(
@@ -110,7 +111,7 @@ async def create_position(
             "location": None,
             "level_rationale": None,
             "started_on": started_on,
-            "ended_on": None,
+            "ended_on": ended_on,
             "context_narrative": context_narrative,
             "sort_order": 0,
         },
@@ -123,6 +124,7 @@ async def resolve_or_create_position(
     employer_id: str,
     title: str,
     started_on: str,
+    ended_on: str | None = None,
     context_narrative: str | None = None,
 ) -> tuple[dict, bool]:
     """Case-insensitive match against this employer's own positions, else
@@ -134,7 +136,7 @@ async def resolve_or_create_position(
         if position["title"].strip().lower() == title.strip().lower():
             return position, False
     created = await create_position(
-        client, token, employer_id, title, started_on, context_narrative
+        client, token, employer_id, title, started_on, ended_on, context_narrative
     )
     return created, True
 

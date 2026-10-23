@@ -70,6 +70,10 @@ def test_resuming_a_session_carries_it_by_id_through_to_completion():
         "/turns",
         json={"token": "fake-jwt", "session_id": session_id, "message": "2020-01"},
     ).json()
+    client.post(
+        "/turns",
+        json={"token": "fake-jwt", "session_id": session_id, "message": "still there"},
+    ).json()
     r4 = client.post(
         "/turns",
         json={

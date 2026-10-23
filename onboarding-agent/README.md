@@ -73,6 +73,16 @@ proficiency/years asked only for tags that read as durable skills. See the
 module docstring for why each loop is its own node with one `interrupt()`
 call, rather than a Python loop with several.
 
+**Dates.** A position is asked for its start and then its end, each with one
+reprompt. Both read the first date anywhere in the answer (`YYYY-MM-DD`,
+`YYYY-MM`, `YYYY`, or a month name and year), so "from 2015, then Globex 2019
+to 2022" still yields a start. When the date came out of a longer answer, the
+answer is kept in the position's `context_narrative`. "Still there" and
+similar answers mean a current job (`ended_on` null). An answer that still
+can't be read after the reprompt falls back to `1900-01-01`, never to null,
+because null claims the job is current. The raw answer is noted beside the
+placeholder so a reviewer can correct it on the Career page.
+
 **Every skill claim links to a supporting contribution.** A tag is only ever
 attached (`agent/tools.py:attach_tag_to_contribution`) to the contribution
 that was just recorded — never created floating free — which is what

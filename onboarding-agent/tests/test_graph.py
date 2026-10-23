@@ -72,7 +72,10 @@ async def test_full_interview_attaches_a_confirmed_skill_to_its_contribution(fak
     assert "when did you start" in _interrupt_text(r3).lower()
 
     r3b = await graph.ainvoke(Command(resume="2019-01"), config)
-    assert "tell me about" in _interrupt_text(r3b).lower()
+    assert "when did you leave" in _interrupt_text(r3b).lower()
+
+    r3c = await graph.ainvoke(Command(resume="2022-06"), config)
+    assert "tell me about" in _interrupt_text(r3c).lower()
 
     r4 = await graph.ainvoke(
         Command(resume="Migrated the billing system to Postgres"), config
@@ -100,6 +103,8 @@ async def test_full_interview_attaches_a_confirmed_skill_to_its_contribution(fak
     # The bug this hardening pass exists for: the date the person actually
     # gave used to be discarded entirely in favor of a hardcoded placeholder.
     assert fake_api.positions[0]["started_on"] == "2019-01-01"
+    # And the end the person gave, which used to be hardcoded to null (#161).
+    assert fake_api.positions[0]["ended_on"] == "2022-06-01"
     assert len(fake_api.contributions) == 1
     assert (
         fake_api.contributions[0]["full_description"]
@@ -139,6 +144,7 @@ async def test_declining_a_tag_attaches_nothing(fake_api):
         "Acme Corp",
         "Engineer",
         "2020-01",
+        "still there",
         "Wrote a script once that touched MongoDB",
         "no",  # declines the tag
     )
@@ -168,6 +174,7 @@ async def test_a_one_off_mention_is_tagged_without_a_skill_depth_question(fake_a
         "Acme Corp",
         "Engineer",
         "2020-01",
+        "still there",
         "Ran one playbook with Ansible for a one-time migration",
         "yes",
     )
@@ -191,6 +198,7 @@ async def test_no_tag_candidates_skips_straight_to_the_next_question(fake_api):
         "Acme Corp",
         "Engineer",
         "2020-01",
+        "still there",
         "Helped organize the team offsite",
     )
 
@@ -217,6 +225,7 @@ async def test_a_second_contribution_gets_its_own_tag_extraction_call(fake_api):
         "Acme Corp",
         "Engineer",
         "2020-01",
+        "still there",
         "Helped organize the team offsite",
         "Wrote the payments service in Go",  # answers "anything else?" directly
         "yes",
@@ -245,11 +254,13 @@ async def test_a_second_employer_reuses_resolve_employer_and_starts_fresh(fake_a
         "Acme Corp",
         "Engineer",
         "2020-01",
+        "2021-12",
         "Helped organize the team offsite",
         "done",  # no more contributions at Acme
         "Widgets Inc",  # next employer, answers "any other jobs?" directly
         "Support Lead",
         "2022-01",
+        "still there",
         "Ran the on-call rotation",
         "done",
         "done",
@@ -259,6 +270,12 @@ async def test_a_second_employer_reuses_resolve_employer_and_starts_fresh(fake_a
     assert len(fake_api.employers) == 2
     assert {e["name"] for e in fake_api.employers} == {"Acme Corp", "Widgets Inc"}
     assert len(fake_api.positions) == 2
+    # Each job keeps its own end: the first one's date must not leak into the
+    # second, which is current.
+    assert [(p["title"], p["ended_on"]) for p in fake_api.positions] == [
+        ("Engineer", "2021-12-01"),
+        ("Support Lead", None),
+    ]
     assert len(fake_api.contributions) == 2
 
 
@@ -271,7 +288,13 @@ async def test_an_existing_employer_is_matched_case_insensitively_not_duplicated
     config = _config(str(uuid.uuid4()), fake_api, tag_model)
 
     result = await _drive(
-        graph, config, "acme corp", "Engineer", "2020-01", "Did some work"
+        graph,
+        config,
+        "acme corp",
+        "Engineer",
+        "2020-01",
+        "still there",
+        "Did some work",
     )
 
     assert "anything else" in _interrupt_text(result).lower()
@@ -293,7 +316,15 @@ async def test_an_existing_position_at_the_same_employer_is_not_duplicated(fake_
     tag_model = FakeTagModel([_TagExtraction(tags=[])])
     config = _config(str(uuid.uuid4()), fake_api, tag_model)
 
-    await _drive(graph, config, "Acme Corp", "engineer", "2020-01", "Did some work")
+    await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "engineer",
+        "2020-01",
+        "still there",
+        "Did some work",
+    )
 
     assert len(fake_api.positions) == 1
 
@@ -313,7 +344,9 @@ async def test_position_start_date_accepts_several_formats(
     tag_model = FakeTagModel([_TagExtraction(tags=[])])
     config = _config(str(uuid.uuid4()), fake_api, tag_model)
 
-    await _drive(graph, config, "Acme Corp", "Engineer", answer, "Did some work")
+    await _drive(
+        graph, config, "Acme Corp", "Engineer", answer, "still there", "Did some work"
+    )
 
     assert fake_api.positions[0]["started_on"] == expected_started_on
     assert fake_api.positions[0]["context_narrative"] is None
@@ -334,10 +367,122 @@ async def test_an_unparseable_start_date_is_reprompted_once_then_falls_back(fake
     bad_date_result = await graph.ainvoke(
         Command(resume="sometime last spring"), config
     )
-    assert "couldn't read that as a date" in _interrupt_text(bad_date_result).lower()
+    assert "couldn't find a date" in _interrupt_text(bad_date_result).lower()
 
     second_result = await graph.ainvoke(Command(resume="still not a date"), config)
-    assert "tell me about" in _interrupt_text(second_result).lower()
+    assert "when did you leave" in _interrupt_text(second_result).lower()
+    await graph.ainvoke(Command(resume="still there"), config)
 
     assert fake_api.positions[0]["started_on"] == "1900-01-01"
     assert "still not a date" in fake_api.positions[0]["context_narrative"]
+
+
+async def test_a_start_date_inside_a_longer_answer_is_read_and_noted(fake_api):
+    """#158: an answer about several jobs used to fail the date parse twice
+    and land on the 1900-01-01 placeholder, though it held a usable date. The
+    date is taken now, and the answer is kept so a reviewer can see what it
+    was read from."""
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "Engineer",
+        "I was at Acme from 2015, then Globex 2019 to 2022",
+        "2019-02",
+        "Did some work",
+    )
+
+    position = fake_api.positions[0]
+    assert position["started_on"] == "2015-01-01"
+    assert position["ended_on"] == "2019-02-01"
+    assert "then Globex 2019 to 2022" in position["context_narrative"]
+
+
+async def test_the_start_reprompt_names_the_job(fake_api):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    result = await _drive(graph, config, "Acme Corp", "Engineer", "a while ago")
+    question = _interrupt_text(result)
+    assert "one job at a time" in question.lower()
+    assert "Engineer at Acme Corp" in question
+
+
+@pytest.mark.parametrize(
+    "answer", ["still there", "I'm still there.", "Current", "now"]
+)
+async def test_a_current_job_is_stored_with_no_end(fake_api, answer):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(graph, config, "Acme Corp", "Engineer", "2020-01", answer, "Work")
+
+    assert fake_api.positions[0]["ended_on"] is None
+    assert fake_api.positions[0]["context_narrative"] is None
+
+
+async def test_an_end_before_the_start_is_reprompted(fake_api):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    result = await _drive(graph, config, "Acme Corp", "Engineer", "2020-01", "2018-05")
+    assert "couldn't read an end date" in _interrupt_text(result).lower()
+
+    await graph.ainvoke(Command(resume="2021-05"), config)
+    await graph.ainvoke(Command(resume="Did some work"), config)
+    assert fake_api.positions[0]["ended_on"] == "2021-05-01"
+
+
+async def test_an_unreadable_end_falls_back_to_the_placeholder_never_to_null(
+    fake_api,
+):
+    """#161: null means "still there". Falling back to it would turn an answer
+    the agent couldn't read into a claim that the job is current -- the false
+    claim the missing question used to make for every position."""
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "Engineer",
+        "2020-01",
+        "a while back",
+        "honestly not sure",
+        "Did some work",
+    )
+
+    position = fake_api.positions[0]
+    assert position["ended_on"] == "1900-01-01"
+    assert "honestly not sure" in position["context_narrative"]
+
+
+async def test_start_and_end_notes_both_reach_the_narrative(fake_api):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "Engineer",
+        "started around 2016-04",
+        "left in 2019-08 for Globex",
+        "Did some work",
+    )
+
+    narrative = fake_api.positions[0]["context_narrative"]
+    assert narrative.splitlines() == [
+        'Start date read from: "started around 2016-04"',
+        'End date read from: "left in 2019-08 for Globex"',
+    ]

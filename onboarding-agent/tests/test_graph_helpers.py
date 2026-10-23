@@ -7,7 +7,13 @@ from __future__ import annotations
 
 import pytest
 
-from agent.graph import _parse_depth_answer, _parse_started_on, _sounds_done
+from agent.graph import (
+    _ends_before,
+    _is_bare_date,
+    _parse_date,
+    _parse_depth_answer,
+    _sounds_done,
+)
 
 
 @pytest.mark.parametrize(
@@ -100,10 +106,57 @@ def test_parse_depth_answer_does_not_treat_a_calendar_year_as_a_duration():
         ("2019-03", "2019-03-01"),
         ("2019", "2019-01-01"),
         ("  2019-03  ", "2019-03-01"),
+        # #159: a date followed by the end of a sentence.
+        ("2019-03.", "2019-03-01"),
+        ("2019-03!", "2019-03-01"),
+        ("2019.", "2019-01-01"),
+        ("March 2019", "2019-03-01"),
+        ("mar. 2019", "2019-03-01"),
+        ("September, 2021", "2021-09-01"),
+        # #158: a date inside a longer answer, including one that goes on to
+        # describe another job -- the first date is the one asked about.
+        ("I started there in 2015-06, I think", "2015-06-01"),
+        ("I was at Acme from 2015, then Globex 2019 to 2022", "2015-01-01"),
+        ("from March 2016 until 2018", "2016-03-01"),
+        # Numbers that are not years stay numbers.
+        ("a 1200-bed hospital", None),
+        ("we had 4000 patients", None),
+        # An impossible month is skipped, not clamped.
+        ("2019-13", None),
         ("sometime last spring", None),
-        ("March 2019", None),
         ("", None),
     ],
 )
-def test_parse_started_on(answer, expected):
-    assert _parse_started_on(answer) == expected
+def test_parse_date(answer, expected):
+    assert _parse_date(answer) == expected
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("2019-03", True),
+        ("2019-03.", True),
+        ("March 2019", True),
+        ("I started in 2019-03", False),
+    ],
+)
+def test_is_bare_date(answer, expected):
+    assert _is_bare_date(answer) == expected
+
+
+@pytest.mark.parametrize(
+    ("ended_on", "answer", "started_on", "expected"),
+    [
+        # Compared at the precision given: "2019" ends a job that started in
+        # March 2019 rather than reading as January and being refused.
+        ("2019-01-01", "2019", "2019-03-15", False),
+        ("2019-03-01", "2019-03", "2019-03-15", False),
+        ("2018-12-01", "2018-12", "2019-03-15", True),
+        ("2019-03-01", "2019-03-01", "2019-03-15", True),
+        # A start that already fell back to the placeholder can't refuse
+        # anything.
+        ("2010-01-01", "2010", "1900-01-01", False),
+    ],
+)
+def test_ends_before(ended_on, answer, started_on, expected):
+    assert _ends_before(ended_on, answer, started_on) == expected
