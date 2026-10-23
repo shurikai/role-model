@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/shurikai/role-model/internal/career"
 	"github.com/shurikai/role-model/internal/contribution"
 	"github.com/shurikai/role-model/internal/db"
 	"github.com/shurikai/role-model/internal/httputil"
@@ -16,10 +17,11 @@ import (
 type ContributionHandler struct {
 	queries    *db.Queries
 	contribSvc *contribution.Service
+	reader     *career.Reader
 }
 
 func NewContributionHandler(queries *db.Queries, contribSvc *contribution.Service) *ContributionHandler {
-	return &ContributionHandler{queries: queries, contribSvc: contribSvc}
+	return &ContributionHandler{queries: queries, contribSvc: contribSvc, reader: career.NewReader(queries)}
 }
 
 type createContributionRequest struct {
@@ -52,10 +54,9 @@ func (h *ContributionHandler) ListByPosition(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	contributions, err := h.queries.GetContributionsByPosition(r.Context(), db.GetContributionsByPositionParams{
-		PositionID: &positionID,
-		UserID:     userID,
-	})
+	// Each contribution carries its tags, so the position page is one request
+	// rather than one per card.
+	contributions, err := h.reader.PositionContributions(r.Context(), userID, positionID)
 	if err != nil {
 		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to fetch contributions")
 		return

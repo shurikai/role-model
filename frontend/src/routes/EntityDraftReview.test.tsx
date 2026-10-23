@@ -394,4 +394,34 @@ describe("EntityDraftReview", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Orphaned Role")).toBeInTheDocument();
   });
+
+  it("links to the career once every draft is decided", async () => {
+    const decided = careerDrafts().map((d) => ({
+      ...d,
+      status: "approved" as const,
+    }));
+    const { fetchMock } = stubFetch(decided);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    expect(
+      await screen.findByRole("link", { name: "See what was added" }),
+    ).toHaveAttribute("href", "/career");
+    expect(
+      screen.queryByRole("link", { name: "Done for now" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers Done for now while drafts are still pending", async () => {
+    const { fetchMock } = stubFetch(careerDrafts());
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    expect(
+      await screen.findByRole("link", { name: "Done for now" }),
+    ).toHaveAttribute("href", "/career");
+    expect(
+      screen.queryByRole("link", { name: "See what was added" }),
+    ).not.toBeInTheDocument();
+  });
 });

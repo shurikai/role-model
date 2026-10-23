@@ -65,11 +65,16 @@ function stubFetch({
       let body: unknown = [];
       if (path.endsWith("/import")) {
         body = batches;
-      } else if (path.endsWith("/employers")) {
-        body = employers;
-      } else {
-        const employerID = path.match(/\/employers\/([^/]+)\/positions/)?.[1];
-        body = (employerID && positionsByEmployer[employerID]) || [];
+      } else if (path.endsWith("/career")) {
+        body = {
+          employers: employers.map((e) => ({
+            ...e,
+            positions: (positionsByEmployer[e.id] ?? []).map((p) => ({
+              ...p,
+              contribution_counts: { active: 0, hidden: 0 },
+            })),
+          })),
+        };
       }
       return {
         ok: true,

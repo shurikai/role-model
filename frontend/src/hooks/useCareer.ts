@@ -1,11 +1,8 @@
-import {
-  useMutation,
-  useQueries,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../lib/api-client";
 import type {
+  CareerTree,
+  Contribution,
   CreateEmployerRequest,
   CreatePositionRequest,
   Employer,
@@ -27,29 +24,38 @@ export function useEmployerPositions(employerID: string | undefined) {
   });
 }
 
+export function useCareerTree() {
+  return useQuery({
+    queryKey: ["career"],
+    queryFn: () => apiFetch<CareerTree>("/career"),
+  });
+}
+
+export function usePositionContributions(positionID: string | undefined) {
+  return useQuery({
+    queryKey: ["positions", positionID, "contributions"],
+    queryFn: () =>
+      apiFetch<Contribution[]>(`/positions/${positionID}/contributions`),
+    enabled: !!positionID,
+  });
+}
+
 /**
  * Whether the account has at least one position, and so whether there is
  * anything to add contributions to. An employer can exist with no positions
  * (a career import that approved the employer and rejected its roles), so the
- * employer list alone cannot answer this.
- *
- * One request per employer, reusing the same keys useEmployerPositions caches
- * under. The career tree endpoint (#118) will answer this in one.
+ * employer count alone cannot answer this.
  */
 export function useHasPositions(): {
   hasPositions: boolean;
   isLoading: boolean;
 } {
-  const employers = useEmployers();
-  const positions = useQueries({
-    queries: (employers.data ?? []).map((e) => ({
-      queryKey: ["employers", e.id, "positions"],
-      queryFn: () => apiFetch<Position[]>(`/employers/${e.id}/positions`),
-    })),
-  });
+  const tree = useCareerTree();
   return {
-    hasPositions: positions.some((q) => (q.data?.length ?? 0) > 0),
-    isLoading: employers.isLoading || positions.some((q) => q.isLoading),
+    hasPositions: (tree.data?.employers ?? []).some(
+      (e) => e.positions.length > 0,
+    ),
+    isLoading: tree.isLoading,
   };
 }
 
@@ -63,6 +69,7 @@ export function useCreateEmployer() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employers"] });
+      queryClient.invalidateQueries({ queryKey: ["career"] });
     },
   });
 }
@@ -79,6 +86,7 @@ export function useCreatePosition() {
       queryClient.invalidateQueries({
         queryKey: ["employers", position.employer_id, "positions"],
       });
+      queryClient.invalidateQueries({ queryKey: ["career"] });
     },
   });
 }

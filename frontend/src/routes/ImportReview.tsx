@@ -230,12 +230,18 @@ export function ImportReview() {
       )}
 
       <div className="mt-8 border-t border-dashed border-rail pt-5">
-        <Link
-          to="/applications"
-          className="font-body text-sm text-ink-dim underline"
-        >
-          Back to applications
-        </Link>
+        {drafts.length > 0 && drafts.every((d) => d.status !== "pending") ? (
+          <Link to="/career" className="font-body text-sm text-ink underline">
+            See what was added
+          </Link>
+        ) : (
+          <Link
+            to="/career"
+            className="font-body text-sm text-ink-dim underline"
+          >
+            Back to your career
+          </Link>
+        )}
       </div>
     </Page>
   );
