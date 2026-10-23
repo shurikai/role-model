@@ -35,6 +35,10 @@ _DONE_WORDS = {"done", "no", "nothing", "nope", "that's it", "thats it", "no mor
 _DONE_LEADING_WORDS = {"done", "no", "nope", "nothing"}
 
 
+# The first clause break: sentence or clause punctuation, or a dash.
+_CLAUSE_BREAK = re.compile(r"\s*(?:[.,;:!?]+|--|\u2014|\u2013)\s*")
+
+
 def _sounds_done(answer: str) -> bool:
     """Whole-utterance, not substring -- the same lesson the fit gate's
     matcher already learned (internal/fitgate): a bare `"done" in normalized`
@@ -50,6 +54,19 @@ def _sounds_done(answer: str) -> bool:
     normalized = answer.strip().lower().rstrip(".!")
     if normalized in _DONE_WORDS or normalized.startswith("next job"):
         return True
+
+    # A stop phrase that is its own first clause: "Done. We've covered
+    # everything", "done, that is everything", "That's it -- thanks" (#163).
+    # The whole-answer check above missed these because only the END of the
+    # answer was stripped, and the leading-word check below saw "done." with
+    # its period. A clause that goes on with "but" is still continuing:
+    # "No, but I also rebuilt the scheduler" is a contribution, not a stop.
+    brk = _CLAUSE_BREAK.search(normalized)
+    if brk:
+        first, rest = normalized[: brk.start()], normalized[brk.end() :]
+        if first in _DONE_WORDS and not rest.startswith("but"):
+            return True
+
     leading_word = normalized.split(" ", 1)[0] if normalized else ""
     return leading_word in _DONE_LEADING_WORDS
 

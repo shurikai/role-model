@@ -37,6 +37,18 @@ from agent.graph import (
         ),
         ("Wrote a script that does nothing but log errors", False),
         ("Rebuilt the onboarding flow end to end", False),
+        # #163: a stop phrase as its own first clause, then more words. These
+        # read as "not done" and were recorded as contributions until the eval
+        # hit its turn cap.
+        ("Done. We have covered everything.", True),
+        ("done, that is everything", True),
+        ("No. That's everything from my notes.", True),
+        ("That's it, thanks!", True),
+        ("Nope -- nothing else", True),
+        ("Done \u2014 there's nothing left to add.", True),
+        # ...but a clause that carries on with "but" is a contribution.
+        ("No, but I also rebuilt the night-shift schedule", False),
+        ("Done. But one more: I trained the new hires.", False),
     ],
 )
 def test_sounds_done(answer, expected):
