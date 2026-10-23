@@ -33,16 +33,23 @@ class InterviewState(TypedDict):
     employer_id: NotRequired[str]
     position_title: NotRequired[str]
     position_started_on: NotRequired[str]
-    # Set only when the date couldn't be read after a reprompt and
-    # position_started_on fell back to a placeholder -- the raw answer,
-    # carried into the position's context_narrative so it isn't silently
-    # lost. See ask_position_start in graph.py.
+    # A line for the position's context_narrative, set when the date was
+    # read out of a longer answer or couldn't be read at all and fell back
+    # to a placeholder -- either way the person's own words, so a reviewer
+    # can see what the date came from. See ask_position_start in graph.py.
     position_started_on_note: NotRequired[str | None]
     # Graph-control flag, not a fact about the position: routes
     # ask_position_start back to itself for exactly one reprompt. Reset
     # explicitly on every path through that node, since a NotRequired key
     # once set for one job otherwise stays set into the next.
     _position_start_needs_retry: NotRequired[bool]
+    # None means "still there" -- a claim, not an absence, which is why an
+    # unreadable end falls back to a placeholder date instead. The note and
+    # the retry flag work exactly as the start date's do. See
+    # ask_position_end in graph.py.
+    position_ended_on: NotRequired[str | None]
+    position_ended_on_note: NotRequired[str | None]
+    _position_end_needs_retry: NotRequired[bool]
     position_id: NotRequired[str]
 
     # The contribution just recorded, and the tags proposed for it.

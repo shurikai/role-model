@@ -1,4 +1,5 @@
-"""The interview graph: employer -> position -> contributions -> tags/skills.
+"""The interview graph: employer -> position (title, start, end) ->
+contributions -> tags/skills.
 
 One user-visible turn is one `ainvoke` call: LangGraph runs nodes until the
 next `interrupt()` (or the graph ends) and returns in one round trip, so a
@@ -21,6 +22,7 @@ agent/tags.py for why that boundary exists.
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Checkpointer, RunnableConfig, interrupt
@@ -80,31 +82,103 @@ async def ask_position_title(state: InterviewState) -> dict:
     return {"position_title": answer}
 
 
-_YEAR_MONTH_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_YEAR_MONTH = re.compile(r"^\d{4}-\d{2}$")
-_YEAR_ONLY = re.compile(r"^\d{4}$")
+# A year is 19xx or 20xx: bounding it keeps "1200 beds" or "4000 patients" in
+# a free-text answer from reading as a date.
+_ISO_DATE = re.compile(
+    r"(?<![\d-])((?:19|20)\d{2})(?:-(\d{1,2})(?:-(\d{1,2}))?)?(?![\d-])"
+)
+_MONTH_NAME_DATE = re.compile(
+    r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+((?:19|20)\d{2})\b",
+    re.IGNORECASE,
+)
+_MONTHS = {
+    name: number
+    for number, name in enumerate(
+        [
+            "jan",
+            "feb",
+            "mar",
+            "apr",
+            "may",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "oct",
+            "nov",
+            "dec",
+        ],
+        start=1,
+    )
+}
+# Trailing sentence punctuation is not part of the answer (#159): "2019-03."
+# is a date someone typed and then ended their sentence.
+_TRAILING_PUNCTUATION = " \t\n.,;:!?"
 
 
-def _parse_started_on(answer: str) -> str | None:
-    """Accepts YYYY-MM-DD, YYYY-MM, or a bare YYYY, normalizing the latter two
-    to a full date -- the same tolerance jd_extraction.tmpl documents for
-    dates elsewhere in this codebase ("Where the text gives only a year, use
-    \"-01\" and let the reviewer correct it"). Returns None for anything else,
-    rather than guessing; the caller re-asks once on None."""
-    text = answer.strip()
-    if _YEAR_MONTH_DAY.match(text):
-        return text
-    if _YEAR_MONTH.match(text):
-        return f"{text}-01"
-    if _YEAR_ONLY.match(text):
-        return f"{text}-01-01"
-    return None
+def _parse_date(answer: str) -> str | None:
+    """The first date in the answer, as YYYY-MM-DD, or None if there is none.
+
+    Accepts YYYY-MM-DD, YYYY-MM, a bare YYYY, and a month name with a year
+    ("March 2019", "Mar. 2019"), normalizing the shorter forms to the 1st --
+    the same tolerance jd_extraction.tmpl documents for dates elsewhere in
+    this codebase ("Where the text gives only a year, use \"-01\" and let the
+    reviewer correct it").
+
+    It looks anywhere in the answer, not only at an answer that is nothing
+    but a date (#158). "I was at Acme from 2015, then Globex 2019 to 2022"
+    contains a start date for the job being asked about, and refusing it
+    drove a real interview into the placeholder fallback. The first date is
+    taken because the question names one job and people answer it first;
+    the caller keeps the whole answer on the position whenever it was more
+    than a date, so a reviewer can see what the date was read from.
+
+    An impossible date ("2019-13") is skipped, not clamped.
+    """
+    candidates: list[tuple[int, str]] = []
+    for m in _ISO_DATE.finditer(answer):
+        year, month, day = m.group(1), m.group(2), m.group(3)
+        iso = _valid_iso(int(year), int(month or 1), int(day or 1))
+        if iso:
+            candidates.append((m.start(), iso))
+    for m in _MONTH_NAME_DATE.finditer(answer):
+        iso = _valid_iso(int(m.group(2)), _MONTHS[m.group(1).lower()], 1)
+        if iso:
+            candidates.append((m.start(), iso))
+    if not candidates:
+        return None
+    return min(candidates)[1]
 
 
-# Used only when a second reprompt still doesn't parse -- see ask_position_start.
-# A recognisably-fake date, not today's date or a null: this is what made the
-# original bug (a silent 2000-01-01 for every position, always) invisible.
-_STARTED_ON_FALLBACK = "1900-01-01"
+def _valid_iso(year: int, month: int, day: int) -> str | None:
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+
+
+def _is_bare_date(answer: str) -> bool:
+    """True when the answer is a date and nothing else, so there is nothing
+    worth keeping beside the parsed value."""
+    text = answer.strip().rstrip(_TRAILING_PUNCTUATION)
+    return bool(_ISO_DATE.fullmatch(text) or _MONTH_NAME_DATE.fullmatch(text))
+
+
+# Used only when a second reprompt still doesn't parse -- see ask_position_start
+# and ask_position_end. A recognisably-fake date, not today's date or a null:
+# this is what made the original bug (a silent 2000-01-01 for every position,
+# always) invisible. For an end date, null is not even available as a
+# fallback -- null means "still there", which is exactly the false claim #161
+# was about.
+_DATE_FALLBACK = "1900-01-01"
+
+
+def _job_label(state: InterviewState) -> str:
+    title = state.get("position_title", "").strip()
+    employer = state.get("employer_name", "").strip()
+    if title and employer:
+        return f"{title} at {employer}"
+    return title or employer or "that job"
 
 
 async def ask_position_start(state: InterviewState) -> dict:
@@ -116,16 +190,21 @@ async def ask_position_start(state: InterviewState) -> dict:
     # there while this job's hasn't been asked yet".
     reprompt = state.get("_position_start_needs_retry", False)
     question = (
-        "I couldn't read that as a date -- try YYYY-MM, like 2019-03."
+        "I couldn't find a date in that. One job at a time: when did you start "
+        f"as {_job_label(state)}? (YYYY-MM, like 2019-03)"
         if reprompt
         else "When did you start there (YYYY-MM)?"
     )
     answer = interrupt(question)
-    parsed = _parse_started_on(answer)
+    parsed = _parse_date(answer)
     if parsed is not None:
         return {
             "position_started_on": parsed,
-            "position_started_on_note": None,
+            "position_started_on_note": (
+                None
+                if _is_bare_date(answer)
+                else f'Start date read from: "{answer.strip()}"'
+            ),
             "_position_start_needs_retry": False,
         }
     if reprompt:
@@ -136,8 +215,10 @@ async def ask_position_start(state: InterviewState) -> dict:
         # discarded the way the original combined-question version discarded
         # the date entirely, with nothing left for a human to correct later.
         return {
-            "position_started_on": _STARTED_ON_FALLBACK,
-            "position_started_on_note": answer,
+            "position_started_on": _DATE_FALLBACK,
+            "position_started_on_note": (
+                f'Start date as stated: "{answer.strip()}" (could not be read as a date)'
+            ),
             "_position_start_needs_retry": False,
         }
     return {"_position_start_needs_retry": True}
@@ -146,24 +227,104 @@ async def ask_position_start(state: InterviewState) -> dict:
 def route_position_start(state: InterviewState) -> str:
     if state.get("_position_start_needs_retry"):
         return "ask_position_start"
+    return "ask_position_end"
+
+
+# Whole words, so "currently" counts and "concurrent" does not. Checked only
+# when the answer holds no date: "I left in 2019, now at Globex" has a "now"
+# in it and is still an end date.
+_STILL_THERE = re.compile(
+    r"\b(still|current|currently|present|now|ongoing|today)\b", re.IGNORECASE
+)
+
+
+async def ask_position_end(state: InterviewState) -> dict:
+    """The end date (#161). The interview used to never ask, and sent every
+    position with ended_on null -- which the career view and the renderer
+    both read as "still there", so an interviewed career printed every job as
+    held at once.
+
+    An end before the start is not accepted: it is either a misread or an
+    answer about a different job, and storing it would print a negative
+    span. Comparison is at the precision the person gave, so "2019" ends a
+    job that started 2019-03 rather than being refused as January.
+    """
+    reprompt = state.get("_position_end_needs_retry", False)
+    started_on = state.get("position_started_on", _DATE_FALLBACK)
+    question = (
+        f"I couldn't read an end date for {_job_label(state)} in that. When did "
+        "you leave? (YYYY-MM, or 'still there' if it's your current job)"
+        if reprompt
+        else "When did you leave (YYYY-MM)? Say 'still there' if it's your current job."
+    )
+    answer = interrupt(question)
+    parsed = _parse_date(answer)
+    if parsed is not None and not _ends_before(parsed, answer, started_on):
+        return {
+            "position_ended_on": max(parsed, started_on),
+            "position_ended_on_note": (
+                None
+                if _is_bare_date(answer)
+                else f'End date read from: "{answer.strip()}"'
+            ),
+            "_position_end_needs_retry": False,
+        }
+    if parsed is None and _STILL_THERE.search(answer):
+        return {
+            "position_ended_on": None,
+            "position_ended_on_note": None,
+            "_position_end_needs_retry": False,
+        }
+    if reprompt:
+        return {
+            "position_ended_on": _DATE_FALLBACK,
+            "position_ended_on_note": (
+                f'End date as stated: "{answer.strip()}" (could not be read as a date)'
+            ),
+            "_position_end_needs_retry": False,
+        }
+    return {"_position_end_needs_retry": True}
+
+
+def _ends_before(ended_on: str, answer: str, started_on: str) -> bool:
+    """Whether the end precedes the start at the precision the answer gave: a
+    bare year compares as a year, a month as a month."""
+    if started_on == _DATE_FALLBACK:
+        return False
+    bare = answer.strip().rstrip(_TRAILING_PUNCTUATION)
+    if re.fullmatch(r"(?:19|20)\d{2}", bare):
+        return ended_on[:4] < started_on[:4]
+    if re.fullmatch(r"(?:19|20)\d{2}-\d{1,2}", bare) or _MONTH_NAME_DATE.fullmatch(
+        bare
+    ):
+        return ended_on[:7] < started_on[:7]
+    return ended_on < started_on
+
+
+def route_position_end(state: InterviewState) -> str:
+    if state.get("_position_end_needs_retry"):
+        return "ask_position_end"
     return "resolve_position"
 
 
 async def resolve_position(state: InterviewState, config: RunnableConfig) -> dict:
     conf = _configurable(config)
-    date_note = state.get("position_started_on_note")
-    context_narrative = (
-        f'Start date as stated: "{date_note}" (could not be read as a date)'
-        if date_note
-        else None
-    )
+    notes = [
+        n
+        for n in (
+            state.get("position_started_on_note"),
+            state.get("position_ended_on_note"),
+        )
+        if n
+    ]
     position, created = await tools.resolve_or_create_position(
         conf["api_client"],
         conf["token"],
         state["employer_id"],
         state["position_title"],
         state["position_started_on"],
-        context_narrative,
+        state.get("position_ended_on"),
+        "\n".join(notes) or None,
     )
     note = (
         f"Got it -- adding {state['position_title']}."
@@ -376,6 +537,7 @@ def build_graph(checkpointer: Checkpointer):
     builder.add_node("resolve_employer", resolve_employer)
     builder.add_node("ask_position_title", ask_position_title)
     builder.add_node("ask_position_start", ask_position_start)
+    builder.add_node("ask_position_end", ask_position_end)
     builder.add_node("resolve_position", resolve_position)
     builder.add_node("ask_contribution", ask_contribution)
     builder.add_node("record_contribution", record_contribution)
@@ -398,7 +560,12 @@ def build_graph(checkpointer: Checkpointer):
     builder.add_conditional_edges(
         "ask_position_start",
         route_position_start,
-        ["ask_position_start", "resolve_position"],
+        ["ask_position_start", "ask_position_end"],
+    )
+    builder.add_conditional_edges(
+        "ask_position_end",
+        route_position_end,
+        ["ask_position_end", "resolve_position"],
     )
     builder.add_edge("resolve_position", "ask_contribution")
     builder.add_edge("ask_contribution", "record_contribution")
