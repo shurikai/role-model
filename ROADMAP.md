@@ -54,8 +54,10 @@ for orientation.
 
 | Phase | Gate | Milestone |
 |---|---|---|
-| **Phase 1** — Usable by humans other than me | Two non-technical test users can enter career data and get a resume without touching the terminal | [milestone](https://github.com/shurikai/role-model/milestone/2) |
-| **Phase 2** — Complete end-to-end pipeline | JD input → `.docx` download without leaving the UI *(met; remaining work is review gates, feedback, correctness eval)* | [milestone](https://github.com/shurikai/role-model/milestone/3) |
+| **Phase 1a** — Import pipeline | A second, non-technical user can get their work history into the system cleanly, without touching the terminal or a database client | [milestone](https://github.com/shurikai/role-model/milestone/2) |
+| **Phase 1b** — Ready for testers | A stranger can use the hosted instance, their data is safe, and a failure is visible without SSH | [milestone](https://github.com/shurikai/role-model/milestone/8) |
+| **Phase 1c** — User testing | Two non-technical users enter career data and download a resume without touching a terminal | [milestone](https://github.com/shurikai/role-model/milestone/9) |
+| **Phase 2** — Output correctness | Testers trust what comes out *(the JD → `.docx` pipeline itself is built)* | [milestone](https://github.com/shurikai/role-model/milestone/3) |
 | **Phase 3** — MCP Server | Career data queryable by any MCP client through live tools, not a derived copy | [milestone](https://github.com/shurikai/role-model/milestone/4) |
 | **Phase 4** — Discovery and distributed systems | New postings from target companies appear automatically; the pipeline runs durably end to end | [milestone](https://github.com/shurikai/role-model/milestone/5) |
 | **Phase 5** — Career threads | Named narrative through-lines, system-proposed and human-confirmed, feed summaries and fit scoring | [milestone](https://github.com/shurikai/role-model/milestone/6) |
@@ -66,25 +68,42 @@ record is `migrations/` and `notes/data-model.md`.
 
 ### Phase 1 — Usable by humans other than me
 
-Gate: two non-technical test users can enter career data and get a resume
-without touching the terminal.
+Split three ways on 2026-10-23 (`notes/post-1a-plan.md`). The original Phase 1
+gate is now Phase 1c's.
 
-Open work: onboarding agent (#117), career-data browsing/editing UI (#118),
-Stage 0 import review UI (#119), OIDC login (#120), Oracle Cloud deployment
-(#20), Stage 0b tag suggestions (#19), Stage 0b tag-suggestion review UI (#137).
+**1a — Import pipeline.** Done once #162 merges: the onboarding interview
+(#117), career browsing and editing (#118), the Stage 0 review UI (#119, #137).
+The live eval on #162 found two more interview bugs, #163 and #164.
 
-### Phase 2 — Complete end-to-end pipeline
+**1b — Ready for testers.** Deployment hardening (#165): the VM on current
+main, Pay-As-You-Go, off-box backups with a restore test, a capped production
+Anthropic key, uptime and 5xx visibility, staging. Also design foundations
+(#166), an in-app feedback link (#167) and the flaky Onboarding test (#157).
+OIDC login (#120) moved to backlog: hand-created accounts cover invited
+testers.
 
-Gate met — a pasted JD reaches a downloaded `.docx` in the browser. What
-remains is the review-and-correctness layer.
+**1c — User testing.** Round 1 with one or two testers on the current UI,
+then a design refresh from what they hit (the information-hierarchy half of
+#143), then round 2. Before round 1, re-check the first beta pass's failures
+(#168). Findings are filed with the `user-testing` label. Testing comes before
+the full refresh because what confuses a real person tells the refresh where
+to spend effort.
 
-Open work: review gate on extracted `jd_signals` (#121), fit-report corrections
-(#122), three-pass output reviewer (#123), Stage 2 generation-correctness eval
-(#124), Stage 1 extraction eval Layer B (#47), feedback loop endpoint (#9),
-project contributions seed (#22), `applied_on` date parsing (#6). Plus a
-cluster of known fit-gate and generation correctness defects: #43 #45 #46 #52
-#55 (scoring), #75 (term matching), #62 (summary length rules), #51 (eval
-fixture drift guard).
+### Phase 2 — Output correctness
+
+Gate: testers trust what comes out. The pipeline itself is built — a pasted JD
+reaches a downloaded `.docx` in the browser — so what remains is correctness,
+ordered by what testers flag.
+
+Open work: seniority mismatch (#116), summary length rules (#62), three-pass
+output reviewer (#123), review gate on extracted `jd_signals` (#121),
+Stage 2 generation eval (#124), Stage 1 extraction eval Layer B (#47). Also
+still in the milestone, not named in the post-1a plan: fit-report corrections
+(#122), feedback loop endpoint (#9), project contributions seed (#22),
+`applied_on` parsing (#6), eval fixture drift guard (#51).
+
+The fit-gate scoring defects (#43, #45, #46, #52, #55, #75, #152, #153) moved
+to backlog. They come back if a tester hits one.
 
 ### Phase 3 — MCP Server
 
