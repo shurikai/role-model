@@ -14,9 +14,10 @@ Active development. Backend: employer/position/contribution CRUD, application
 CRUD, tags and tag-categories CRUD, education/credentials/projects, JWT auth
 (signup/login/me), JD signal extraction and resume generation pipeline,
 Stage 0 import (extract + enrich + approve/reject), fit gate scoring with
-skills and preferences tables, CORS. Frontend: auth shell plus the
-application generation flow (JD paste → fit → generate → render), built on
-Vite + React + TypeScript.
+skills and preferences tables, CORS. Frontend: auth shell, the
+application generation flow (JD paste → fit → generate → render), and the
+career view — browse and edit employers, positions and contributions under
+`/career` — built on Vite + React + TypeScript.
 
 Resume rendering is built: a Python docx-renderer service (FastAPI +
 python-docx) owns document output, and internal/renderer is the Go HTTP

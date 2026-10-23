@@ -406,6 +406,55 @@ export interface CreatePositionRequest {
   sort_order?: number;
 }
 
+/** PATCH /employers/{id}. Full replacement: every field is written. */
+export interface UpdateEmployerRequest {
+  name: string;
+  industry: string | null;
+  notes: string | null;
+}
+
+/**
+ * PATCH /positions/{id}. Full replacement: a field left out is written as
+ * null (or 0 for sort_order), so build it from the fetched position.
+ */
+export interface UpdatePositionRequest {
+  title: string;
+  industry_level: string | null;
+  industry_role: string | null;
+  location: string | null;
+  level_rationale: string | null;
+  started_on: string;
+  ended_on: string | null;
+  context_narrative: string | null;
+  sort_order: number;
+}
+
+export interface CreateContributionRequest {
+  position_id: string;
+  summary: string;
+  full_description: string;
+  outcomes: string | null;
+  scale_context: string | null;
+}
+
+/** PATCH /contributions/{id}. Full replacement, like positions. */
+export interface UpdateContributionRequest {
+  summary: string;
+  full_description: string;
+  outcomes: string | null;
+  scale_context: string | null;
+  is_active: boolean;
+}
+
+/** A rung on the account's own seniority ladder (career_levels). */
+export interface CareerLevel {
+  id: string;
+  value: string;
+  label: string;
+  rank: number;
+  sort_order: number;
+}
+
 // ---------------------------------------------------------------------------
 // Career intake (entity drafts)
 // ---------------------------------------------------------------------------

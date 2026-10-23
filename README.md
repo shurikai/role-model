@@ -251,10 +251,9 @@ notification consumers.
 
 What's missing:
 
-- **No career-data browsing or editing in the UI.** Import review is the only
-  way to see what was captured. Correcting a contribution afterwards means the
-  API or raw SQL. Skills and preferences can be edited on the Profile screen.
-  Employers, positions, and contributions cannot.
+- **Tags on contributions are read-only in the UI.** The Career screens edit,
+  hide and delete employers, positions and contributions, but changing which
+  tags a contribution carries still means the API.
 - **No password reset in the app.** `make reset-password` is the stopgap.
 - **No review gate on extracted JD signals** before generation runs.
 - **Rendered documents are not persisted.** The `.docx` is streamed back to

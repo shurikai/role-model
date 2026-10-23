@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  EmployerForm,
+  PositionForm,
+  textButton,
+} from "../components/CareerForms";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { EmptyState } from "../components/EmptyState";
 import { Page } from "../components/Page";
-import { useCareerTree } from "../hooks/useCareer";
+import { useCareerTree, useDeleteEmployer } from "../hooks/useCareer";
 import { formatApiError } from "../lib/api-client";
 import { formatSpan } from "../lib/dates";
 import type { CareerEmployer, CareerPosition } from "../lib/types";
@@ -16,8 +23,8 @@ const addLink = (
 );
 
 /**
- * The record itself: every employer, each listing its positions. Read-only;
- * editing is the next PR (#118).
+ * The record itself: every employer, each listing its positions. Employers
+ * are edited in place here; positions open their own page.
  *
  * Employers come in the order the server sends them, which is resume order —
  * current first, then by most recent end date — because that is how people
@@ -63,21 +70,63 @@ export function Career() {
 }
 
 function EmployerSection({ employer }: { employer: CareerEmployer }) {
+  const [mode, setMode] = useState<"view" | "edit" | "add-position">("view");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const del = useDeleteEmployer();
+
+  // An employer with positions cannot be deleted (the server 409s), so the
+  // control is not offered rather than offered and refused.
+  const deletable = employer.positions.length === 0;
+
   return (
     <section aria-labelledby={`employer-${employer.id}`}>
-      <div className="mb-2 flex flex-wrap items-baseline gap-x-3">
-        <h2
-          id={`employer-${employer.id}`}
-          className="font-display text-lg font-bold text-ink"
-        >
-          {employer.name}
-        </h2>
-        {employer.industry && (
-          <span className="font-body text-[13px] text-ink-dim">
-            {employer.industry}
-          </span>
-        )}
-      </div>
+      {mode === "edit" ? (
+        <div className="mb-3">
+          <EmployerForm employer={employer} onDone={() => setMode("view")} />
+        </div>
+      ) : (
+        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4">
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <h2
+              id={`employer-${employer.id}`}
+              className="font-display text-lg font-bold text-ink"
+            >
+              {employer.name}
+            </h2>
+            {employer.industry && (
+              <span className="font-body text-[13px] text-ink-dim">
+                {employer.industry}
+              </span>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setMode("edit")}
+              aria-label={`Edit ${employer.name}`}
+              className={textButton}
+            >
+              Edit
+            </button>
+            {deletable && (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                aria-label={`Delete ${employer.name}`}
+                className="font-body text-[13px] text-reject hover:underline"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      {del.error && (
+        <p role="alert" className="mb-2 font-body text-sm text-reject">
+          {formatApiError(del.error)}
+        </p>
+      )}
+
       {employer.positions.length === 0 ? (
         <p className="border border-dashed border-rail bg-card px-4 py-3 font-body text-[13px] text-ink-dim">
           No roles recorded here yet.
@@ -91,6 +140,40 @@ function EmployerSection({ employer }: { employer: CareerEmployer }) {
           ))}
         </ul>
       )}
+
+      {mode === "add-position" ? (
+        <div className="mt-2">
+          <PositionForm
+            employerID={employer.id}
+            onDone={() => setMode("view")}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setMode("add-position")}
+          aria-label={`Add a position at ${employer.name}`}
+          className={`mt-2 ${textButton}`}
+        >
+          + Add position
+        </button>
+      )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`Delete ${employer.name}?`}
+        confirmLabel="Delete employer"
+        pending={del.isPending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() =>
+          del.mutate(employer.id, {
+            onSettled: () => setConfirmingDelete(false),
+          })
+        }
+      >
+        This removes the employer from your career. It has no roles under it, so
+        nothing else goes with it.
+      </ConfirmDialog>
     </section>
   );
 }
