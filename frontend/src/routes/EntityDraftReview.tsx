@@ -10,6 +10,7 @@ import {
 } from "../hooks/useIntake";
 import { isBatchWorking, useImportBatch } from "../hooks/useImport";
 import { PayloadEditor } from "../components/PayloadEditor";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 import type { EntityDraft, EntityDraftStatus } from "../lib/types";
 
@@ -204,151 +205,142 @@ export function EntityDraftReview() {
   const working = batch ? isBatchWorking(batch.status) : false;
 
   return (
-    <div>
-      <div className="mx-auto max-w-4xl px-6 py-10">
-        <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-          Career import · Review
+    <Page
+      eyebrow="Career import · Review"
+      title="Review your career"
+      actions={
+        drafts.length > 0 && (
+          <span className="font-mono text-[13px] text-ink-dim">
+            {drafts.length - pendingCount} / {drafts.length} decided
+          </span>
+        )
+      }
+      lede="Nothing here is in your record yet. Approve what is right, fix what is not, reject what should not be there."
+    >
+      {working && (
+        <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
+          Still extracting. This page refreshes itself.
         </p>
-        <div className="mb-1 flex items-baseline justify-between gap-4">
-          <h1 className="font-display text-2xl font-bold text-ink">
-            Review your career
-          </h1>
-          {drafts.length > 0 && (
-            <span className="font-mono text-[13px] text-ink-dim">
-              {drafts.length - pendingCount} / {drafts.length} decided
-            </span>
-          )}
-        </div>
-        <p className="mb-6 font-body text-[13px] text-ink-dim">
-          Nothing here is in your record yet. Approve what is right, fix what is
-          not, reject what should not be there.
+      )}
+      {batch?.status === "failed" && (
+        <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
+          Import failed.{" "}
+          <span className="text-ink-dim">
+            {batch.error_text ?? "No reason was recorded."}
+          </span>
         </p>
+      )}
 
-        {working && (
-          <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-            Still extracting. This page refreshes itself.
+      {draftsQuery.isLoading && (
+        <p className="font-body text-sm text-ink-dim">Loading drafts…</p>
+      )}
+      {draftsQuery.error && (
+        <p className="font-body text-sm text-reject">
+          {formatApiError(draftsQuery.error)}
+        </p>
+      )}
+      {!draftsQuery.isLoading && drafts.length === 0 && !working && (
+        <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
+          This batch produced no drafts.
+        </p>
+      )}
+
+      {grouped.employers.map((employer) => (
+        <section key={employer.id} className="mb-6">
+          <DraftCard draft={employer} drafts={drafts} batchID={batchID} />
+          <div className="mt-2 ml-6 border-l border-border pl-4">
+            {(grouped.positionsByEmployer.get(employer.id) ?? []).map(
+              (position) => (
+                <PositionBlock
+                  key={position.id}
+                  position={position}
+                  contributions={
+                    grouped.contributionsByPosition.get(position.id) ?? []
+                  }
+                  drafts={drafts}
+                  batchID={batchID}
+                />
+              ),
+            )}
+            {(grouped.positionsByEmployer.get(employer.id) ?? []).length ===
+              0 && (
+              <p className="font-body text-sm text-ink-dim">
+                No positions drafted for this employer.
+              </p>
+            )}
+          </div>
+        </section>
+      ))}
+
+      <FlatGroup
+        title="Skills"
+        drafts={grouped.skills}
+        all={drafts}
+        batchID={batchID}
+      />
+      <FlatGroup
+        title="Preferences"
+        drafts={grouped.preferences}
+        all={drafts}
+        batchID={batchID}
+      />
+      <FlatGroup
+        title="Education"
+        drafts={grouped.education}
+        all={drafts}
+        batchID={batchID}
+      />
+      <FlatGroup
+        title="Credentials"
+        drafts={grouped.credentials}
+        all={drafts}
+        batchID={batchID}
+      />
+      <FlatGroup
+        title="Not attached to anything"
+        drafts={grouped.unplaced}
+        all={drafts}
+        batchID={batchID}
+        note="These name a parent that is not in this batch, or a kind this screen does not know. They are shown so nothing disappears unreviewed."
+      />
+
+      <div className="mt-8 border-t border-dashed border-rail pt-5">
+        <button
+          type="button"
+          disabled={resolveBatch.isPending || pendingCount === 0}
+          onClick={() => resolveBatch.mutate()}
+          className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
+        >
+          {resolveBatch.isPending
+            ? "Writing…"
+            : `Approve all ${pendingCount} remaining`}
+        </button>
+        <Link
+          to="/applications"
+          className="ml-4 font-body text-sm text-ink-dim underline"
+        >
+          Done for now
+        </Link>
+
+        {resolveBatch.error && (
+          <p className="mt-3 font-body text-sm text-reject">
+            {formatApiError(resolveBatch.error)}
           </p>
         )}
-        {batch?.status === "failed" && (
-          <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
-            Import failed.{" "}
-            <span className="text-ink-dim">
-              {batch.error_text ?? "No reason was recorded."}
-            </span>
+        {resolveBatch.data && (
+          <p className="mt-3 font-body text-sm text-ink-dim">
+            Wrote {Object.keys(resolveBatch.data.resolved).length} rows.
+            {Object.keys(resolveBatch.data.unresolved).length > 0 && (
+              <span className="text-reject">
+                {" "}
+                {Object.keys(resolveBatch.data.unresolved).length} could not be
+                written — see the drafts still marked pending.
+              </span>
+            )}
           </p>
         )}
-
-        {draftsQuery.isLoading && (
-          <p className="font-body text-sm text-ink-dim">Loading drafts…</p>
-        )}
-        {draftsQuery.error && (
-          <p className="font-body text-sm text-reject">
-            {formatApiError(draftsQuery.error)}
-          </p>
-        )}
-        {!draftsQuery.isLoading && drafts.length === 0 && !working && (
-          <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-            This batch produced no drafts.
-          </p>
-        )}
-
-        {grouped.employers.map((employer) => (
-          <section key={employer.id} className="mb-6">
-            <DraftCard draft={employer} drafts={drafts} batchID={batchID} />
-            <div className="mt-2 ml-6 border-l border-border pl-4">
-              {(grouped.positionsByEmployer.get(employer.id) ?? []).map(
-                (position) => (
-                  <PositionBlock
-                    key={position.id}
-                    position={position}
-                    contributions={
-                      grouped.contributionsByPosition.get(position.id) ?? []
-                    }
-                    drafts={drafts}
-                    batchID={batchID}
-                  />
-                ),
-              )}
-              {(grouped.positionsByEmployer.get(employer.id) ?? []).length ===
-                0 && (
-                <p className="font-body text-sm text-ink-dim">
-                  No positions drafted for this employer.
-                </p>
-              )}
-            </div>
-          </section>
-        ))}
-
-        <FlatGroup
-          title="Skills"
-          drafts={grouped.skills}
-          all={drafts}
-          batchID={batchID}
-        />
-        <FlatGroup
-          title="Preferences"
-          drafts={grouped.preferences}
-          all={drafts}
-          batchID={batchID}
-        />
-        <FlatGroup
-          title="Education"
-          drafts={grouped.education}
-          all={drafts}
-          batchID={batchID}
-        />
-        <FlatGroup
-          title="Credentials"
-          drafts={grouped.credentials}
-          all={drafts}
-          batchID={batchID}
-        />
-        <FlatGroup
-          title="Not attached to anything"
-          drafts={grouped.unplaced}
-          all={drafts}
-          batchID={batchID}
-          note="These name a parent that is not in this batch, or a kind this screen does not know. They are shown so nothing disappears unreviewed."
-        />
-
-        <div className="mt-8 border-t border-dashed border-rail pt-5">
-          <button
-            type="button"
-            disabled={resolveBatch.isPending || pendingCount === 0}
-            onClick={() => resolveBatch.mutate()}
-            className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
-          >
-            {resolveBatch.isPending
-              ? "Writing…"
-              : `Approve all ${pendingCount} remaining`}
-          </button>
-          <Link
-            to="/applications"
-            className="ml-4 font-body text-sm text-ink-dim underline"
-          >
-            Done for now
-          </Link>
-
-          {resolveBatch.error && (
-            <p className="mt-3 font-body text-sm text-reject">
-              {formatApiError(resolveBatch.error)}
-            </p>
-          )}
-          {resolveBatch.data && (
-            <p className="mt-3 font-body text-sm text-ink-dim">
-              Wrote {Object.keys(resolveBatch.data.resolved).length} rows.
-              {Object.keys(resolveBatch.data.unresolved).length > 0 && (
-                <span className="text-reject">
-                  {" "}
-                  {Object.keys(resolveBatch.data.unresolved).length} could not
-                  be written — see the drafts still marked pending.
-                </span>
-              )}
-            </p>
-          )}
-        </div>
       </div>
-    </div>
+    </Page>
   );
 }
 

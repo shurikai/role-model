@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -67,6 +68,62 @@ func (q *Queries) GetImportBatch(ctx context.Context, arg GetImportBatchParams) 
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listImportBatchSummaries = `-- name: ListImportBatchSummaries :many
+SELECT
+    b.id,
+    b.status,
+    b.created_at,
+    (CASE WHEN EXISTS (SELECT 1 FROM entity_drafts e WHERE e.batch_id = b.id)
+          THEN 'career' ELSE 'contributions' END)::text AS kind,
+    ((SELECT COUNT(*) FROM entity_drafts e
+       WHERE e.batch_id = b.id AND e.status = 'pending')
+     + (SELECT COUNT(*) FROM contribution_drafts c
+         WHERE c.batch_id = b.id AND c.status = 'pending'))::int AS pending_count
+FROM import_batches b
+WHERE b.user_id = $1
+ORDER BY b.created_at DESC, b.id
+`
+
+type ListImportBatchSummariesRow struct {
+	ID           uuid.UUID `json:"id"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
+	Kind         string    `json:"kind"`
+	PendingCount int32     `json:"pending_count"`
+}
+
+// The hub's list of imports. kind is derived, not stored: the narrow path
+// writes only contribution_drafts and the career path only entity_drafts, so
+// a batch with any entity draft is a career batch. That holds only once drafts
+// exist -- a career batch that failed before staging anything reads as
+// 'contributions' -- which is why the hub lists only batches with pending
+// drafts. raw_text is deliberately not selected; a list has no use for it.
+func (q *Queries) ListImportBatchSummaries(ctx context.Context, userID uuid.UUID) ([]ListImportBatchSummariesRow, error) {
+	rows, err := q.db.Query(ctx, listImportBatchSummaries, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListImportBatchSummariesRow
+	for rows.Next() {
+		var i ListImportBatchSummariesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Status,
+			&i.CreatedAt,
+			&i.Kind,
+			&i.PendingCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listImportBatches = `-- name: ListImportBatches :many

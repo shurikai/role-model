@@ -284,6 +284,21 @@ export interface ImportBatch {
 }
 
 /**
+ * One row of `GET /import`: the hub's list of imports across both paths.
+ * `kind` is which review screen the batch belongs to — `career` for the wide
+ * path (`/import/career/:id`), `contributions` for the narrow one
+ * (`/import/:id`). The server derives it from which draft table the batch
+ * staged into, so it is only meaningful once a batch has drafts.
+ */
+export interface ImportBatchSummary {
+  id: string;
+  status: ImportBatchStatus;
+  created_at: string;
+  kind: "career" | "contributions";
+  pending_count: number;
+}
+
+/**
  * `POST /import` answers with a narrower shape than the GET: no `raw_text`, no
  * timestamps, and a flat `draft_count` rather than the four-way breakdown.
  * Modelled separately because it genuinely is a different response, not an

@@ -129,6 +129,7 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Get("/applications/{applicationID}/fit/{reportID}", fitHandler.Get)
 
 			importHandler := handlers.NewImportHandler(deps.Queries, deps.Stage0Svc)
+			r.Get("/import", importHandler.List)
 			r.With(llmLimit).Post("/import", importHandler.Create)
 			r.Get("/import/{batchID}", importHandler.GetBatch)
 			r.Get("/import/{batchID}/drafts", importHandler.ListDrafts)

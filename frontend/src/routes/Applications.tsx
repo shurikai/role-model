@@ -4,6 +4,7 @@ import {
   useFitReports,
   useResumeVersions,
 } from "../hooks/useApplications";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 import type { Application } from "../lib/types";
 
@@ -51,22 +52,18 @@ export function Applications() {
   const { data: applications, isLoading, error } = useApplications();
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
-      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-        Applications
-      </p>
-      <div className="mb-6 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="font-display text-2xl font-bold text-ink">
-          Everywhere you have applied
-        </h1>
+    <Page
+      eyebrow="Applications"
+      title="Everywhere you have applied"
+      actions={
         <Link
           to="/applications/new"
           className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface"
         >
           New application
         </Link>
-      </div>
-
+      }
+    >
       {isLoading && <p className="font-body text-sm text-ink-dim">Loading…</p>}
       {error && (
         <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
@@ -120,6 +117,6 @@ export function Applications() {
           ))}
         </ul>
       )}
-    </div>
+    </Page>
   );
 }

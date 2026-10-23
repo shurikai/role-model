@@ -14,6 +14,8 @@ import { ImportReview } from "./routes/ImportReview";
 import { CareerImportStart } from "./routes/CareerImportStart";
 import { EntityDraftReview } from "./routes/EntityDraftReview";
 import { Onboarding } from "./routes/Onboarding";
+import { Career } from "./routes/Career";
+import { CareerAdd } from "./routes/CareerAdd";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,10 +35,14 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route element={<RequireAuth />}>
-                <Route
-                  path="/"
-                  element={<Navigate to="/applications" replace />}
-                />
+                {/*
+                  Career, not Applications: an application is meaningless
+                  before there is career data to fit it against, so landing a
+                  new account on the applications list was backwards.
+                */}
+                <Route path="/" element={<Navigate to="/career" replace />} />
+                <Route path="/career" element={<Career />} />
+                <Route path="/career/add" element={<CareerAdd />} />
                 <Route path="/applications" element={<Applications />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/applications/new" element={<ApplicationNew />} />

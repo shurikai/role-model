@@ -21,6 +21,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 import {
   DRAFT_EDITABLE_FIELDS,
@@ -162,93 +163,81 @@ export function ImportReview() {
   ).length;
 
   return (
-    <div>
-      <div className="mx-auto flex max-w-5xl">
-        <LedgerRail drafts={drafts} skipped={skipped} />
-
-        <div className="flex-1 px-6 py-10">
-          <header className="mb-8">
-            <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-              Stage 0 · Import review
+    <Page
+      width="wide"
+      aside={<LedgerRail drafts={drafts} skipped={skipped} />}
+      eyebrow="Stage 0 · Import review"
+      title="Review imported entries"
+      actions={
+        drafts.length > 0 && (
+          <span className="font-mono text-[13px] text-ink-dim">
+            {reviewed} / {drafts.length} reviewed
+          </span>
+        )
+      }
+      lede={
+        <>
+          <BatchStatusLine batch={batch} />
+          {batchQuery.error && (
+            <p className="font-body text-sm text-reject">
+              {formatApiError(batchQuery.error)}
             </p>
-            <div className="mb-1 flex items-baseline justify-between gap-4">
-              <h1 className="font-display text-2xl font-bold text-ink">
-                Review imported entries
-              </h1>
-              {drafts.length > 0 && (
-                <span className="font-mono text-[13px] text-ink-dim">
-                  {reviewed} / {drafts.length} reviewed
-                </span>
-              )}
-            </div>
-            <BatchStatusLine batch={batch} />
-            {batchQuery.error && (
-              <p className="font-body text-sm text-reject">
-                {formatApiError(batchQuery.error)}
-              </p>
-            )}
-          </header>
+          )}
+        </>
+      }
+    >
+      {batch && isBatchWorking(batch.status) && (
+        <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
+          Still working — extraction and enrichment are running. This page
+          refreshes itself.
+        </p>
+      )}
 
-          {batch && isBatchWorking(batch.status) && (
+      {batch?.status === "failed" && (
+        <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
+          Import failed.{" "}
+          <span className="text-ink-dim">
+            {batch.error_text ?? "No reason was recorded."}
+          </span>
+        </p>
+      )}
+
+      {batch && !isBatchWorking(batch.status) && batch.status !== "failed" && (
+        <>
+          {draftsQuery.isLoading && (
+            <p className="font-body text-sm text-ink-dim">Loading drafts…</p>
+          )}
+          {draftsQuery.error && (
+            <p className="font-body text-sm text-reject">
+              {formatApiError(draftsQuery.error)}
+            </p>
+          )}
+          {drafts.length === 0 && !draftsQuery.isLoading && (
             <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-              Still working — extraction and enrichment are running. This page
-              refreshes itself.
+              This batch produced no drafts.
             </p>
           )}
+          {drafts.map((draft) => (
+            <DraftCard
+              key={draft.id}
+              draft={draft}
+              batchID={batchID}
+              skipped={skipped.has(draft.id)}
+              onSkip={() => setSkipped((prev) => new Set(prev).add(draft.id))}
+            />
+          ))}
+        </>
+      )}
 
-          {batch?.status === "failed" && (
-            <p className="border border-reject bg-card p-4 font-body text-sm text-ink">
-              Import failed.{" "}
-              <span className="text-ink-dim">
-                {batch.error_text ?? "No reason was recorded."}
-              </span>
-            </p>
-          )}
-
-          {batch &&
-            !isBatchWorking(batch.status) &&
-            batch.status !== "failed" && (
-              <>
-                {draftsQuery.isLoading && (
-                  <p className="font-body text-sm text-ink-dim">
-                    Loading drafts…
-                  </p>
-                )}
-                {draftsQuery.error && (
-                  <p className="font-body text-sm text-reject">
-                    {formatApiError(draftsQuery.error)}
-                  </p>
-                )}
-                {drafts.length === 0 && !draftsQuery.isLoading && (
-                  <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-                    This batch produced no drafts.
-                  </p>
-                )}
-                {drafts.map((draft) => (
-                  <DraftCard
-                    key={draft.id}
-                    draft={draft}
-                    batchID={batchID}
-                    skipped={skipped.has(draft.id)}
-                    onSkip={() =>
-                      setSkipped((prev) => new Set(prev).add(draft.id))
-                    }
-                  />
-                ))}
-              </>
-            )}
-
-          <div className="mt-8 border-t border-dashed border-rail pt-5">
-            <Link
-              to="/applications"
-              className="font-body text-sm text-ink-dim underline"
-            >
-              Back to applications
-            </Link>
-          </div>
-        </div>
+      <div className="mt-8 border-t border-dashed border-rail pt-5">
+        <Link
+          to="/applications"
+          className="font-body text-sm text-ink-dim underline"
+        >
+          Back to applications
+        </Link>
       </div>
-    </div>
+    </Page>
   );
 }
 
@@ -277,7 +266,7 @@ function LedgerRail({
 }) {
   if (drafts.length === 0) return null;
   return (
-    <div className="hidden w-8 flex-shrink-0 flex-col items-center pt-[168px] pr-4 md:flex">
+    <div className="hidden w-8 flex-shrink-0 flex-col items-center pt-[160px] pr-4 md:flex">
       {drafts.map((draft) => {
         const state = cardState(draft, skipped.has(draft.id));
         const style = STATE_STYLE[state];
