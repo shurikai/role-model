@@ -63,8 +63,33 @@ describe("AppShell", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     localStorage.clear();
     cleanup();
+  });
+
+  // A deployment with no feedback channel configured shows no link, rather
+  // than one that goes nowhere.
+  it("shows no feedback link when none is configured", async () => {
+    vi.stubEnv("VITE_FEEDBACK_URL", "");
+    renderAt("/applications");
+    await screen.findByText("Applications page");
+
+    expect(
+      screen.queryByRole("link", { name: "Feedback" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("links feedback to a prefilled email naming the current page", async () => {
+    vi.stubEnv("VITE_FEEDBACK_URL", "mailto:me@example.com");
+    renderAt("/applications");
+    await screen.findByText("Applications page");
+
+    const href = screen
+      .getByRole("link", { name: "Feedback" })
+      .getAttribute("href")!;
+    expect(href).toMatch(/^mailto:me@example\.com\?/);
+    expect(decodeURIComponent(href)).toContain("Page: /applications");
   });
 
   // logout() had been defined on AuthContext since the auth shell landed and
