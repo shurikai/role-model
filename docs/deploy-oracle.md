@@ -153,6 +153,11 @@ DOMAIN=resume.example.com
 ACME_EMAIL=you@example.com
 ENVIRONMENT=production
 SIGNUP_ENABLED=false
+
+# Optional: the shell's "Feedback" link. A form URL, or a mailto: address
+# (prefilled with the page the tester was on). Unset hides the link. Baked in
+# at build time, so it takes effect on the next `up --build`.
+FEEDBACK_URL=mailto:you@example.com
 ```
 
 Then:

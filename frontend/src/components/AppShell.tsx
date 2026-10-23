@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { feedbackHref } from "../lib/feedback";
 
 /**
  * The frame every authenticated page renders inside.
@@ -16,6 +17,8 @@ import { useAuth } from "../contexts/AuthContext";
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { pathname } = useLocation();
+  const feedback = feedbackHref(import.meta.env.VITE_FEEDBACK_URL, pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
@@ -57,6 +60,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
+            {feedback && (
+              <a
+                href={feedback}
+                target="_blank"
+                rel="noreferrer"
+                className="font-body text-xs text-verify underline"
+              >
+                Feedback
+              </a>
+            )}
             {user && (
               <span className="font-mono text-[10px] tracking-widest text-rail uppercase">
                 {user.email}

@@ -19,6 +19,12 @@ COPY . .
 ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Where the shell's "Feedback" link points: a form URL, or a mailto: address
+# that gets prefilled with the page the report came from. Empty hides the
+# link. Inlined at build time like the API URL, so changing it means a rebuild.
+ARG VITE_FEEDBACK_URL=
+ENV VITE_FEEDBACK_URL=$VITE_FEEDBACK_URL
+
 RUN npm run build
 
 FROM nginx:1.27-alpine
