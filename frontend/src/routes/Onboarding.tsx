@@ -173,8 +173,8 @@ export function Onboarding() {
       {done ? (
         <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
           That's everything for now.{" "}
-          <Link to="/applications" className="text-ink underline">
-            Back to applications
+          <Link to="/career" className="text-ink underline">
+            See what was added
           </Link>
         </p>
       ) : (

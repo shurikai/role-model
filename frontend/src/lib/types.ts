@@ -347,6 +347,45 @@ export interface Position {
   updated_at: string;
 }
 
+/** GET /career: the whole employer → position tree in one response. */
+export interface CareerTree {
+  employers: CareerEmployer[];
+}
+
+/** Employers arrive in resume order (current first), not alphabetical. */
+export interface CareerEmployer extends Employer {
+  positions: CareerPosition[];
+}
+
+/**
+ * Hidden contributions (is_active false) are kept but never reach a generated
+ * resume, which is why they are counted apart.
+ */
+export interface CareerPosition extends Position {
+  contribution_counts: { active: number; hidden: number };
+}
+
+export interface ContributionTag {
+  id: string;
+  name: string;
+  category: string;
+}
+
+/** GET /positions/{id}/contributions, each carrying its tags. */
+export interface Contribution {
+  id: string;
+  user_id: string;
+  position_id: string | null;
+  summary: string;
+  full_description: string;
+  outcomes: string | null;
+  scale_context: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  tags: ContributionTag[];
+}
+
 export interface CreateEmployerRequest {
   name: string;
   industry?: string | null;

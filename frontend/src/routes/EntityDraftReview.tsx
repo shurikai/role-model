@@ -315,12 +315,21 @@ export function EntityDraftReview() {
             ? "Writing…"
             : `Approve all ${pendingCount} remaining`}
         </button>
-        <Link
-          to="/applications"
-          className="ml-4 font-body text-sm text-ink-dim underline"
-        >
-          Done for now
-        </Link>
+        {drafts.length > 0 && pendingCount === 0 ? (
+          <Link
+            to="/career"
+            className="ml-4 font-body text-sm text-ink underline"
+          >
+            See what was added
+          </Link>
+        ) : (
+          <Link
+            to="/career"
+            className="ml-4 font-body text-sm text-ink-dim underline"
+          >
+            Done for now
+          </Link>
+        )}
 
         {resolveBatch.error && (
           <p className="mt-3 font-body text-sm text-reject">

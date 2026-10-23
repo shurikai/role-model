@@ -151,6 +151,10 @@ describe("Onboarding", () => {
       await screen.findByText(/that's everything for now/i),
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Your answer")).not.toBeInTheDocument();
+    // The interview wrote to the career, so that is where it sends you.
+    expect(
+      screen.getByRole("link", { name: "See what was added" }),
+    ).toHaveAttribute("href", "/career");
   });
 
   it("restores a saved session without starting a new interview", async () => {

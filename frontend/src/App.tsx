@@ -16,6 +16,7 @@ import { EntityDraftReview } from "./routes/EntityDraftReview";
 import { Onboarding } from "./routes/Onboarding";
 import { Career } from "./routes/Career";
 import { CareerAdd } from "./routes/CareerAdd";
+import { CareerPosition } from "./routes/CareerPosition";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +44,10 @@ function App() {
                 <Route path="/" element={<Navigate to="/career" replace />} />
                 <Route path="/career" element={<Career />} />
                 <Route path="/career/add" element={<CareerAdd />} />
+                <Route
+                  path="/career/positions/:positionID"
+                  element={<CareerPosition />}
+                />
                 <Route path="/applications" element={<Applications />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/applications/new" element={<ApplicationNew />} />

@@ -489,4 +489,34 @@ describe("ImportReview", () => {
     const approve = calls.find((c) => c.path.endsWith("/approve"))!;
     expect(approve.body).toEqual({ position_id: "position-1" });
   });
+
+  it("links to the career once every draft is decided", async () => {
+    const { fetchMock } = stubFetch(makeBatch(), [
+      makeDraft({ id: "d1", status: "approved" }),
+      makeDraft({ id: "d2", status: "rejected" }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    expect(
+      await screen.findByRole("link", { name: "See what was added" }),
+    ).toHaveAttribute("href", "/career");
+  });
+
+  // Skipping is local and decides nothing, so it does not finish a batch.
+  it("does not call a batch finished while a draft is pending", async () => {
+    const { fetchMock } = stubFetch(makeBatch(), [
+      makeDraft({ id: "d1", status: "approved" }),
+      makeDraft({ id: "d2" }),
+    ]);
+    vi.stubGlobal("fetch", fetchMock);
+    renderReview();
+
+    expect(
+      await screen.findByRole("link", { name: "Back to your career" }),
+    ).toHaveAttribute("href", "/career");
+    expect(
+      screen.queryByRole("link", { name: "See what was added" }),
+    ).not.toBeInTheDocument();
+  });
 });

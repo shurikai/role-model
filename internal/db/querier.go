@@ -16,6 +16,9 @@ type Querier interface {
 	AssignTagToProject(ctx context.Context, arg AssignTagToProjectParams) error
 	CountContributionDraftsByBatch(ctx context.Context, arg CountContributionDraftsByBatchParams) (CountContributionDraftsByBatchRow, error)
 	CountContributionsByPosition(ctx context.Context, arg CountContributionsByPositionParams) (int64, error)
+	// Contributions with no position (project-only) belong to no position and are
+	// not counted here.
+	CountContributionsByPositionForUser(ctx context.Context, userID uuid.UUID) ([]CountContributionsByPositionForUserRow, error)
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
 	CountTagUsage(ctx context.Context, tagID uuid.UUID) (int32, error)
 	CountTagsInCategory(ctx context.Context, arg CountTagsInCategoryParams) (int64, error)
@@ -120,7 +123,15 @@ type Querier interface {
 	// three levels that the database accepted and extraction could never emit.
 	ListCareerLevelsByUser(ctx context.Context, userID uuid.UUID) ([]CareerLevel, error)
 	ListContributionDraftsByBatch(ctx context.Context, arg ListContributionDraftsByBatchParams) ([]ContributionDraft, error)
+	// Every tag on every contribution of one position, so the position page is
+	// one request for contributions and their tags rather than one per card.
+	ListContributionTagsByPosition(ctx context.Context, arg ListContributionTagsByPositionParams) ([]ListContributionTagsByPositionRow, error)
 	ListContributionsBySkill(ctx context.Context, skillID uuid.UUID) ([]uuid.UUID, error)
+	// The career view's employer order: resume order, not alphabetical. An
+	// employer with a current position (ended_on IS NULL) comes first, then by
+	// the latest end date, then the latest start. An employer with no positions
+	// has nothing to date it by and sorts last.
+	ListEmployersByRecency(ctx context.Context, userID uuid.UUID) ([]Employer, error)
 	// Every draft in the batch, pending and resolved alike.
 	//
 	// The resolver needs the resolved ones: a dependent draft finds its parent's
@@ -138,6 +149,7 @@ type Querier interface {
 	// drafts. raw_text is deliberately not selected; a list has no use for it.
 	ListImportBatchSummaries(ctx context.Context, userID uuid.UUID) ([]ListImportBatchSummariesRow, error)
 	ListImportBatches(ctx context.Context, userID uuid.UUID) ([]ImportBatch, error)
+	ListPositionsByUser(ctx context.Context, userID uuid.UUID) ([]Position, error)
 	ListPreferencesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
 	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)
 	// The user's depth scale, weakest first. Read by the fit gate to compare a

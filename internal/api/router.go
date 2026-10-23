@@ -83,6 +83,9 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Patch("/employers/{id}", employerHandler.Update)
 			r.Delete("/employers/{id}", employerHandler.Delete)
 
+			careerHandler := handlers.NewCareerHandler(deps.Queries)
+			r.Get("/career", careerHandler.Get)
+
 			positionHandler := handlers.NewPositionHandler(deps.Queries)
 			r.Get("/employers/{employerID}/positions", positionHandler.ListByEmployer)
 			r.Get("/positions/{id}", positionHandler.Get)
