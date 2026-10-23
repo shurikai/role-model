@@ -1,8 +1,21 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ContributionForm,
+  PositionForm,
+  textButton,
+} from "../components/CareerForms";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Page } from "../components/Page";
-import { useCareerTree, usePositionContributions } from "../hooks/useCareer";
+import {
+  useCareerTree,
+  useDeleteContribution,
+  useDeletePosition,
+  usePositionContributions,
+  useUpdateContribution,
+} from "../hooks/useCareer";
+import { contributionUpdate } from "../lib/career-edit";
 import { formatApiError } from "../lib/api-client";
 import { formatSpan } from "../lib/dates";
 import type { Contribution } from "../lib/types";
@@ -15,11 +28,21 @@ import type { Contribution } from "../lib/types";
  * Hidden contributions are kept but never reach a generated resume. They are
  * folded away under their own heading, not dropped, so the page still shows
  * everything that was written.
+ *
+ * Hiding is the primary way to take a contribution off resumes: one click,
+ * no confirm, reversible. Delete is permanent and sits behind ConfirmDialog.
+ * That ordering is deliberate — what an interview or an import wrote wrong is
+ * usually wrong-ish, not junk.
  */
 export function CareerPosition() {
   const { positionID } = useParams<{ positionID: string }>();
   const tree = useCareerTree();
   const contributions = usePositionContributions(positionID);
+  const navigate = useNavigate();
+  const deletePosition = useDeletePosition();
+  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const employer = tree.data?.employers.find((e) =>
     e.positions.some((p) => p.id === positionID),
@@ -58,6 +81,10 @@ export function CareerPosition() {
   const all = contributions.data ?? [];
   const active = all.filter((c) => c.is_active);
   const hidden = all.filter((c) => !c.is_active);
+  // A position with contributions, hidden ones included, cannot be deleted
+  // (the server 409s), so the control is not offered.
+  const { active: nActive, hidden: nHidden } = position.contribution_counts;
+  const deletable = nActive + nHidden === 0 && all.length === 0;
 
   return (
     <Page
@@ -65,6 +92,28 @@ export function CareerPosition() {
         <Breadcrumb employer={employer.name} position={position.title} />
       }
       title={position.title}
+      actions={
+        !editing && (
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className={textButton}
+            >
+              Edit position
+            </button>
+            {deletable && (
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                className="font-body text-[13px] text-reject hover:underline"
+              >
+                Delete position
+              </button>
+            )}
+          </div>
+        )
+      }
       lede={
         <>
           {employer.name} · {formatSpan(position.started_on, position.ended_on)}
@@ -72,11 +121,26 @@ export function CareerPosition() {
         </>
       }
     >
-      <PositionDetails
-        industryRole={position.industry_role}
-        industryLevel={position.industry_level}
-        context={position.context_narrative}
-      />
+      {editing ? (
+        <div className="mb-8">
+          <PositionForm
+            position={position}
+            employerID={employer.id}
+            onDone={() => setEditing(false)}
+          />
+        </div>
+      ) : (
+        <PositionDetails
+          industryRole={position.industry_role}
+          industryLevel={position.industry_level}
+          context={position.context_narrative}
+        />
+      )}
+      {deletePosition.error && (
+        <p role="alert" className="mb-4 font-body text-sm text-reject">
+          {formatApiError(deletePosition.error)}
+        </p>
+      )}
 
       <h2 className="mb-2 font-display text-lg font-bold text-ink">
         What you did here
@@ -91,10 +155,11 @@ export function CareerPosition() {
       )}
       {contributions.data && all.length === 0 && (
         <p className="border border-dashed border-rail bg-card p-4 font-body text-[13px] text-ink-dim">
-          Nothing recorded for this role yet.{" "}
+          Nothing recorded for this role yet. Add one below, or{" "}
           <Link to="/career/add" className="text-ink underline">
-            Add to your career
+            import several at once
           </Link>
+          .
         </p>
       )}
       {contributions.data && all.length > 0 && active.length === 0 && (
@@ -105,12 +170,49 @@ export function CareerPosition() {
       <ul className="flex flex-col gap-3">
         {active.map((c) => (
           <li key={c.id}>
-            <ContributionCard contribution={c} />
+            <ContributionCard contribution={c} positionID={position.id} />
           </li>
         ))}
       </ul>
 
-      {hidden.length > 0 && <HiddenContributions contributions={hidden} />}
+      {contributions.data &&
+        (adding ? (
+          <div className="mt-3">
+            <ContributionForm
+              positionID={position.id}
+              onDone={() => setAdding(false)}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className={`mt-3 ${textButton}`}
+          >
+            + Add contribution
+          </button>
+        ))}
+
+      {hidden.length > 0 && (
+        <HiddenContributions contributions={hidden} positionID={position.id} />
+      )}
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`Delete ${position.title}?`}
+        confirmLabel="Delete position"
+        pending={deletePosition.isPending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() =>
+          deletePosition.mutate(position, {
+            onSuccess: () => navigate("/career"),
+            onSettled: () => setConfirmingDelete(false),
+          })
+        }
+      >
+        This removes the role from your career. Nothing is recorded under it, so
+        nothing else goes with it.
+      </ConfirmDialog>
     </Page>
   );
 }
@@ -172,14 +274,36 @@ function PositionDetails({
   );
 }
 
-function ContributionCard({ contribution }: { contribution: Contribution }) {
+function ContributionCard({
+  contribution,
+  positionID,
+}: {
+  contribution: Contribution;
+  positionID: string;
+}) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const update = useUpdateContribution(positionID);
+  const del = useDeleteContribution(positionID);
+
+  if (editing) {
+    return (
+      <ContributionForm
+        contribution={contribution}
+        positionID={positionID}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
+
   const details: [string, string | null][] = [
     ["Full description", contribution.full_description],
     ["Outcomes", contribution.outcomes],
     ["Scale", contribution.scale_context],
   ];
   const present = details.filter(([, v]) => v && v.trim() !== "");
+  const error = update.error ?? del.error;
 
   return (
     <article className="border border-border bg-card p-4">
@@ -197,38 +321,91 @@ function ContributionCard({ contribution }: { contribution: Contribution }) {
           ))}
         </ul>
       )}
-      {present.length > 0 && (
-        <>
+      {open && present.length > 0 && (
+        <dl className="mt-3 flex flex-col gap-2 border-t border-dashed border-rail pt-3 font-body text-[13px]">
+          {present.map(([label, value]) => (
+            <div key={label}>
+              <dt className="font-mono text-[11px] tracking-widest text-ink-dim uppercase">
+                {label}
+              </dt>
+              <dd className="whitespace-pre-line text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 font-body text-sm text-reject">
+          {formatApiError(error)}
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+        {present.length > 0 && (
           <button
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((o) => !o)}
-            className="mt-3 font-body text-[13px] text-verify hover:underline"
+            className={textButton}
           >
             {open ? "Less" : "More detail"}
           </button>
-          {open && (
-            <dl className="mt-2 flex flex-col gap-2 border-t border-dashed border-rail pt-3 font-body text-[13px]">
-              {present.map(([label, value]) => (
-                <div key={label}>
-                  <dt className="font-mono text-[11px] tracking-widest text-ink-dim uppercase">
-                    {label}
-                  </dt>
-                  <dd className="whitespace-pre-line text-ink">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </>
-      )}
+        )}
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className={textButton}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          disabled={update.isPending}
+          onClick={() =>
+            update.mutate({
+              id: contribution.id,
+              ...contributionUpdate(contribution, {
+                is_active: !contribution.is_active,
+              }),
+            })
+          }
+          className={textButton}
+        >
+          {contribution.is_active ? "Hide from resumes" : "Show on resumes"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          className="font-body text-[13px] text-reject hover:underline"
+        >
+          Delete
+        </button>
+      </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        title="Delete this contribution?"
+        confirmLabel="Delete permanently"
+        pending={del.isPending}
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() =>
+          del.mutate(contribution.id, {
+            onSettled: () => setConfirmingDelete(false),
+          })
+        }
+      >
+        This cannot be undone: the contribution, its tags and any feedback on it
+        are removed for good. To keep it off resumes but keep the record, hide
+        it instead.
+      </ConfirmDialog>
     </article>
   );
 }
 
 function HiddenContributions({
   contributions,
+  positionID,
 }: {
   contributions: Contribution[];
+  positionID: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -250,7 +427,7 @@ function HiddenContributions({
         <ul className="mt-3 flex flex-col gap-3 opacity-75">
           {contributions.map((c) => (
             <li key={c.id}>
-              <ContributionCard contribution={c} />
+              <ContributionCard contribution={c} positionID={positionID} />
             </li>
           ))}
         </ul>
