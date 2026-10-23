@@ -4,6 +4,7 @@ import {
   useSendOnboardingTurn,
   useStartOnboarding,
 } from "../hooks/useOnboarding";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 
 interface Turn {
@@ -136,86 +137,78 @@ export function Onboarding() {
   }
 
   return (
-    <div>
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-          Career interview
-        </p>
-        <h1 className="mb-1 font-display text-2xl font-bold text-ink">
-          Tell me about your work
-        </h1>
-        <p className="mb-6 font-body text-[13px] text-ink-dim">
-          Answer one question at a time. Nothing is written to your record until
-          you confirm it here in the conversation.
-        </p>
-
-        <div className="mb-4 flex flex-col gap-3">
-          {transcript.map((turn, i) => (
-            <div
-              key={i}
-              className={`max-w-[85%] border p-3 font-body text-sm ${
-                turn.role === "agent"
-                  ? "self-start border-border bg-card text-ink"
-                  : "self-end border-verify bg-surface text-ink"
-              }`}
-            >
-              {turn.text}
-            </div>
-          ))}
-        </div>
-
-        {start.isPending && (
-          <p className="mb-3 font-body text-sm text-ink-dim">
-            Starting the interview…
-          </p>
-        )}
-        {start.isError && (
-          <p className="mb-3 font-body text-sm text-reject">
-            {formatApiError(start.error)}
-          </p>
-        )}
-        {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
-
-        {done ? (
-          <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
-            That's everything for now.{" "}
-            <Link to="/applications" className="text-ink underline">
-              Back to applications
-            </Link>
-          </p>
-        ) : (
-          <form onSubmit={submit} className="flex gap-2">
-            <label htmlFor="onboarding-answer" className="sr-only">
-              Your answer
-            </label>
-            <input
-              id="onboarding-answer"
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={sendTurn.isPending || !sessionId}
-              className="flex-1 border border-border bg-surface p-3 font-body text-sm text-ink disabled:opacity-70"
-              placeholder="Type your answer…"
-            />
-            <button
-              type="submit"
-              disabled={sendTurn.isPending || !sessionId || !input.trim()}
-              className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
-            >
-              {sendTurn.isPending ? "Sending…" : "Send"}
-            </button>
-          </form>
-        )}
-
-        <div className="mt-8 border-t border-dashed border-rail pt-5">
-          <Link
-            to="/applications"
-            className="font-body text-sm text-ink-dim underline"
+    <Page
+      width="narrow"
+      eyebrow="Career interview"
+      title="Tell me about your work"
+      lede="Answer one question at a time. Nothing is written to your record until you confirm it here in the conversation."
+    >
+      <div className="mb-4 flex flex-col gap-3">
+        {transcript.map((turn, i) => (
+          <div
+            key={i}
+            className={`max-w-[85%] border p-3 font-body text-sm ${
+              turn.role === "agent"
+                ? "self-start border-border bg-card text-ink"
+                : "self-end border-verify bg-surface text-ink"
+            }`}
           >
+            {turn.text}
+          </div>
+        ))}
+      </div>
+
+      {start.isPending && (
+        <p className="mb-3 font-body text-sm text-ink-dim">
+          Starting the interview…
+        </p>
+      )}
+      {start.isError && (
+        <p className="mb-3 font-body text-sm text-reject">
+          {formatApiError(start.error)}
+        </p>
+      )}
+      {error && <p className="mb-3 font-body text-sm text-reject">{error}</p>}
+
+      {done ? (
+        <p className="border border-border bg-card p-4 font-body text-sm text-ink-dim">
+          That's everything for now.{" "}
+          <Link to="/applications" className="text-ink underline">
             Back to applications
           </Link>
-        </div>
+        </p>
+      ) : (
+        <form onSubmit={submit} className="flex gap-2">
+          <label htmlFor="onboarding-answer" className="sr-only">
+            Your answer
+          </label>
+          <input
+            id="onboarding-answer"
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={sendTurn.isPending || !sessionId}
+            className="flex-1 border border-border bg-surface p-3 font-body text-sm text-ink disabled:opacity-70"
+            placeholder="Type your answer…"
+          />
+          <button
+            type="submit"
+            disabled={sendTurn.isPending || !sessionId || !input.trim()}
+            className="bg-ink px-5 py-2.5 font-display text-sm font-bold text-surface disabled:opacity-50"
+          >
+            {sendTurn.isPending ? "Sending…" : "Send"}
+          </button>
+        </form>
+      )}
+
+      <div className="mt-8 border-t border-dashed border-rail pt-5">
+        <Link
+          to="/applications"
+          className="font-body text-sm text-ink-dim underline"
+        >
+          Back to applications
+        </Link>
       </div>
-    </div>
+    </Page>
   );
 }

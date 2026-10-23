@@ -105,6 +105,29 @@ func (h *ImportHandler) Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// List returns the user's import batches, newest first, across both import
+// paths. kind says which review screen a batch belongs to; pending_count is
+// how many of its drafts still await a decision. Without this an abandoned
+// review was reachable only by its URL.
+func (h *ImportHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httputil.UserIDFromContext(r.Context())
+	if !ok {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "missing user context")
+		return
+	}
+
+	batches, err := h.queries.ListImportBatchSummaries(r.Context(), userID)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "internal_error", "failed to list import batches")
+		return
+	}
+	if batches == nil {
+		batches = []db.ListImportBatchSummariesRow{}
+	}
+
+	httputil.WriteJSON(w, http.StatusOK, batches)
+}
+
 // GetBatch returns the batch row plus draft status counts.
 func (h *ImportHandler) GetBatch(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httputil.UserIDFromContext(r.Context())

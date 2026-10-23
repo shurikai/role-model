@@ -9,6 +9,7 @@ import {
   useGenerateResume,
   useRenderResumeVersion,
 } from "../hooks/useApplications";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 import { preferenceLabel } from "../lib/types";
 import type {
@@ -214,16 +215,18 @@ export function ApplicationDetail() {
 
   if (isLoading) {
     return (
-      <p className="mx-auto max-w-3xl px-6 py-10 font-body text-sm text-ink-dim">
-        Loading…
-      </p>
+      <Page>
+        <p className="font-body text-sm text-ink-dim">Loading…</p>
+      </Page>
     );
   }
   if (error || !application) {
     return (
-      <p className="mx-auto max-w-3xl px-6 py-10 font-body text-sm text-reject">
-        {error ? formatApiError(error) : "Application not found."}
-      </p>
+      <Page>
+        <p className="font-body text-sm text-reject">
+          {error ? formatApiError(error) : "Application not found."}
+        </p>
+      </Page>
     );
   }
 
@@ -237,22 +240,20 @@ export function ApplicationDetail() {
     .replace(/[^a-z0-9]+/g, "-");
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
-      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-        {/* The breadcrumb is the back affordance. The shell's nav reaches the
-            same place, but a detail page should not make you go looking. */}
-        <Link to="/applications" className="underline">
-          Applications
-        </Link>{" "}
-        · {application.company_name}
-      </p>
-      <h1 className="mb-1 font-display text-2xl font-bold text-ink">
-        {application.role_title}
-      </h1>
-      <p className="mb-6 font-body text-[13px] text-ink-dim">
-        Status: {application.status}
-      </p>
-
+    <Page
+      eyebrow={
+        // The breadcrumb is the back affordance. The shell's nav reaches the
+        // same place, but a detail page should not make you go looking.
+        <>
+          <Link to="/applications" className="underline">
+            Applications
+          </Link>{" "}
+          · {application.company_name}
+        </>
+      }
+      title={application.role_title}
+      lede={`Status: ${application.status}`}
+    >
       <section className="mb-6">
         <h2 className="mb-2 font-display text-lg font-bold text-ink">
           Job description signals
@@ -469,6 +470,6 @@ export function ApplicationDetail() {
           )}
         </div>
       </section>
-    </div>
+    </Page>
   );
 }

@@ -4,6 +4,7 @@ import {
   useCreateApplication,
   useExtractSignals,
 } from "../hooks/useApplications";
+import { Page } from "../components/Page";
 import { formatApiError } from "../lib/api-client";
 import { Field, QuietLink, SubmitButton } from "../components/AuthCard";
 
@@ -44,20 +45,12 @@ export function ApplicationNew() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-10">
-      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-        Applications · New
-      </p>
-      <h1 className="mb-1 font-display text-2xl font-bold text-ink">
-        Paste a job description
-      </h1>
-      <p className="mb-6 font-body text-[13px] text-ink-dim">
-        This reads the posting for what it asks for — requirements, the
-        capabilities behind them, seniority, and how the role describes itself —
-        and stores those signals against the application. Nothing is compared
-        against your career until you run the fit gate.
-      </p>
-
+    <Page
+      width="narrow"
+      eyebrow="Applications · New"
+      title="Paste a job description"
+      lede="This reads the posting for what it asks for — requirements, the capabilities behind them, seniority, and how the role describes itself — and stores those signals against the application. Nothing is compared against your career until you run the fit gate."
+    >
       <form onSubmit={handleSubmit}>
         <Field
           id="companyName"
@@ -121,6 +114,6 @@ export function ApplicationNew() {
           </p>
         )}
       </form>
-    </div>
+    </Page>
   );
 }

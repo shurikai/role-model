@@ -6,7 +6,19 @@ import type {
   CreateImportBatchResponse,
   DraftEditableField,
   ImportBatch,
+  ImportBatchSummary,
 } from "../lib/types";
+
+/**
+ * Every import batch the user has, newest first. Keyed under ["import"] so the
+ * create mutation's invalidation refreshes it.
+ */
+export function useImportBatches() {
+  return useQuery({
+    queryKey: ["import", "batches"],
+    queryFn: () => apiFetch<ImportBatchSummary[]>("/import"),
+  });
+}
 
 export function useCreateImportBatch() {
   const queryClient = useQueryClient();

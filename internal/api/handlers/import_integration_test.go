@@ -286,3 +286,122 @@ func TestApproveDraftNoTagIDs(t *testing.T) {
 		t.Fatalf("draft status = %q, want approved", s)
 	}
 }
+
+// TestListImportBatches covers GET /import: kind derived from which draft
+// table a batch staged into, pending_count across both tables, newest first,
+// and no other user's batches.
+func TestListImportBatches(t *testing.T) {
+	f := newImportFixture(t)
+
+	// The fixture's batch is a narrow one: two pending drafts, one decided.
+	f.pendingDraft()
+	f.pendingDraft()
+	decided := f.pendingDraft()
+	if _, err := f.q.UpdateContributionDraftStatus(f.ctx, db.UpdateContributionDraftStatusParams{
+		ID: decided.ID, UserID: f.userID, Status: "approved",
+	}); err != nil {
+		t.Fatalf("approve draft: %v", err)
+	}
+
+	// A batch that failed before staging anything.
+	failed, err := f.q.CreateImportBatch(f.ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: f.userID, RawText: "x", Status: "failed",
+	})
+	if err != nil {
+		t.Fatalf("create failed batch: %v", err)
+	}
+
+	// A career batch, created last: one pending entity draft, one rejected.
+	career, err := f.q.CreateImportBatch(f.ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: f.userID, RawText: "x", Status: "review",
+	})
+	if err != nil {
+		t.Fatalf("create career batch: %v", err)
+	}
+	payload := json.RawMessage(`{"name":"Acme"}`)
+	for _, status := range []string{"pending", "rejected"} {
+		if _, err := f.q.CreateEntityDraft(f.ctx, db.CreateEntityDraftParams{
+			ID: uuid.New(), UserID: f.userID, BatchID: career.ID, Kind: "employer",
+			Payload: &payload, DependsOn: []uuid.UUID{}, Status: status,
+		}); err != nil {
+			t.Fatalf("create entity draft: %v", err)
+		}
+	}
+
+	// Another user's batch must not appear.
+	otherID := uuid.New()
+	if _, err := f.q.CreateUser(f.ctx, db.CreateUserParams{
+		ID: otherID, Email: "import-other-" + otherID.String() + "@test.local",
+	}); err != nil {
+		t.Fatalf("create other user: %v", err)
+	}
+	if _, err := f.q.CreateImportBatch(f.ctx, db.CreateImportBatchParams{
+		ID: uuid.New(), UserID: otherID, RawText: "x", Status: "review",
+	}); err != nil {
+		t.Fatalf("create other batch: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/import", nil)
+	req = req.WithContext(httputil.WithUserID(req.Context(), f.userID))
+	rec := httptest.NewRecorder()
+	f.handler.List(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rec.Code, rec.Body)
+	}
+
+	var got []struct {
+		ID           uuid.UUID `json:"id"`
+		Status       string    `json:"status"`
+		Kind         string    `json:"kind"`
+		PendingCount int       `json:"pending_count"`
+		RawText      *string   `json:"raw_text"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body)
+	}
+
+	type want struct {
+		id      uuid.UUID
+		kind    string
+		pending int
+	}
+	wants := []want{
+		{career.ID, "career", 1},
+		{failed.ID, "contributions", 0},
+		{f.batchID, "contributions", 2},
+	}
+	if len(got) != len(wants) {
+		t.Fatalf("want %d batches, got %d: %s", len(wants), len(got), rec.Body)
+	}
+	for i, w := range wants {
+		g := got[i]
+		if g.ID != w.id || g.Kind != w.kind || g.PendingCount != w.pending {
+			t.Errorf("batch %d = {%v %s %d}, want {%v %s %d}",
+				i, g.ID, g.Kind, g.PendingCount, w.id, w.kind, w.pending)
+		}
+		if g.RawText != nil {
+			t.Errorf("batch %d carries raw_text; a list should not", i)
+		}
+	}
+}
+
+func TestListImportBatchesEmpty(t *testing.T) {
+	f := newImportFixture(t)
+	otherID := uuid.New()
+	if _, err := f.q.CreateUser(f.ctx, db.CreateUserParams{
+		ID: otherID, Email: "import-empty-" + otherID.String() + "@test.local",
+	}); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/import", nil)
+	req = req.WithContext(httputil.WithUserID(req.Context(), otherID))
+	rec := httptest.NewRecorder()
+	f.handler.List(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rec.Code, rec.Body)
+	}
+	if body := bytes.TrimSpace(rec.Body.Bytes()); string(body) != "[]" {
+		t.Fatalf("want [], got %s", body)
+	}
+}

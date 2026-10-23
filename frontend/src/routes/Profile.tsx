@@ -1,3 +1,4 @@
+import { Page } from "../components/Page";
 import { ProfileSkills } from "../components/ProfileSkills";
 import { ProfilePreferences } from "../components/ProfilePreferences";
 
@@ -15,22 +16,13 @@ import { ProfilePreferences } from "../components/ProfilePreferences";
  */
 export function Profile() {
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
-      <p className="mb-2 font-mono text-[11px] tracking-widest text-verify uppercase">
-        Profile
-      </p>
-      <h1 className="mb-1 font-display text-2xl font-bold text-ink">
-        What you can do, and what you want
-      </h1>
-      <p className="mb-8 font-body text-[13px] text-ink-dim">
-        Every fit report is built from these two lists. Skills answer whether a
-        posting's requirements are covered; preferences answer whether the job
-        is one you would take. Neither is inferred from your career history —
-        they are claims you make, and only you can make them.
-      </p>
-
+    <Page
+      eyebrow="Skills & preferences"
+      title="What you can do, and what you want"
+      lede="Every fit report is built from these two lists. Skills answer whether a posting's requirements are covered; preferences answer whether the job is one you would take. Neither is inferred from your career history — they are claims you make, and only you can make them."
+    >
       <ProfileSkills />
       <ProfilePreferences />
-    </div>
+    </Page>
   );
 }

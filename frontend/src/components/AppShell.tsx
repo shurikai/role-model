@@ -1,4 +1,4 @@
-import { NavLink, Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 /**
@@ -22,30 +22,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
           <Link
-            to="/applications"
+            to="/career"
             className="font-display text-sm font-bold tracking-tight text-ink"
           >
             Role Model
           </Link>
 
           <nav className="flex items-center gap-4">
-            <ShellLink to="/applications">Applications</ShellLink>
-            <ShellLink to="/profile">Profile</ShellLink>
-            <ShellLink to="/import/career/new">Career import</ShellLink>
+            <ShellLink to="/career" sections={CAREER_SECTIONS}>
+              Career
+            </ShellLink>
+            <ShellLink to="/applications" sections={["/applications"]}>
+              Applications
+            </ShellLink>
             {/*
-              The narrow path: contributions against employers and positions
-              that already exist. Named for what it does rather than for which
-              of the two import routes it happens to be, since "import" alone
-              cannot distinguish them.
+              "Profile" read as name and contact details to someone who does
+              not know the data model. Label only: the route stays /profile.
             */}
-            <ShellLink to="/import/new">Add contributions</ShellLink>
-            {/*
-              #117: the other on-ramp, for someone with no document to paste
-              at all. Both write the same tables, through the same REST
-              endpoints — this one just gets there by conversation.
-            */}
-            <ShellLink to="/onboarding/new">Career interview</ShellLink>
+            <ShellLink to="/profile" sections={["/profile"]}>
+              Skills &amp; preferences
+            </ShellLink>
           </nav>
+          {/*
+            The three on-ramps (career import, add contributions, career
+            interview) used to be three of five top-level links, all doing one
+            job by different means. They live behind this one action now, on a
+            hub that explains which to pick.
+          */}
+          <Link
+            to="/career/add"
+            className="bg-ink px-3 py-1.5 font-display text-xs font-bold text-surface"
+          >
+            + Add to career
+          </Link>
 
           <div className="ml-auto flex items-center gap-3">
             {user && (
@@ -70,30 +79,41 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * `end` on every link because the paths nest: /applications would otherwise
- * stay marked active while /applications/new is open, and /import/new sits
- * under the same prefix as /import/career/new.
+ * The on-ramps are reached from /career/add and write to the career, so the
+ * Career tab stays current while one is open.
+ */
+const CAREER_SECTIONS = ["/career", "/import", "/onboarding"];
+
+/**
+ * Current-ness is by section prefix, not exact path. The links used to carry
+ * `end`, which was right while every nav target was a leaf; Career has nested
+ * routes (/career/positions/:id) that must keep it marked. Matching on a path
+ * segment boundary keeps /applications-archive, say, out of /applications.
  */
 function ShellLink({
   to,
+  sections,
   children,
 }: {
   to: string;
+  sections: string[];
   children: React.ReactNode;
 }) {
+  const { pathname } = useLocation();
+  const current = sections.some(
+    (s) => pathname === s || pathname.startsWith(s + "/"),
+  );
   return (
-    <NavLink
+    <Link
       to={to}
-      end
-      className={({ isActive }) =>
-        `font-body text-[13px] ${
-          isActive
-            ? "border-b-2 border-verify pb-0.5 text-ink"
-            : "border-b-2 border-transparent pb-0.5 text-ink-dim"
-        }`
-      }
+      aria-current={current ? "page" : undefined}
+      className={`font-body text-[13px] ${
+        current
+          ? "border-b-2 border-verify pb-0.5 text-ink"
+          : "border-b-2 border-transparent pb-0.5 text-ink-dim"
+      }`}
     >
       {children}
-    </NavLink>
+    </Link>
   );
 }

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,6 +24,12 @@ function renderAt(path: string) {
           <Routes>
             <Route path="/login" element={<p>Login page</p>} />
             <Route element={<RequireAuth />}>
+              <Route path="/career" element={<p>Career page</p>} />
+              <Route path="/career/add" element={<p>Add page</p>} />
+              <Route
+                path="/career/positions/:id"
+                element={<p>Position page</p>}
+              />
               <Route path="/applications" element={<p>Applications page</p>} />
               <Route path="/applications/new" element={<p>New page</p>} />
               <Route path="/import/new" element={<p>Narrow import</p>} />
@@ -73,33 +85,73 @@ describe("AppShell", () => {
     expect(getSession()).toBeNull();
   });
 
-  // The narrow import path had no link from anywhere and was reachable only
-  // by typing its URL.
-  it("links to both import paths and to the applications list", async () => {
+  // Three areas plus one action. The on-ramps used to be three of five
+  // top-level links; they are reached through /career/add now.
+  it("links to the three areas and the add hub, and no on-ramp", async () => {
     renderAt("/applications");
     await screen.findByText("Applications page");
 
-    const hrefs = screen
+    const nav = screen.getByRole("navigation");
+    const navHrefs = within(nav)
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
-    for (const href of [
-      "/applications",
+    expect(navHrefs).toEqual(["/career", "/applications", "/profile"]);
+    expect(
+      screen.getByRole("link", { name: "Skills & preferences" }),
+    ).toHaveAttribute("href", "/profile");
+    expect(
+      screen.getByRole("link", { name: "+ Add to career" }),
+    ).toHaveAttribute("href", "/career/add");
+
+    const allHrefs = screen
+      .getAllByRole("link")
+      .map((a) => a.getAttribute("href"));
+    for (const onRamp of [
       "/import/career/new",
       "/import/new",
       "/onboarding/new",
     ]) {
-      expect(hrefs).toContain(href);
+      expect(allHrefs).not.toContain(onRamp);
     }
   });
 
-  // `end` on every NavLink: the routes nest, so /applications would otherwise
-  // stay marked current while /applications/new is open.
-  it("marks only the open route as current", async () => {
+  // The links used to carry `end`, which would drop Career's current state
+  // on any nested career route.
+  it("keeps Career current on a nested career route", async () => {
+    renderAt("/career/positions/p1");
+    await screen.findByText("Position page");
+
+    expect(screen.getByRole("link", { name: "Career" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: "Applications" }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  // The on-ramps write to the career, so opening one keeps Career current.
+  it("keeps Career current inside an on-ramp", async () => {
+    renderAt("/import/new");
+    await screen.findByText("Narrow import");
+
+    expect(screen.getByRole("link", { name: "Career" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("keeps Applications current on a nested applications route", async () => {
     renderAt("/applications/new");
     await screen.findByText("New page");
 
-    const applications = screen.getByRole("link", { name: "Applications" });
-    expect(applications.className).toContain("border-transparent");
+    expect(screen.getByRole("link", { name: "Applications" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: "Career" })).not.toHaveAttribute(
+      "aria-current",
+    );
   });
 
   it("does not render for an unauthenticated visitor", async () => {

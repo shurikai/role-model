@@ -130,6 +130,13 @@ type Querier interface {
 	ListFitReports(ctx context.Context, userID uuid.UUID) ([]FitReport, error)
 	ListFitReportsByApplication(ctx context.Context, arg ListFitReportsByApplicationParams) ([]FitReport, error)
 	ListHardGatesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
+	// The hub's list of imports. kind is derived, not stored: the narrow path
+	// writes only contribution_drafts and the career path only entity_drafts, so
+	// a batch with any entity draft is a career batch. That holds only once drafts
+	// exist -- a career batch that failed before staging anything reads as
+	// 'contributions' -- which is why the hub lists only batches with pending
+	// drafts. raw_text is deliberately not selected; a list has no use for it.
+	ListImportBatchSummaries(ctx context.Context, userID uuid.UUID) ([]ListImportBatchSummariesRow, error)
 	ListImportBatches(ctx context.Context, userID uuid.UUID) ([]ImportBatch, error)
 	ListPreferencesByUser(ctx context.Context, userID uuid.UUID) ([]Preference, error)
 	ListPreferencesByUserAndType(ctx context.Context, arg ListPreferencesByUserAndTypeParams) ([]Preference, error)
