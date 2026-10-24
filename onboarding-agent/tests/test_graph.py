@@ -486,3 +486,143 @@ async def test_start_and_end_notes_both_reach_the_narrative(fake_api):
         'Start date read from: "started around 2016-04"',
         'End date read from: "left in 2019-08 for Globex"',
     ]
+
+
+_PARAGRAPH = (
+    "I've worked at three places. I started at St. Brigid Regional Hospital, "
+    "then moved to Coastal Vascular Associates."
+)
+
+
+async def test_a_paragraph_for_the_employer_is_asked_again_for_just_the_name(
+    fake_api,
+):
+    """#164: the whole paragraph used to become one employer's name."""
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    result = await _drive(graph, config, _PARAGRAPH)
+    assert "just the company name" in _interrupt_text(result).lower()
+    assert fake_api.employers == []
+
+    result = await graph.ainvoke(Command(resume="St. Brigid Regional Hospital"), config)
+    assert "title" in _interrupt_text(result).lower()
+    assert [e["name"] for e in fake_api.employers] == ["St. Brigid Regional Hospital"]
+    assert fake_api.employers[0]["notes"] is None
+
+
+async def test_two_sentences_for_the_employer_fall_back_to_a_placeholder(fake_api):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[]), _TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(
+        graph,
+        config,
+        _PARAGRAPH,
+        "I already told you, all three of them.",
+        "Staff Nurse",
+        "2011-06",
+        "2015-01",
+        "Built the handoff sheet",
+        "done",
+        # A second unnamed employer: must be its own row, not merged into the
+        # first placeholder by name.
+        "I also did some agency work but I don't remember the name.",
+        "Honestly I don't remember the agency's name.",
+        "Agency Nurse",
+        "2016",
+        "2017",
+        "Covered night shifts",
+        "done",
+        "done",
+    )
+
+    assert [e["name"] for e in fake_api.employers] == [
+        "Employer (name not given)",
+        "Employer (name not given)",
+    ]
+    assert "all three of them" in fake_api.employers[0]["notes"]
+    assert "agency's name" in fake_api.employers[1]["notes"]
+    assert [p["employer_id"] for p in fake_api.positions] == [
+        fake_api.employers[0]["id"],
+        fake_api.employers[1]["id"],
+    ]
+
+
+async def test_a_sentence_for_the_title_is_asked_again_naming_the_employer(
+    fake_api,
+):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    result = await _drive(
+        graph, config, "Acme Corp", "I'm not sure which one you're asking about?"
+    )
+    question = _interrupt_text(result)
+    assert "just the job title you held at acme corp" in question.lower()
+
+    await graph.ainvoke(Command(resume="Staff Nurse"), config)
+    await graph.ainvoke(Command(resume="2020-01"), config)
+    await graph.ainvoke(Command(resume="still there"), config)
+    await graph.ainvoke(Command(resume="Did some work"), config)
+    assert fake_api.positions[0]["title"] == "Staff Nurse"
+    assert fake_api.positions[0]["context_narrative"] is None
+
+
+async def test_two_sentences_for_the_title_fall_back_and_keep_the_words(fake_api):
+    fake_api.employers.append({"id": "e1", "name": "Acme Corp"})
+    fake_api.positions.append(
+        {
+            "id": "p1",
+            "employer_id": "e1",
+            "title": "Position (title not given)",
+            "started_on": "2010-01-01",
+        }
+    )
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "I had a few different titles there over the years.",
+        "It changed a lot, I was doing a bit of everything.",
+        "2020-01",
+        "still there",
+        "Did some work",
+    )
+
+    # A new row, not merged into the existing placeholder of the same name.
+    assert len(fake_api.positions) == 2
+    created = fake_api.positions[1]
+    assert created["title"] == "Position (title not given)"
+    assert created["context_narrative"] == (
+        'Title as stated: "It changed a lot, I was doing a bit of everything."'
+    )
+
+
+async def test_a_sentence_for_another_job_is_asked_again_for_the_name(fake_api):
+    graph = _graph()
+    tag_model = FakeTagModel([_TagExtraction(tags=[]), _TagExtraction(tags=[])])
+    config = _config(str(uuid.uuid4()), fake_api, tag_model)
+
+    result = await _drive(
+        graph,
+        config,
+        "Acme Corp",
+        "Engineer",
+        "2020-01",
+        "2021-12",
+        "Did some work",
+        "done",
+        "Yes, after that I moved to a company called Widgets in 2022.",
+    )
+    assert "just the company name" in _interrupt_text(result).lower()
+
+    await graph.ainvoke(Command(resume="Widgets Inc"), config)
+    assert [e["name"] for e in fake_api.employers] == ["Acme Corp", "Widgets Inc"]

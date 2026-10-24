@@ -75,13 +75,115 @@ def _configurable(config: RunnableConfig) -> dict:
     return config["configurable"]
 
 
+# Words that open a sentence about a name rather than the name itself. "I"
+# forms are matched case-sensitively below, so "IT Solutions" is a company.
+_SENTENCE_OPENERS = {
+    "i",
+    "i'm",
+    "i've",
+    "i'd",
+    "i'll",
+    "we",
+    "we're",
+    "my",
+    "our",
+    "they",
+    "sorry",
+}
+# Case-sensitive: "I" the pronoun, not "i" in a lowercased brand.
+_FIRST_PERSON = {"I", "I'm", "I've", "I'd", "I'll"}
+# A sentence break mid-answer: a word of four or more letters, a full stop,
+# then more text. Four letters, so "St. Brigid's" and "U.S. Bank" are names.
+_MID_SENTENCE_BREAK = re.compile(r"[A-Za-z]{4,}[.!]\s+\S")
+# Longer than any plausible name or title: "The University of Texas MD
+# Anderson Cancer Center" is eight words.
+_MAX_NAME_WORDS = 10
+
+
+def _reads_as_a_sentence(answer: str) -> bool:
+    """Whether an answer to "what company?" or "what was your title?" is a
+    sentence about the name rather than the name (#164).
+
+    "What company did you work at?" invites a whole history in reply, and the
+    whole reply used to become the employer's name: "I've worked at three
+    places. I started at St. Brigid Regional Hospital..." went into the
+    database as one employer. Nothing marks where a name starts and ends in a
+    sentence, so this doesn't try to find one -- it notices the answer isn't
+    one, and the caller asks again.
+    """
+    text = answer.strip()
+    if not text or text.endswith("?"):
+        return True
+    words = text.split()
+    if len(words) > _MAX_NAME_WORDS:
+        return True
+    cleaned = [w.strip(',.;:!"()').replace("\u2019", "'") for w in words]
+    first = cleaned[0]
+    is_acronym = first.isupper() and len(first) > 1
+    if first.lower() in _SENTENCE_OPENERS and not is_acronym:
+        return True
+    # Anywhere in the answer, not only first: "Honestly I don't remember the
+    # agency's name" opens with neither. A standalone "I" or a "-n't" word
+    # is speech, not part of a name.
+    if any(w in _FIRST_PERSON or w.lower().endswith("n't") for w in cleaned):
+        return True
+    return bool(_MID_SENTENCE_BREAK.search(text))
+
+
+# Used when a second answer still reads as a sentence. Recognisably a
+# placeholder, like _DATE_FALLBACK: the person's own words go into the row's
+# notes so a reviewer can rename it on the Career page.
+_EMPLOYER_FALLBACK = "Employer (name not given)"
+_TITLE_FALLBACK = "Position (title not given)"
+
+
 async def ask_employer(state: InterviewState) -> dict:
-    answer = interrupt("What company did you work at?")
-    return {"employer_name": answer}
+    # Reached for the first job, and for a later one when its answer to "any
+    # other jobs?" read as a sentence (resolve_employer_again). Either way the
+    # retry flag is set on every return, as the date nodes do.
+    reprompt = state.get("_employer_needs_retry", False)
+    question = (
+        "Just the company name for now -- if there were several, start with "
+        "one and we'll get to the others."
+        if reprompt
+        else "What company did you work at?"
+    )
+    answer = interrupt(question)
+    if not _reads_as_a_sentence(answer):
+        return {
+            "employer_name": answer.strip(),
+            "employer_name_note": None,
+            "_employer_needs_retry": False,
+        }
+    if reprompt:
+        return {
+            "employer_name": _EMPLOYER_FALLBACK,
+            "employer_name_note": f'Name as stated: "{answer.strip()}"',
+            "_employer_needs_retry": False,
+        }
+    return {"_employer_needs_retry": True}
+
+
+def route_employer(state: InterviewState) -> str:
+    if state.get("_employer_needs_retry"):
+        return "ask_employer"
+    return "resolve_employer"
 
 
 async def resolve_employer(state: InterviewState, config: RunnableConfig) -> dict:
     conf = _configurable(config)
+    name_note = state.get("employer_name_note")
+    if name_note:
+        # Always a new row: matching by name would file every unnamed
+        # employer under the first one.
+        employer = await tools.create_employer(
+            conf["api_client"], conf["token"], state["employer_name"], notes=name_note
+        )
+        return {
+            "employer_id": employer["id"],
+            "reply": f'I\'ll add it as "{employer["name"]}" for now -- you can '
+            "rename it on your Career page.",
+        }
     employer, created = await tools.resolve_or_create_employer(
         conf["api_client"], conf["token"], state["employer_name"]
     )
@@ -94,9 +196,35 @@ async def resolve_employer(state: InterviewState, config: RunnableConfig) -> dic
 
 
 async def ask_position_title(state: InterviewState) -> dict:
-    prior_note = state.get("reply", "")
-    answer = interrupt(f"{prior_note} What was your title there?")
-    return {"position_title": answer}
+    reprompt = state.get("_position_title_needs_retry", False)
+    if reprompt:
+        employer = state.get("employer_name", "").strip()
+        where = (
+            f"at {employer}" if employer and employer != _EMPLOYER_FALLBACK else "there"
+        )
+        question = f"Just the job title you held {where}, as they wrote it."
+    else:
+        question = f"{state.get('reply', '')} What was your title there?"
+    answer = interrupt(question)
+    if not _reads_as_a_sentence(answer):
+        return {
+            "position_title": answer.strip(),
+            "position_title_note": None,
+            "_position_title_needs_retry": False,
+        }
+    if reprompt:
+        return {
+            "position_title": _TITLE_FALLBACK,
+            "position_title_note": f'Title as stated: "{answer.strip()}"',
+            "_position_title_needs_retry": False,
+        }
+    return {"_position_title_needs_retry": True}
+
+
+def route_position_title(state: InterviewState) -> str:
+    if state.get("_position_title_needs_retry"):
+        return "ask_position_title"
+    return "ask_position_start"
 
 
 # A year is 19xx or 20xx: bounding it keeps "1200 beds" or "4000 patients" in
@@ -326,15 +454,17 @@ def route_position_end(state: InterviewState) -> str:
 
 async def resolve_position(state: InterviewState, config: RunnableConfig) -> dict:
     conf = _configurable(config)
+    title_note = state.get("position_title_note")
     notes = [
         n
         for n in (
+            title_note,
             state.get("position_started_on_note"),
             state.get("position_ended_on_note"),
         )
         if n
     ]
-    position, created = await tools.resolve_or_create_position(
+    args = (
         conf["api_client"],
         conf["token"],
         state["employer_id"],
@@ -343,6 +473,12 @@ async def resolve_position(state: InterviewState, config: RunnableConfig) -> dic
         state.get("position_ended_on"),
         "\n".join(notes) or None,
     )
+    if title_note:
+        # A placeholder title is always a new row, for the same reason as a
+        # placeholder employer in resolve_employer.
+        position, created = await tools.create_position(*args), True
+    else:
+        position, created = await tools.resolve_or_create_position(*args)
     note = (
         f"Got it -- adding {state['position_title']}."
         if created
@@ -538,7 +674,17 @@ def route_more_employers(state: InterviewState) -> str:
 
 
 async def resolve_employer_again(state: InterviewState) -> dict:
-    return {"employer_name": state["reply"]}
+    """The answer to "any other jobs?" is the next company's name -- unless it
+    reads as a sentence, in which case ask_employer asks for just the name,
+    and its own second-miss fallback applies from there."""
+    reply = state["reply"]
+    if _reads_as_a_sentence(reply):
+        return {"_employer_needs_retry": True}
+    return {
+        "employer_name": reply.strip(),
+        "employer_name_note": None,
+        "_employer_needs_retry": False,
+    }
 
 
 async def finish(state: InterviewState) -> dict:
@@ -571,9 +717,15 @@ def build_graph(checkpointer: Checkpointer):
     builder.add_node("finish", finish)
 
     builder.add_edge(START, "ask_employer")
-    builder.add_edge("ask_employer", "resolve_employer")
+    builder.add_conditional_edges(
+        "ask_employer", route_employer, ["ask_employer", "resolve_employer"]
+    )
     builder.add_edge("resolve_employer", "ask_position_title")
-    builder.add_edge("ask_position_title", "ask_position_start")
+    builder.add_conditional_edges(
+        "ask_position_title",
+        route_position_title,
+        ["ask_position_title", "ask_position_start"],
+    )
     builder.add_conditional_edges(
         "ask_position_start",
         route_position_start,
@@ -616,7 +768,9 @@ def build_graph(checkpointer: Checkpointer):
         route_more_employers,
         ["resolve_employer_again", "finish"],
     )
-    builder.add_edge("resolve_employer_again", "resolve_employer")
+    builder.add_conditional_edges(
+        "resolve_employer_again", route_employer, ["ask_employer", "resolve_employer"]
+    )
     builder.add_edge("finish", END)
 
     return builder.compile(checkpointer=checkpointer)

@@ -73,6 +73,16 @@ proficiency/years asked only for tags that read as durable skills. See the
 module docstring for why each loop is its own node with one `interrupt()`
 call, rather than a Python loop with several.
 
+**Names.** "What company did you work at?" invites a whole history in reply,
+and a name can't be read out of a sentence the way a date can. So an answer to
+the company or title question that reads as a sentence gets asked again, once,
+for just the name. That covers an answer that's long, asks a question back,
+opens like a sentence, contains a first-person "I" or a "-n't" word, or has a
+sentence break in the middle. A second sentence stores `Employer (name not
+given)` or `Position (title not given)`, with the person's words in the notes.
+These placeholders are always created as new rows, never matched by name, so
+two unnamed employers stay two.
+
 **Dates.** A position is asked for its start and then its end, each with one
 reprompt. Both read the first date anywhere in the answer (`YYYY-MM-DD`,
 `YYYY-MM`, `YYYY`, or a month name and year), so "from 2015, then Globex 2019
