@@ -12,6 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppFeedback struct {
+	ID         uuid.UUID `json:"id"`
+	UserID     uuid.UUID `json:"user_id"`
+	Category   string    `json:"category"`
+	Message    string    `json:"message"`
+	Route      string    `json:"route"`
+	AppVersion string    `json:"app_version"`
+	UserAgent  *string   `json:"user_agent"`
+	Viewport   *string   `json:"viewport"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type Application struct {
 	ID          uuid.UUID        `json:"id"`
 	UserID      uuid.UUID        `json:"user_id"`
