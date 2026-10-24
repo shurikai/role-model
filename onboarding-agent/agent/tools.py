@@ -59,13 +59,15 @@ async def list_employers(client: httpx.AsyncClient, token: str) -> list[dict]:
     return await _list_request(client, token, "/employers")
 
 
-async def create_employer(client: httpx.AsyncClient, token: str, name: str) -> dict:
+async def create_employer(
+    client: httpx.AsyncClient, token: str, name: str, notes: str | None = None
+) -> dict:
     return await _request(
         client,
         token,
         "POST",
         "/employers",
-        {"name": name, "industry": None, "notes": None},
+        {"name": name, "industry": None, "notes": notes},
     )
 
 

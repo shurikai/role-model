@@ -12,6 +12,7 @@ from agent.graph import (
     _is_bare_date,
     _parse_date,
     _parse_depth_answer,
+    _reads_as_a_sentence,
     _sounds_done,
 )
 
@@ -172,3 +173,50 @@ def test_is_bare_date(answer, expected):
 )
 def test_ends_before(ended_on, answer, started_on, expected):
     assert _ends_before(ended_on, answer, started_on) == expected
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Acme Corp",
+        "acme corp",
+        "St. Brigid Regional Hospital",
+        "U.S. Bank",
+        "IT Solutions Ltd",
+        "The University of Texas MD Anderson Cancer Center",
+        "Senior Engineer",
+        "RN III",
+        "Nurse Manager, Cardiac ICU",
+        "Acme Corp.",
+    ],
+)
+def test_a_name_reads_as_a_name(answer):
+    assert _reads_as_a_sentence(answer) is False
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        # The answer the live eval on #162 stored as one employer's name.
+        (
+            "I've worked at three places. I started at St. Brigid Regional "
+            "Hospital in Providence right after nursing school, then moved to "
+            "Coastal Vascular Associates."
+        ),
+        # Its answer to the title question in the same run.
+        (
+            "I'm not sure which one you're asking about \u2014 do you mean at St. "
+            "Brigid's, Coastal Vascular, or County Health Network?"
+        ),
+        "I worked at Acme",
+        "I\u2019ve been at Acme since 2018",
+        "We were a small startup called Nimbus",
+        "Acme. I was there for five years.",
+        "Which one?",
+        "Honestly I don't remember the agency's name.",
+        "Can't recall, it was a temp agency",
+        "",
+    ],
+)
+def test_a_sentence_reads_as_a_sentence(answer):
+    assert _reads_as_a_sentence(answer) is True

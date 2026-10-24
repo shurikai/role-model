@@ -30,8 +30,18 @@ class InterviewState(TypedDict):
 
     # The employer/position currently being discussed.
     employer_name: NotRequired[str]
+    # Set only when the name answer read as a sentence twice and
+    # employer_name fell back to a placeholder: the person's words, carried
+    # into the employer's notes. The retry flag routes ask_employer back to
+    # itself once and is reset on every path, like the date flags below. See
+    # _reads_as_a_sentence in graph.py.
+    employer_name_note: NotRequired[str | None]
+    _employer_needs_retry: NotRequired[bool]
     employer_id: NotRequired[str]
     position_title: NotRequired[str]
+    # The same pair for the title, whose note goes into context_narrative.
+    position_title_note: NotRequired[str | None]
+    _position_title_needs_retry: NotRequired[bool]
     position_started_on: NotRequired[str]
     # A line for the position's context_narrative, set when the date was
     # read out of a longer answer or couldn't be read at all and fell back
