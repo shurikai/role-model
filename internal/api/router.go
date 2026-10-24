@@ -149,6 +149,12 @@ func NewRouter(deps RouterDeps) *chi.Mux {
 			r.Post("/import/entities/{draftID}/reject", intakeHandler.RejectEntityDraft)
 			r.Put("/import/entities/{draftID}", intakeHandler.UpdateEntityDraftPayload)
 
+			// Product feedback from testers (#167). Its own limit: a report
+			// is a person typing, so ten a minute is generous, and it keeps a
+			// stuck retry loop from filling the table.
+			feedbackHandler := handlers.NewFeedbackHandler(deps.Queries)
+			r.With(middleware.NewRateLimit(10, time.Minute).Handler).Post("/feedback", feedbackHandler.Create)
+
 			educationHandler := handlers.NewEducationHandler(deps.Queries)
 			r.Get("/education", educationHandler.List)
 			r.Post("/education", educationHandler.Create)

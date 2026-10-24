@@ -22,6 +22,7 @@ type Querier interface {
 	CountPositionsByEmployer(ctx context.Context, arg CountPositionsByEmployerParams) (int64, error)
 	CountTagUsage(ctx context.Context, tagID uuid.UUID) (int32, error)
 	CountTagsInCategory(ctx context.Context, arg CountTagsInCategoryParams) (int64, error)
+	CreateAppFeedback(ctx context.Context, arg CreateAppFeedbackParams) (AppFeedback, error)
 	CreateApplication(ctx context.Context, arg CreateApplicationParams) (Application, error)
 	CreateCareerLevel(ctx context.Context, arg CreateCareerLevelParams) (CareerLevel, error)
 	CreateContribution(ctx context.Context, arg CreateContributionParams) (Contribution, error)
@@ -113,6 +114,9 @@ type Querier interface {
 	ListActiveSkillProfileByUser(ctx context.Context, userID uuid.UUID) ([]ListActiveSkillProfileByUserRow, error)
 	ListActiveSkillTagNamesByUser(ctx context.Context, userID uuid.UUID) ([]string, error)
 	ListActiveSkillsByUser(ctx context.Context, userID uuid.UUID) ([]Skill, error)
+	// For cmd/feedback, which triages across every account, so it is deliberately
+	// not user-scoped. An empty status lists everything.
+	ListAppFeedbackByStatus(ctx context.Context, status string) ([]ListAppFeedbackByStatusRow, error)
 	ListApplications(ctx context.Context, userID uuid.UUID) ([]Application, error)
 	// The user's seniority ladder, weakest first.
 	//
@@ -173,6 +177,7 @@ type Querier interface {
 	ListSkillsWithTagsByUser(ctx context.Context, userID uuid.UUID) ([]ListSkillsWithTagsByUserRow, error)
 	ListTagCategories(ctx context.Context, userID uuid.UUID) ([]TagCategory, error)
 	ListTags(ctx context.Context, userID uuid.UUID) ([]Tag, error)
+	MarkAppFeedbackTriaged(ctx context.Context, id uuid.UUID) (int64, error)
 	// Rejecting is legal only from pending.
 	//
 	// The guard is in the WHERE clause rather than in a Go check before the call,

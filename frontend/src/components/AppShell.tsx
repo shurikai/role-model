@@ -1,6 +1,7 @@
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { feedbackHref } from "../lib/feedback";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 /**
  * The frame every authenticated page renders inside.
@@ -17,8 +18,16 @@ import { feedbackHref } from "../lib/feedback";
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const { pathname } = useLocation();
-  const feedback = feedbackHref(import.meta.env.VITE_FEEDBACK_URL, pathname);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [thanked, setThanked] = useState(false);
+  const closeFeedback = useCallback(() => setFeedbackOpen(false), []);
+
+  // The confirmation is a moment, not a state to dismiss.
+  useEffect(() => {
+    if (!thanked) return;
+    const t = setTimeout(() => setThanked(false), 4000);
+    return () => clearTimeout(t);
+  }, [thanked]);
 
   return (
     <div className="flex min-h-screen flex-col bg-paper">
@@ -60,16 +69,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
 
           <div className="ml-auto flex items-center gap-3">
-            {feedback && (
-              <a
-                href={feedback}
-                target="_blank"
-                rel="noreferrer"
-                className="font-body text-xs text-verify underline"
-              >
-                Feedback
-              </a>
+            {thanked && (
+              <span role="status" className="font-body text-xs text-stamp">
+                Thanks, got it
+              </span>
             )}
+            <button
+              type="button"
+              onClick={() => setFeedbackOpen(true)}
+              className="font-body text-xs text-verify underline"
+            >
+              Feedback
+            </button>
             {user && (
               <span className="font-mono text-[10px] tracking-widest text-rail uppercase">
                 {user.email}
@@ -87,6 +98,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <main className="flex-1">{children}</main>
+
+      <FeedbackDialog
+        open={feedbackOpen}
+        onClose={closeFeedback}
+        onSent={() => {
+          setFeedbackOpen(false);
+          setThanked(true);
+        }}
+      />
     </div>
   );
 }

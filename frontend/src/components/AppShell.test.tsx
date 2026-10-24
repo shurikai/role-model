@@ -63,33 +63,41 @@ describe("AppShell", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
     localStorage.clear();
     cleanup();
   });
 
-  // A deployment with no feedback channel configured shows no link, rather
-  // than one that goes nowhere.
-  it("shows no feedback link when none is configured", async () => {
-    vi.stubEnv("VITE_FEEDBACK_URL", "");
+  // Always there for a signed-in user: there is no deployment setting to
+  // turn it on any more, so a tester can always report from where they are.
+  it("always offers Feedback, and opens the dialog from it", async () => {
+    const user = userEvent.setup();
     renderAt("/applications");
     await screen.findByText("Applications page");
 
+    await user.click(screen.getByRole("button", { name: "Feedback" }));
     expect(
-      screen.queryByRole("link", { name: "Feedback" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("dialog", { name: "Send feedback" }),
+    ).toBeInTheDocument();
   });
 
-  it("links feedback to a prefilled email naming the current page", async () => {
-    vi.stubEnv("VITE_FEEDBACK_URL", "mailto:me@example.com");
+  it("thanks the tester in the shell once a report is sent", async () => {
+    const user = userEvent.setup();
     renderAt("/applications");
     await screen.findByText("Applications page");
 
-    const href = screen
-      .getByRole("link", { name: "Feedback" })
-      .getAttribute("href")!;
-    expect(href).toMatch(/^mailto:me@example\.com\?/);
-    expect(decodeURIComponent(href)).toContain("Page: /applications");
+    await user.click(screen.getByRole("button", { name: "Feedback" }));
+    await user.click(screen.getByLabelText("Something broke"));
+    await user.type(screen.getByLabelText("What happened"), "It froze.");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Thanks, got it",
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/feedback$/),
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   // logout() had been defined on AuthContext since the auth shell landed and
