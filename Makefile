@@ -87,7 +87,7 @@ endef
 # Fictional sample dataset, tracked in this repo (see database/sample/README.md).
 SAMPLE_DIR ?= database/sample
 
-.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer run-onboarding dev check-prompts reset-password add-user clear-history fmt fmt-check test-renderer test-onboarding
+.PHONY: all setup build clean test test-all test-race check-migrations db-up db-down db-reset db-dump migrate-up migrate-down migrate-down-all migrate-create seed seed-sample seed-clinical sqlc run run-frontend run-renderer run-onboarding dev check-prompts reset-password add-user feedback-list feedback-triage clear-history fmt fmt-check test-renderer test-onboarding
 
 # Build
 all: build
@@ -311,6 +311,18 @@ ifndef EMAIL
 	$(error EMAIL is required, e.g. make add-user EMAIL=you@example.com)
 endif
 	@go run ./cmd/adduser -email "$(EMAIL)"
+
+# Product feedback testers sent from the app (#167). STATUS is new (default),
+# triaged or all. On a deployed instance, run the binary in the container:
+# `docker compose exec server /usr/local/bin/feedback list`.
+feedback-list:
+	@go run ./cmd/feedback list -status "$(or $(STATUS),new)"
+
+feedback-triage:
+ifndef ID
+	$(error ID is required, e.g. make feedback-triage ID=<feedback id>)
+endif
+	@go run ./cmd/feedback triage "$(ID)"
 
 # Deletes an account's career and application history -- employers, positions,
 # contributions, tags, skills, education, credentials, preferences, projects,

@@ -10,6 +10,19 @@ starts at the point the project became something another person could run.
 
 ## [Unreleased]
 
+### Added
+
+- **In-app feedback for testers** (#167). A **Feedback** button in the shell
+  opens a short dialog: one of three categories ("Something broke", "Something
+  was confusing", "An idea") and a message. The report carries the page, the
+  viewport and the frontend build without the tester typing them, and is
+  stored in a new `app_feedback` table (migration 026) through
+  `POST /api/v1/feedback`, rate-limited to ten a minute. `cmd/feedback` lists
+  and triages reports from the terminal (`make feedback-list`,
+  `make feedback-triage ID=...`, or `/usr/local/bin/feedback` in the server
+  image). The build is tagged by `APP_VERSION` at deploy. This replaces the
+  `FEEDBACK_URL` link, which never shipped to a deployment.
+
 ## [0.1.0] — 2026-08-27
 
 First release intended for someone other than its author. Development began

@@ -153,11 +153,6 @@ DOMAIN=resume.example.com
 ACME_EMAIL=you@example.com
 ENVIRONMENT=production
 SIGNUP_ENABLED=false
-
-# Optional: the shell's "Feedback" link. A form URL, or a mailto: address
-# (prefilled with the page the tester was on). Unset hides the link. Baked in
-# at build time, so it takes effect on the next `up --build`.
-FEEDBACK_URL=mailto:you@example.com
 ```
 
 Then:
@@ -320,6 +315,29 @@ docker compose -f docker-compose.yml -f compose.prod.yml run --rm migrate \
 ```
 
 Take a backup (step 8) before any update that ships a migration.
+
+### Tester feedback
+
+Testers send feedback from the **Feedback** button in the app. Each report
+records the page they were on and the build they were running, so tag the
+build when you deploy:
+
+```bash
+APP_VERSION=$(git rev-parse --short HEAD) \
+  docker compose -f docker-compose.yml -f compose.prod.yml up -d --build
+```
+
+Without `APP_VERSION`, reports say `dev`. Read and triage them in the
+container:
+
+```bash
+docker compose exec server /usr/local/bin/feedback list                  # new reports
+docker compose exec server /usr/local/bin/feedback list -status all
+docker compose exec server /usr/local/bin/feedback triage <id>
+```
+
+The endpoint allows ten reports a minute, and behind Caddy and nginx every
+caller shares that limit (see the rate-limiting note in step 10).
 
 ---
 

@@ -708,3 +708,22 @@ export interface OnboardingTurnResponse {
   reply: string;
   done: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Product feedback (#167)
+// ---------------------------------------------------------------------------
+
+export type FeedbackCategory = "bug" | "confusing" | "idea";
+
+/**
+ * POST /feedback. route, app_version and viewport are filled in by the
+ * dialog, never typed; the server reads the user agent from the request and
+ * the account from the token.
+ */
+export interface CreateFeedbackRequest {
+  category: FeedbackCategory;
+  message: string;
+  route: string;
+  app_version: string;
+  viewport: string;
+}

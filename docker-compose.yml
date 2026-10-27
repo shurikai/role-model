@@ -130,9 +130,9 @@ services:
         # build time, so an absolute URL would bake in one hostname and break
         # for every other way of reaching the instance.
         VITE_API_BASE_URL: /api/v1
-        # The shell's "Feedback" link: a form URL or a mailto: address. Unset
-        # hides the link. Read from .env at build time.
-        VITE_FEEDBACK_URL: ${FEEDBACK_URL:-}
+        # The build every feedback report is tagged with. Set it at deploy:
+        # APP_VERSION=$(git rev-parse --short HEAD) docker compose ... up --build
+        VITE_APP_VERSION: ${APP_VERSION:-dev}
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
